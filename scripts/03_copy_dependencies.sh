@@ -8,7 +8,7 @@
 
 set -e
 
-GAME_APP="${GAME_APP:-/Users/$USER/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 
 echo "=== Copying Qt External Dependencies ==="

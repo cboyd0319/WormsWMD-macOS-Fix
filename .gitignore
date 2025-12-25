@@ -1,17 +1,30 @@
-# macOS
+# macOS system files
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
+.Spotlight-V100
+.Trashes
 
 # Build artifacts
 *.dylib
 *.o
 *.a
+*.so
+*.dSYM/
 
 # Temporary files
-/tmp/
 *.log
+*.tmp
+*.temp
+
+# Editor and IDE files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
 
 # Backup directories (created by fix script)
 WormsWMD-Backup-*/

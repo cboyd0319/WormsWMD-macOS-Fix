@@ -5,16 +5,37 @@
 # Updates all library references to use @executable_path instead
 # of absolute paths like /usr/local/opt/...
 #
+# This script dynamically detects installed library versions to handle
+# different Homebrew package versions across systems.
+#
 
 set -e
 
-GAME_APP="${GAME_APP:-/Users/$USER/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
 BUILD_DIR="/tmp/agl_stub_build"
 
 echo "=== Fixing Library Path References ==="
+
+# Dynamically detect installed versions
+QT_VERSION=$(ls /usr/local/Cellar/qt@5/ 2>/dev/null | head -1 || echo "")
+GLIB_VERSION=$(ls /usr/local/Cellar/glib/ 2>/dev/null | head -1 || echo "")
+
+# Build list of prefixes dynamically
+PREFIXES="/usr/local/opt/qt@5/lib"
+if [ -n "$QT_VERSION" ]; then
+    PREFIXES="$PREFIXES /usr/local/Cellar/qt@5/$QT_VERSION/lib"
+fi
+PREFIXES="$PREFIXES /usr/local/opt/pcre2/lib /usr/local/opt/zstd/lib /usr/local/opt/glib/lib"
+if [ -n "$GLIB_VERSION" ]; then
+    PREFIXES="$PREFIXES /usr/local/Cellar/glib/$GLIB_VERSION/lib"
+fi
+PREFIXES="$PREFIXES /usr/local/opt/gettext/lib /usr/local/opt/libpng/lib /usr/local/opt/md4c/lib /usr/local/opt/freetype/lib /usr/local/opt/jpeg-turbo/lib /usr/local/opt/libtiff/lib /usr/local/opt/xz/lib /usr/local/opt/webp/lib"
+
+echo "Detected Qt version: ${QT_VERSION:-unknown}"
+echo "Detected GLib version: ${GLIB_VERSION:-unknown}"
 
 # Install AGL stub
 echo ""
@@ -47,9 +68,6 @@ FRAMEWORKS="QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus"
 
 # Dylib dependencies
 DYLIBS="libpcre2-16.0.dylib libpcre2-8.0.dylib libzstd.1.dylib libgthread-2.0.0.dylib libglib-2.0.0.dylib libintl.8.dylib libpng16.16.dylib libmd4c.0.dylib libfreetype.6.dylib libjpeg.8.dylib libtiff.6.dylib liblzma.5.dylib libwebp.7.dylib libwebpdemux.2.dylib libwebpmux.3.dylib libsharpyuv.0.dylib"
-
-# Homebrew prefixes to fix
-PREFIXES="/usr/local/opt/qt@5/lib /usr/local/Cellar/qt@5/5.15.18/lib /usr/local/opt/pcre2/lib /usr/local/opt/zstd/lib /usr/local/opt/glib/lib /usr/local/Cellar/glib/2.86.3/lib /usr/local/opt/gettext/lib /usr/local/opt/libpng/lib /usr/local/opt/md4c/lib /usr/local/opt/freetype/lib /usr/local/opt/jpeg-turbo/lib /usr/local/opt/libtiff/lib /usr/local/opt/xz/lib /usr/local/opt/webp/lib"
 
 echo ""
 echo "--- Fixing Qt framework references ---"
@@ -99,13 +117,18 @@ install_name_tool -change \
     "@executable_path/../Frameworks/libpcre2-8.0.dylib" \
     "$GAME_FRAMEWORKS/libglib-2.0.0.dylib" 2>/dev/null || true
 
-# Fix libgthread
-for prefix in "/usr/local/Cellar/glib/2.86.3/lib" "/usr/local/opt/glib/lib"; do
+# Fix libgthread - handle any glib version
+install_name_tool -change \
+    "/usr/local/opt/glib/lib/libglib-2.0.0.dylib" \
+    "@executable_path/../Frameworks/libglib-2.0.0.dylib" \
+    "$GAME_FRAMEWORKS/libgthread-2.0.0.dylib" 2>/dev/null || true
+
+if [ -n "$GLIB_VERSION" ]; then
     install_name_tool -change \
-        "$prefix/libglib-2.0.0.dylib" \
+        "/usr/local/Cellar/glib/$GLIB_VERSION/lib/libglib-2.0.0.dylib" \
         "@executable_path/../Frameworks/libglib-2.0.0.dylib" \
         "$GAME_FRAMEWORKS/libgthread-2.0.0.dylib" 2>/dev/null || true
-done
+fi
 
 # Fix libtiff
 install_name_tool -change \

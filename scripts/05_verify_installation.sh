@@ -6,7 +6,7 @@
 # the game should be able to load all dependencies.
 #
 
-GAME_APP="${GAME_APP:-/Users/$USER/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"

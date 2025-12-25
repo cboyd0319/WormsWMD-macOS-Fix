@@ -8,7 +8,7 @@
 
 set -e
 
-GAME_APP="${GAME_APP:-/Users/$USER/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 NEW_QT="${NEW_QT:-/usr/local/opt/qt@5/lib}"
 NEW_QT_PLUGINS="${NEW_QT_PLUGINS:-/usr/local/opt/qt@5/plugins}"
