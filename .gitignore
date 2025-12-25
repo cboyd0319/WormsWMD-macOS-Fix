@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Build artifacts
+*.dylib
+*.o
+*.a
+
+# Temporary files
+/tmp/
+*.log
+
+# Backup directories (created by fix script)
+WormsWMD-Backup-*/
