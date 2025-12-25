@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build AGL stub
+        run: |
+          mkdir -p build
+
+          # Build x86_64 version
+          clang -arch x86_64 \
+            -dynamiclib \
+            -o build/AGL_x86_64.dylib \
+            -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \
+            -framework OpenGL \
+            -compatibility_version 1.0.0 \
+            -current_version 1.0.0 \
+            src/agl_stub.c
+
+          echo "Built AGL stub:"
+          file build/AGL_x86_64.dylib
+          ls -la build/
+
+      - name: Create release archive
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCHIVE_NAME="WormsWMD-macOS-Fix-${VERSION}"
+
+          # Create archive directory
+          mkdir -p "dist/${ARCHIVE_NAME}"
+
+          # Copy files
+          cp -R fix_worms_wmd.sh install.sh scripts src README.md LICENSE CHANGELOG.md "dist/${ARCHIVE_NAME}/"
+          cp build/AGL_x86_64.dylib "dist/${ARCHIVE_NAME}/"
+
+          # Make scripts executable
+          chmod +x "dist/${ARCHIVE_NAME}/fix_worms_wmd.sh"
+          chmod +x "dist/${ARCHIVE_NAME}/install.sh"
+          chmod +x "dist/${ARCHIVE_NAME}/scripts/"*.sh
+
+          # Create tarball
+          cd dist
+          tar -czvf "${ARCHIVE_NAME}.tar.gz" "${ARCHIVE_NAME}"
+
+          # Create zip
+          zip -r "${ARCHIVE_NAME}.zip" "${ARCHIVE_NAME}"
+
+          # Generate checksums
+          shasum -a 256 "${ARCHIVE_NAME}.tar.gz" "${ARCHIVE_NAME}.zip" > checksums.txt
+
+          echo "Created release artifacts:"
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            build/AGL_x86_64.dylib

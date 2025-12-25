@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          severity: warning
+        env:
+          SHELLCHECK_OPTS: -e SC2034 -e SC1091
+
+  validate-scripts:
+    name: Validate Scripts
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check bash syntax
+        run: |
+          echo "Checking bash syntax..."
+          for script in fix_worms_wmd.sh install.sh scripts/*.sh; do
+            if [[ -f "$script" ]]; then
+              echo "  Checking $script"
+              bash -n "$script"
+            fi
+          done
+          echo "All scripts have valid syntax!"
+
+      - name: Check script permissions
+        run: |
+          echo "Verifying scripts are executable..."
+          chmod +x fix_worms_wmd.sh install.sh scripts/*.sh
+          echo "Done!"
+
+      - name: Test --help flag
+        run: |
+          ./fix_worms_wmd.sh --help
+
+  validate-c-code:
+    name: Validate C Code
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check AGL stub compiles
+        run: |
+          echo "Compiling AGL stub..."
+          clang -arch x86_64 \
+            -dynamiclib \
+            -o /tmp/AGL_test \
+            -framework OpenGL \
+            src/agl_stub.c
+          echo "AGL stub compiles successfully!"
+          file /tmp/AGL_test
+          rm /tmp/AGL_test

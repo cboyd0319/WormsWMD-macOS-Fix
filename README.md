@@ -1,5 +1,10 @@
 # Worms W.M.D - macOS Tahoe (26.x) Fix
 
+[![CI](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml/badge.svg)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![macOS](https://img.shields.io/badge/macOS-26.0%2B-blue.svg)](https://www.apple.com/macos/)
+[![GitHub release](https://img.shields.io/github/v/release/cboyd0319/WormsWMD-macOS-Fix?include_prereleases)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases)
+
 A comprehensive fix for Worms W.M.D black screen issues on macOS 26 (Tahoe) and later.
 
 ## Table of Contents
@@ -72,10 +77,27 @@ This automatically installs all required dependencies (glib, pcre2, libpng, free
 
 ## Quick Start
 
+### One-Liner Install (Easiest)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
+```
+
+This will automatically download and run the fix. Add `--dry-run` to preview changes first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash -s -- --dry-run
+```
+
+### Manual Install
+
 ```bash
 # Clone the repository
 git clone https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
+
+# Preview changes (optional)
+./fix_worms_wmd.sh --dry-run
 
 # Run the fix
 ./fix_worms_wmd.sh
