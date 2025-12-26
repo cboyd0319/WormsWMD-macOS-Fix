@@ -10,7 +10,7 @@
 #   QT_SOURCE   - "prebuild" or "homebrew"
 #
 
-set -e
+set -euo pipefail
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
@@ -36,6 +36,8 @@ fi
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/common.sh"
 worms_log_init "02_replace_qt_frameworks"
 worms_debug_init
 
@@ -69,28 +71,6 @@ if [ ! -d "$NEW_QT/QtCore.framework" ]; then
     fi
     exit 1
 fi
-
-framework_binary() {
-    local fw_dir="$1"
-    local fw_name="$2"
-
-    if [ -f "$fw_dir/Versions/5/$fw_name" ]; then
-        echo "$fw_dir/Versions/5/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/Versions/Current/$fw_name" ]; then
-        echo "$fw_dir/Versions/Current/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/Versions/A/$fw_name" ]; then
-        echo "$fw_dir/Versions/A/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/$fw_name" ]; then
-        echo "$fw_dir/$fw_name"
-        return
-    fi
-}
 
 FRAMEWORKS=()
 
@@ -141,7 +121,7 @@ for fw in "${FRAMEWORKS[@]}"; do
 
     # Update install name to use @executable_path
     fw_path="$GAME_FRAMEWORKS/$fw.framework"
-    fw_bin=$(framework_binary "$fw_path" "$fw")
+    fw_bin=$(worms_framework_binary "$fw_path" "$fw" || true)
     if [ -n "$fw_bin" ]; then
         rel_path="${fw_bin#"$fw_path"/}"
         install_name_tool -id "@executable_path/../Frameworks/$fw.framework/$rel_path" \

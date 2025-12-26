@@ -7,7 +7,7 @@
 # Frameworks folder to keep the app self-contained.
 #
 
-set -e
+set -euo pipefail
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
@@ -18,6 +18,8 @@ LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/common.sh"
 worms_log_init "03_copy_dependencies"
 worms_debug_init
 
@@ -38,34 +40,11 @@ mkdir -p "$GAME_FRAMEWORKS" "$GAME_PLUGINS/platforms" "$GAME_PLUGINS/imageformat
 
 echo "=== Copying Qt External Dependencies ==="
 
-framework_binary() {
-    local fw_dir="$1"
-    local fw_name
-    fw_name=$(basename "$fw_dir" .framework)
-
-    if [ -f "$fw_dir/Versions/5/$fw_name" ]; then
-        echo "$fw_dir/Versions/5/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/Versions/A/$fw_name" ]; then
-        echo "$fw_dir/Versions/A/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/Versions/Current/$fw_name" ]; then
-        echo "$fw_dir/Versions/Current/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/$fw_name" ]; then
-        echo "$fw_dir/$fw_name"
-        return
-    fi
-}
-
 scan_bins=()
 
 for fw_dir in "$GAME_FRAMEWORKS"/*.framework; do
     if [ -d "$fw_dir" ]; then
-        fw_bin=$(framework_binary "$fw_dir")
+        fw_bin=$(worms_framework_binary "$fw_dir" || true)
         if [ -n "$fw_bin" ]; then
             scan_bins+=("$fw_bin")
         fi

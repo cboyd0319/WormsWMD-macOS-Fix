@@ -10,16 +10,13 @@
 #   ./controller_helper.sh --test   # Test controller input
 #
 
-set -e
+set -euo pipefail
 
-
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/ui.sh"
+worms_color_init
 
 print_help() {
     cat << 'EOF'

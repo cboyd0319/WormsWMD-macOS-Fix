@@ -15,6 +15,7 @@ To see what the fix does without applying it, run:
 Run these scripts in order:
 
 ```bash
+git clone https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
 
 # Step 1: Build the AGL stub library

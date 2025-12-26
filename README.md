@@ -21,25 +21,18 @@ Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibilit
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
 ```
 
-### Option 3: Manual clone
+Requires `git` (Xcode Command Line Tools installs it if missing).
 
-```bash
-git clone https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
-cd WormsWMD-macOS-Fix
-./fix_worms_wmd.sh
-```
+### Option 3: Manual / advanced
 
-Preview changes without applying:
-
-```bash
-./fix_worms_wmd.sh --dry-run
-```
+See `docs/INSTALL.md` for manual install, dry-run, and restore steps.
 
 ## Requirements
 
 - macOS 26 (Tahoe) or later
 - Worms W.M.D installed via Steam or GOG
 - Internet connection
+- git (installed by Xcode Command Line Tools)
 
 The script installs these if needed (you may see system prompts):
 - Rosetta 2 (Apple Silicon)

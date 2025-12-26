@@ -11,23 +11,26 @@
 #   ./check_updates.sh --download   # Download latest if available
 #
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 GITHUB_REPO="cboyd0319/WormsWMD-macOS-Fix"
 RAW_FIX_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/fix_worms_wmd.sh"
 ZIP_URL="https://github.com/${GITHUB_REPO}/archive/refs/heads/main.zip"
+CURL_BASE=(--proto '=https' --tlsv1.2 --retry 3 --retry-delay 1 --retry-connrefused)
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/ui.sh"
+worms_color_init
 
 QUIET=false
 DOWNLOAD=false
+
+if ! command -v curl >/dev/null 2>&1; then
+    echo -e "${RED}curl is required but not installed.${NC}"
+    exit 2
+fi
 
 print_help() {
     cat << 'EOF'
@@ -65,7 +68,7 @@ EOF
 # Get current version from fix script
 get_current_version() {
     if [[ -f "$REPO_DIR/fix_worms_wmd.sh" ]]; then
-        grep -m1 'VERSION=' "$REPO_DIR/fix_worms_wmd.sh" | cut -d'"' -f2
+        grep -m1 'VERSION=' "$REPO_DIR/fix_worms_wmd.sh" | cut -d'"' -f2 || true
     else
         echo "unknown"
     fi
@@ -74,11 +77,11 @@ get_current_version() {
 # Get latest version from GitHub
 get_latest_version() {
     local response
-    response=$(curl -sf --max-time 15 "$RAW_FIX_URL" 2>/dev/null) || return 1
+    response=$(curl "${CURL_BASE[@]}" -sf --max-time 15 "$RAW_FIX_URL" 2>/dev/null) || return 1
 
     # Extract VERSION="x.y.z"
     local version
-    version=$(echo "$response" | grep -m1 'VERSION=' | cut -d'"' -f2)
+    version=$(echo "$response" | grep -m1 'VERSION=' | cut -d'"' -f2 || true)
     if [[ -z "$version" ]]; then
         return 2
     fi
@@ -87,7 +90,7 @@ get_latest_version() {
 
 # Get download URL for latest version
 get_download_url() {
-    if curl -sfI --max-time 10 "$ZIP_URL" >/dev/null 2>&1; then
+    if curl "${CURL_BASE[@]}" -sfI --max-time 10 "$ZIP_URL" >/dev/null 2>&1; then
         echo "$ZIP_URL"
     else
         return 1
@@ -215,7 +218,7 @@ else
         fi
 
         download_file="$HOME/Downloads/WormsWMD-Fix-${latest}.zip"
-        if curl -L --max-time 120 -o "$download_file" "$download_url"; then
+        if curl "${CURL_BASE[@]}" -L --max-time 120 -o "$download_file" "$download_url"; then
             echo -e "${GREEN}Downloaded: $download_file${NC}"
             echo ""
             echo "To install:"

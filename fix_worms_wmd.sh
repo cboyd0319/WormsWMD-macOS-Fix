@@ -21,7 +21,7 @@
 #   - Pre-built Qt frameworks are downloaded automatically
 #
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
@@ -33,6 +33,8 @@ WORMSWMD_VERBOSE="${WORMSWMD_VERBOSE:-false}"
 
 # shellcheck source=./scripts/logging.sh
 source "$SCRIPTS_DIR/logging.sh"
+# shellcheck source=./scripts/common.sh
+source "$SCRIPTS_DIR/common.sh"
 
 # Default game location (uses $HOME instead of ~ for reliability)
 DEFAULT_GAME_PATH="$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
@@ -107,21 +109,6 @@ print_info() {
 
 print_dry_run() {
     echo -e "${DIM}   [dry-run] $1${NC}"
-}
-
-latest_path_by_mtime() {
-    local search_dir="$1"
-    local name_glob="$2"
-    local type="${3:-d}"
-
-    find "$search_dir" -mindepth 1 -maxdepth 1 -type "$type" -name "$name_glob" -print0 2>/dev/null \
-        | while IFS= read -r -d '' item; do
-            mtime=$(stat -f "%m" "$item" 2>/dev/null || echo 0)
-            printf '%s\t%s\n' "$mtime" "$item"
-        done \
-        | sort -nr \
-        | head -1 \
-        | cut -f2-
 }
 
 init_logging() {
@@ -234,7 +221,7 @@ auto_detect_game() {
         echo ""
 
         while true; do
-            read -r -p "Which installation do you want to fix? [1-${#unique_games[@]}] " choice
+            read -r -p "Which installation do you want to fix? [1-${#unique_games[@]}] " choice < /dev/tty
             if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -le ${#unique_games[@]} ]]; then
                 echo "${unique_games[$((choice-1))]}"
                 return
@@ -270,7 +257,7 @@ ensure_rosetta() {
     else
         read -p "Install Rosetta 2 now? [Y/n] " -n 1 -r < /dev/tty
         echo ""
-        if [[ $REPLY =~ ^[Nn]$ ]]; then
+        if [[ "${REPLY:-}" =~ ^[Nn]$ ]]; then
             print_error "Rosetta 2 is required. Cannot continue without it."
             exit 1
         fi
@@ -317,7 +304,7 @@ ensure_xcode_clt() {
     else
         read -p "Install Xcode Command Line Tools now? [Y/n] " -n 1 -r < /dev/tty
         echo ""
-        if [[ $REPLY =~ ^[Nn]$ ]]; then
+        if [[ "${REPLY:-}" =~ ^[Nn]$ ]]; then
             print_error "Xcode Command Line Tools are required. Cannot continue without them."
             exit 1
         fi
@@ -337,7 +324,12 @@ ensure_xcode_clt() {
     echo ""
 
     # Wait for user to complete the installation
-    read -n 1 -s -r
+    if [[ -t 0 ]]; then
+        read -n 1 -s -r < /dev/tty
+    else
+        print_warning "Non-interactive session detected. Re-run after CLT installation completes."
+        exit 1
+    fi
 
     # Verify installation
     if ! command -v clang &>/dev/null; then
@@ -383,7 +375,7 @@ offer_steam_watcher() {
     read -p "Install the Steam update watcher? [y/N] " -n 1 -r < /dev/tty
     echo ""
 
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    if [[ "${REPLY:-}" =~ ^[Yy]$ ]]; then
         chmod +x "$watcher_script"
         if "$watcher_script" --install 2>/dev/null; then
             print_success "Steam update watcher installed!"
@@ -636,14 +628,14 @@ do_restore() {
     echo ""
 
     # Use the most recent backup
-    latest=$(latest_path_by_mtime "$HOME/Documents" "WormsWMD-Backup-*" "d")
+    latest=$(worms_latest_path_by_mtime "$HOME/Documents" "WormsWMD-Backup-*" "d")
     echo "Most recent backup: $latest"
     echo ""
 
     if ! $FORCE; then
         read -p "Restore from this backup? [y/N] " -n 1 -r < /dev/tty
         echo ""
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        if [[ ! "${REPLY:-}" =~ ^[Yy]$ ]]; then
             echo "Restore cancelled."
             exit 0
         fi
@@ -749,7 +741,7 @@ do_dry_run() {
     fi
     local qt_version
     local qt_version_path
-    qt_version_path=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+    qt_version_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
     if [[ -n "$qt_version_path" ]]; then
         qt_version=$(basename "$qt_version_path")
     else
@@ -822,7 +814,7 @@ do_fix() {
         if ! $FORCE; then
             read -p "Re-apply the fix anyway? [y/N] " -n 1 -r < /dev/tty
             echo ""
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            if [[ ! "${REPLY:-}" =~ ^[Yy]$ ]]; then
                 echo ""
                 print_info "To verify the installation, run: ./fix_worms_wmd.sh --verify"
                 exit 0
@@ -853,7 +845,7 @@ do_fix() {
         if ! $FORCE; then
             read -p "Continue anyway? [y/N] " -n 1 -r < /dev/tty
             echo ""
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            if [[ ! "${REPLY:-}" =~ ^[Yy]$ ]]; then
                 echo "Fix cancelled."
                 exit 0
             fi
@@ -899,7 +891,7 @@ do_fix() {
         if [[ -f "/usr/local/bin/brew" ]] && [[ -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]; then
             local qt_version
             local qt_version_path
-            qt_version_path=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+            qt_version_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
             if [[ -n "$qt_version_path" ]]; then
                 qt_version=$(basename "$qt_version_path")
             else
@@ -986,10 +978,11 @@ do_fix() {
     if [[ "$QT_SOURCE" == "prebuild" ]]; then
         start_spinner "Downloading Qt frameworks..."
         local qt_extract_dir
-        qt_extract_dir=$("$SCRIPTS_DIR/download_qt_frameworks.sh" 2>/dev/null | tail -1)
+        qt_extract_output=$("$SCRIPTS_DIR/download_qt_frameworks.sh" 2>/dev/null || true)
+        qt_extract_dir=$(echo "$qt_extract_output" | tail -1)
         stop_spinner
 
-        if [[ -d "$qt_extract_dir/Frameworks" ]]; then
+        if [[ -n "$qt_extract_dir" ]] && [[ -d "$qt_extract_dir/Frameworks" ]]; then
             export QT_PREFIX="$qt_extract_dir"
             print_substep "Using pre-built Qt 5.15"
         else
@@ -1010,7 +1003,7 @@ do_fix() {
         qt_version_display="5.15 (pre-built)"
     else
         local qt_version_display_path
-        qt_version_display_path=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+        qt_version_display_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
         if [[ -n "$qt_version_display_path" ]]; then
             qt_version_display=$(basename "$qt_version_display_path")
         else
@@ -1041,7 +1034,7 @@ do_fix() {
         print_warning "$missing dependencies were not found"
         echo "$copy_output" | grep -E "^WARNING:" | head -5 | while read -r line; do
             print_substep "$line"
-        done
+        done || true
     fi
 
     echo ""
@@ -1118,7 +1111,7 @@ do_fix() {
             print_warning "Some verification checks had warnings"
             echo "$verify_output" | grep -E "WARNING|ERROR" | head -5 | while read -r line; do
                 print_substep "$line"
-            done
+            done || true
         fi
     fi
 

@@ -9,7 +9,7 @@
 # any matching dependency paths to @executable_path for portability.
 #
 
-set -e
+set -euo pipefail
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
@@ -21,6 +21,8 @@ LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/common.sh"
 worms_log_init "04_fix_library_paths"
 worms_debug_init
 
@@ -78,29 +80,6 @@ else
     echo "Run 01_build_agl_stub.sh first"
 fi
 
-framework_binary() {
-    local fw_dir="$1"
-    local fw_name
-    fw_name=$(basename "$fw_dir" .framework)
-
-    if [ -f "$fw_dir/Versions/5/$fw_name" ]; then
-        echo "$fw_dir/Versions/5/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/Versions/A/$fw_name" ]; then
-        echo "$fw_dir/Versions/A/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/Versions/Current/$fw_name" ]; then
-        echo "$fw_dir/Versions/Current/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/$fw_name" ]; then
-        echo "$fw_dir/$fw_name"
-        return
-    fi
-}
-
 fw_names=()
 fw_ids=()
 fw_bins=()
@@ -108,7 +87,7 @@ fw_bins=()
 for fw_dir in "$GAME_FRAMEWORKS"/*.framework; do
     if [ -d "$fw_dir" ]; then
         fw_name=$(basename "$fw_dir" .framework)
-        fw_bin=$(framework_binary "$fw_dir")
+        fw_bin=$(worms_framework_binary "$fw_dir" || true)
         if [ -n "$fw_bin" ]; then
             rel_path="${fw_bin#"$fw_dir"/}"
             fw_id="@executable_path/../Frameworks/$fw_name.framework/$rel_path"

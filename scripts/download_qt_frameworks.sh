@@ -9,7 +9,7 @@
 #   ./download_qt_frameworks.sh [--force]
 #
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
@@ -23,16 +23,91 @@ CHECKSUM_URL=""
 PACKAGE_NAME=""
 QT_VERSION=""
 USE_LOCAL=false
+CACHED_PACKAGE=""
+EXTRACT_DIR=""
+TEMP_EXTRACT=""
+CHECKSUM_TMP=""
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/ui.sh"
+worms_color_init
 
 FORCE=false
 CHECK_ONLY=false
+
+CURL_BASE=(--proto '=https' --tlsv1.2 --retry 3 --retry-delay 1 --retry-connrefused)
+
+cleanup() {
+    if [[ -n "$TEMP_EXTRACT" ]] && [[ -d "$TEMP_EXTRACT" ]]; then
+        rm -rf "$TEMP_EXTRACT"
+    fi
+    if [[ -n "$CHECKSUM_TMP" ]] && [[ -f "$CHECKSUM_TMP" ]]; then
+        rm -f "$CHECKSUM_TMP"
+    fi
+}
+
+trap cleanup EXIT
+
+for cmd in curl tar shasum mktemp; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo -e "${RED}ERROR:${NC} Missing required command: $cmd"
+        exit 1
+    fi
+done
+
+read_checksum() {
+    local checksum_file="$1"
+    local expected
+
+    expected=$(awk 'NR==1 {print $1}' "$checksum_file" 2>/dev/null || true)
+    if [[ ! "$expected" =~ ^[a-fA-F0-9]{64}$ ]]; then
+        return 1
+    fi
+
+    echo "$expected"
+}
+
+verify_checksum() {
+    local archive="$1"
+    local checksum_file="$2"
+    local expected actual
+
+    expected=$(read_checksum "$checksum_file") || return 1
+    actual=$(shasum -a 256 "$archive" | awk '{print $1}')
+
+    if [[ "$expected" != "$actual" ]]; then
+        return 1
+    fi
+}
+
+validate_tar_layout() {
+    local archive="$1"
+    local entry
+    local listing
+
+    if ! listing=$(tar -tzf "$archive" 2>/dev/null); then
+        echo -e "${RED}ERROR:${NC} Unable to read archive contents."
+        return 1
+    fi
+
+    while IFS= read -r entry; do
+        [[ -z "$entry" ]] && continue
+
+        if [[ "$entry" == /* ]] || [[ "$entry" == *"../"* ]] || [[ "$entry" == *"/.."* ]]; then
+            echo -e "${RED}ERROR:${NC} Unsafe path in archive: $entry"
+            return 1
+        fi
+
+        case "$entry" in
+            Frameworks|Frameworks/*|PlugIns|PlugIns/*|METADATA.txt)
+                ;;
+            *)
+                echo -e "${RED}ERROR:${NC} Unexpected entry in archive: $entry"
+                return 1
+                ;;
+        esac
+    done <<< "$listing"
+}
 
 version_compare() {
     local v1="$1"
@@ -78,6 +153,12 @@ select_local_package() {
 
     while IFS= read -r -d '' package; do
         local name version
+        if [[ ! -f "${package}.sha256" ]]; then
+            continue
+        fi
+        if ! read_checksum "${package}.sha256" >/dev/null; then
+            continue
+        fi
         name=$(basename "$package")
         version=${name#qt-frameworks-x86_64-}
         version=${version%.tar.gz}
@@ -102,10 +183,10 @@ select_local_package() {
 
 select_remote_package() {
     local response
-    response=$(curl -sf --max-time 30 "$GITHUB_API_URL" 2>/dev/null) || return 1
+    response=$(curl "${CURL_BASE[@]}" -sf --max-time 30 "$GITHUB_API_URL" 2>/dev/null) || return 1
 
     local urls
-    urls=$(echo "$response" | grep -o '"download_url": *"[^"]*qt-frameworks-x86_64-[^"]*\.tar\.gz"' | cut -d'"' -f4)
+    urls=$(echo "$response" | grep -o '"download_url": *"[^"]*qt-frameworks-x86_64-[^"]*\.tar\.gz"' | cut -d'"' -f4 || true)
     if [[ -z "$urls" ]]; then
         return 1
     fi
@@ -168,10 +249,16 @@ done
 
 if $CHECK_ONLY; then
     if select_local_package; then
-        echo "available"
-        exit 0
+        if [[ -f "${CACHED_PACKAGE}.sha256" ]] && read_checksum "${CACHED_PACKAGE}.sha256" >/dev/null; then
+            echo "available"
+            exit 0
+        fi
     fi
-    if select_remote_package && curl -sfI --max-time 10 "$DOWNLOAD_URL" >/dev/null 2>&1; then
+    CHECKSUM_TMP=$(mktemp -t wormswmd-checksum.XXXXXX)
+    if select_remote_package \
+        && curl "${CURL_BASE[@]}" -sfI --max-time 10 "$DOWNLOAD_URL" >/dev/null 2>&1 \
+        && curl "${CURL_BASE[@]}" -sf --max-time 10 "$CHECKSUM_URL" -o "$CHECKSUM_TMP" 2>/dev/null \
+        && read_checksum "$CHECKSUM_TMP" >/dev/null; then
         echo "available"
     else
         echo "unavailable"
@@ -221,14 +308,14 @@ else
         echo "Downloading from: $DOWNLOAD_URL"
 
         # Check if URL is accessible
-        if ! curl -sfI --max-time 10 "$DOWNLOAD_URL" >/dev/null 2>&1; then
+        if ! curl "${CURL_BASE[@]}" -sfI --max-time 10 "$DOWNLOAD_URL" >/dev/null 2>&1; then
             echo -e "${YELLOW}Pre-built Qt frameworks not available.${NC}"
             echo "FALLBACK_TO_HOMEBREW"
             exit 1
         fi
 
         # Download with progress
-        if ! curl -L --max-time 300 --progress-bar -o "$CACHED_PACKAGE" "$DOWNLOAD_URL"; then
+        if ! curl "${CURL_BASE[@]}" -L --max-time 300 --progress-bar -o "$CACHED_PACKAGE" "$DOWNLOAD_URL"; then
             echo -e "${RED}ERROR:${NC} Download failed"
             rm -f "$CACHED_PACKAGE"
             exit 1
@@ -236,47 +323,48 @@ else
     fi
 fi
 
-# Verify checksum if available
-echo "Verifying download..."
 if $USE_LOCAL; then
     local_checksum="${CACHED_PACKAGE}.sha256"
-    if [[ -f "$local_checksum" ]]; then
-        EXPECTED=$(cut -d' ' -f1 "$local_checksum")
-        ACTUAL=$(shasum -a 256 "$CACHED_PACKAGE" | cut -d' ' -f1)
-
-        if [[ "$EXPECTED" != "$ACTUAL" ]]; then
-            echo -e "${RED}ERROR:${NC} Checksum verification failed!"
-            echo "Expected: $EXPECTED"
-            echo "Actual:   $ACTUAL"
-            exit 1
-        fi
-        echo -e "${GREEN}Checksum verified${NC}"
-    else
-        echo -e "${YELLOW}Warning: Could not verify checksum (missing .sha256)${NC}"
+    if [[ ! -f "$local_checksum" ]]; then
+        echo -e "${RED}ERROR:${NC} Missing checksum for local package: $local_checksum"
+        echo "FALLBACK_TO_HOMEBREW"
+        exit 1
     fi
 else
-    if curl -sf --max-time 10 "$CHECKSUM_URL" -o "$CACHED_PACKAGE.sha256" 2>/dev/null; then
-        EXPECTED=$(cat "$CACHED_PACKAGE.sha256" | cut -d' ' -f1)
-        ACTUAL=$(shasum -a 256 "$CACHED_PACKAGE" | cut -d' ' -f1)
-
-        if [[ "$EXPECTED" != "$ACTUAL" ]]; then
-            echo -e "${RED}ERROR:${NC} Checksum verification failed!"
-            echo "Expected: $EXPECTED"
-            echo "Actual:   $ACTUAL"
-            rm -f "$CACHED_PACKAGE"
-            exit 1
-        fi
-        echo -e "${GREEN}Checksum verified${NC}"
-    else
-        echo -e "${YELLOW}Warning: Could not verify checksum (continuing anyway)${NC}"
+    if ! curl "${CURL_BASE[@]}" -sf --max-time 10 "$CHECKSUM_URL" -o "$CACHED_PACKAGE.sha256" 2>/dev/null; then
+        echo -e "${RED}ERROR:${NC} Could not download checksum."
+        echo "FALLBACK_TO_HOMEBREW"
+        exit 1
     fi
+fi
+
+# Verify checksum (required)
+echo "Verifying download..."
+if ! verify_checksum "$CACHED_PACKAGE" "$CACHED_PACKAGE.sha256"; then
+    echo -e "${RED}ERROR:${NC} Checksum verification failed!"
+    rm -f "$CACHED_PACKAGE"
+    echo "FALLBACK_TO_HOMEBREW"
+    exit 1
+fi
+echo -e "${GREEN}Checksum verified${NC}"
+
+# Verify archive layout before extraction
+if ! validate_tar_layout "$CACHED_PACKAGE"; then
+    echo -e "${RED}ERROR:${NC} Archive validation failed."
+    rm -f "$CACHED_PACKAGE"
+    echo "FALLBACK_TO_HOMEBREW"
+    exit 1
 fi
 
 # Extract
 echo "Extracting..."
+TEMP_EXTRACT=$(mktemp -d)
+tar -xzf "$CACHED_PACKAGE" -C "$TEMP_EXTRACT"
+
 rm -rf "$EXTRACT_DIR"
-mkdir -p "$EXTRACT_DIR"
-tar -xzf "$CACHED_PACKAGE" -C "$EXTRACT_DIR"
+mkdir -p "$(dirname "$EXTRACT_DIR")"
+mv "$TEMP_EXTRACT" "$EXTRACT_DIR"
+TEMP_EXTRACT=""
 
 # Verify extraction
 if [[ ! -d "$EXTRACT_DIR/Frameworks" ]] || [[ ! -d "$EXTRACT_DIR/PlugIns" ]]; then

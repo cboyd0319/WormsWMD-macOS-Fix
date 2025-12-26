@@ -12,7 +12,15 @@
 #   ./backup_saves.sh --list            # List available backups
 #
 
-set -e
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/common.sh"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/ui.sh"
+worms_color_init
 
 # Cleanup temp files on exit
 TEMP_DIR=""
@@ -27,13 +35,6 @@ trap cleanup EXIT
 STEAM_SAVES="$HOME/Library/Application Support/Steam/userdata"
 TEAM17_SAVES="$HOME/Library/Application Support/Team17"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/WormsWMD-SaveBackups}"
-
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
 
 print_help() {
     cat << 'EOF'
@@ -81,21 +82,6 @@ find_steam_saves() {
     done
 
     printf '%s\n' "${found[@]}"
-}
-
-latest_path_by_mtime() {
-    local search_dir="$1"
-    local name_glob="$2"
-    local type="${3:-f}"
-
-    find "$search_dir" -mindepth 1 -maxdepth 1 -type "$type" -name "$name_glob" -print0 2>/dev/null \
-        | while IFS= read -r -d '' item; do
-            mtime=$(stat -f "%m" "$item" 2>/dev/null || echo 0)
-            printf '%s\t%s\n' "$mtime" "$item"
-        done \
-        | sort -nr \
-        | head -1 \
-        | cut -f2-
 }
 
 # Create backup
@@ -173,7 +159,7 @@ do_restore() {
 
     # If no file specified, use latest
     if [[ -z "$backup_file" ]]; then
-        backup_file=$(latest_path_by_mtime "$BACKUP_DIR" "saves-*.tar.gz" "f")
+        backup_file=$(worms_latest_path_by_mtime "$BACKUP_DIR" "saves-*.tar.gz" "f")
 
         if [[ -z "$backup_file" ]]; then
             echo -e "${RED}No backups found in $BACKUP_DIR${NC}"
@@ -190,10 +176,10 @@ do_restore() {
 
     echo -e "${YELLOW}WARNING: This will overwrite your current save games!${NC}"
     echo ""
-    read -p "Continue? [y/N] " -n 1 -r
+    read -p "Continue? [y/N] " -n 1 -r < /dev/tty
     echo ""
 
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [[ ! "${REPLY:-}" =~ ^[Yy]$ ]]; then
         echo "Restore cancelled."
         exit 0
     fi

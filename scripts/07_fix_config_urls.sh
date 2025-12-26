@@ -7,7 +7,7 @@
 # - Removes/comments out internal staging URLs that shouldn't be in retail builds
 #
 
-set -e
+set -euo pipefail
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 DATA_DIR="$GAME_APP/Contents/Resources/DataOSX"

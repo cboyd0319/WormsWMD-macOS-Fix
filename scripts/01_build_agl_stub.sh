@@ -6,7 +6,7 @@
 # implementations of all AGL functions removed in macOS 26.
 #
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SRC_DIR="$(dirname "$SCRIPT_DIR")/src"

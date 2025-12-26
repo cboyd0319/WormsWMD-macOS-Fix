@@ -15,7 +15,14 @@
 #   --help          Show this help
 #
 
-set -e
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/common.sh"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/ui.sh"
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 OUTPUT_FILE=""
@@ -25,14 +32,9 @@ COPY_TO_CLIPBOARD=false
 # Colors (disabled for file output)
 setup_colors() {
     if [[ -t 1 ]] && [[ -z "$OUTPUT_FILE" ]]; then
-        CYAN='\033[0;36m'
-        GREEN='\033[0;32m'
-        YELLOW='\033[1;33m'
-        RED='\033[0;31m'
-        BOLD='\033[1m'
-        NC='\033[0m'
+        worms_color_init always
     else
-        CYAN='' GREEN='' YELLOW='' RED='' BOLD='' NC=''
+        worms_color_init never
     fi
 }
 
@@ -95,25 +97,14 @@ info() {
     echo "  $1"
 }
 
-latest_path_by_mtime() {
-    local search_dir="$1"
-    local name_glob="$2"
-    local type="${3:-d}"
-
-    find "$search_dir" -mindepth 1 -maxdepth 1 -type "$type" -name "$name_glob" -print0 2>/dev/null \
-        | while IFS= read -r -d '' item; do
-            mtime=$(stat -f "%m" "$item" 2>/dev/null || echo 0)
-            printf '%s\t%s\n' "$mtime" "$item"
-        done \
-        | sort -nr \
-        | head -1 \
-        | cut -f2-
-}
-
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --output)
+            if [[ -z "${2:-}" ]] || [[ "$2" == -* ]]; then
+                echo "ERROR: --output requires a file path"
+                exit 1
+            fi
             OUTPUT_FILE="$2"
             shift 2
             ;;
@@ -301,7 +292,7 @@ collect_diagnostics() {
         ok "Qt 5 found"
         local qt5_version
         local qt5_version_path
-        qt5_version_path=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+        qt5_version_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
         if [[ -n "$qt5_version_path" ]]; then
             qt5_version=$(basename "$qt5_version_path")
         else
@@ -435,7 +426,11 @@ collect_diagnostics() {
 
         subsection "Fix Tool Backups"
         local backup_count
-        backup_count=$(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print 2>/dev/null | wc -l | tr -d ' ')
+        if [[ -d "$HOME/Documents" ]]; then
+            backup_count=$(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print 2>/dev/null | wc -l | tr -d ' ')
+        else
+            backup_count=0
+        fi
         info "Backup directories found: $backup_count"
         if [[ "$backup_count" -gt 0 ]]; then
             find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null \
@@ -474,8 +469,13 @@ if [[ -n "$OUTPUT_FILE" ]]; then
     collect_diagnostics > "$OUTPUT_FILE"
     echo "Diagnostics saved to: $OUTPUT_FILE"
 elif $COPY_TO_CLIPBOARD; then
-    collect_diagnostics | pbcopy
-    echo "Diagnostics copied to clipboard!"
+    if command -v pbcopy >/dev/null 2>&1; then
+        collect_diagnostics | pbcopy
+        echo "Diagnostics copied to clipboard!"
+    else
+        echo "pbcopy not available; printing diagnostics to stdout."
+        collect_diagnostics
+    fi
 else
     collect_diagnostics
 fi

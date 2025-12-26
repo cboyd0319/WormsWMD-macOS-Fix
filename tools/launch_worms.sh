@@ -28,7 +28,7 @@
 #   --help          Show this help
 #
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
@@ -48,12 +48,9 @@ CHECK_FIX=false
 CRASH_REPORT=true
 STEAM_MODE=false
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/ui.sh"
+worms_color_init
 
 print_help() {
     cat << 'EOF'
@@ -136,7 +133,15 @@ while [[ $# -gt 0 ]]; do
             ;;
         --log-file)
             ENABLE_LOGGING=true
+            if [[ -z "${2:-}" ]] || [[ "$2" == -* ]]; then
+                echo -e "${RED}--log-file requires a path${NC}"
+                exit 1
+            fi
             LOG_FILE="$2"
+            if [[ -d "$LOG_FILE" ]]; then
+                echo -e "${RED}--log-file must be a file path, not a directory${NC}"
+                exit 1
+            fi
             shift 2
             ;;
         --verbose)
@@ -188,7 +193,11 @@ fi
 
 # Setup logging
 if [[ "$ENABLE_LOGGING" == true ]]; then
-    mkdir -p "$LOG_DIR"
+    if [[ -n "$LOG_FILE" ]]; then
+        mkdir -p "$(dirname "$LOG_FILE")"
+    else
+        mkdir -p "$LOG_DIR"
+    fi
     if [[ -z "$LOG_FILE" ]]; then
         LOG_FILE="$LOG_DIR/worms-$(date '+%Y%m%d-%H%M%S').log"
     fi
@@ -249,9 +258,9 @@ if [[ "$CHECK_FIX" == true ]]; then
     if [[ -x "$SCRIPT_DIR/watch_for_updates.sh" ]]; then
         if ! "$SCRIPT_DIR/watch_for_updates.sh" --check >/dev/null 2>&1; then
             echo -e "${YELLOW}Fix needs to be reapplied!${NC}"
-            read -p "Reapply now? [Y/n] " -n 1 -r
+            read -p "Reapply now? [Y/n] " -n 1 -r < /dev/tty
             echo ""
-            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            if [[ ! "${REPLY:-}" =~ ^[Nn]$ ]]; then
                 cd "$REPO_DIR"
                 ./fix_worms_wmd.sh --force
             else

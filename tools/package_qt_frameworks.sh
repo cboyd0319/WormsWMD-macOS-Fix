@@ -14,46 +14,26 @@
 #   - Run on macOS with x86_64 support
 #
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/../dist}"
 QT_PREFIX="/usr/local/opt/qt@5"
 PACKAGE_NAME="qt-frameworks-x86_64"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/common.sh"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/ui.sh"
+worms_color_init
 
-print_step() {
-    echo -e "${GREEN}==>${NC} ${1}"
-}
-
-print_error() {
-    echo -e "${RED}ERROR:${NC} ${1}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}WARNING:${NC} ${1}"
-}
-
-latest_path_by_mtime() {
-    local search_dir="$1"
-    local name_glob="$2"
-    local type="${3:-d}"
-
-    find "$search_dir" -mindepth 1 -maxdepth 1 -type "$type" -name "$name_glob" -print0 2>/dev/null \
-        | while IFS= read -r -d '' item; do
-            mtime=$(stat -f "%m" "$item" 2>/dev/null || echo 0)
-            printf '%s\t%s\n' "$mtime" "$item"
-        done \
-        | sort -nr \
-        | head -1 \
-        | cut -f2-
-}
+for cmd in otool tar shasum mktemp; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        worms_print_error "Missing required command: $cmd"
+        exit 1
+    fi
+done
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -70,7 +50,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            print_error "Unknown option: $1"
+            worms_print_error "Unknown option: $1"
             exit 1
             ;;
     esac
@@ -78,19 +58,19 @@ done
 
 # Verify Qt installation
 if [[ ! -d "$QT_PREFIX" ]]; then
-    print_error "Qt 5 not found at $QT_PREFIX"
+    worms_print_error "Qt 5 not found at $QT_PREFIX"
     echo "Install with: arch -x86_64 /usr/local/bin/brew install qt@5"
     exit 1
 fi
 
-QT_VERSION_PATH=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+QT_VERSION_PATH=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
 if [[ -n "$QT_VERSION_PATH" ]]; then
     QT_VERSION=$(basename "$QT_VERSION_PATH")
 else
     QT_VERSION=""
 fi
 if [[ -z "$QT_VERSION" ]]; then
-    print_error "Could not determine Qt version"
+    worms_print_error "Could not determine Qt version"
     exit 1
 fi
 
@@ -112,7 +92,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Copy Qt frameworks
-print_step "Copying Qt frameworks..."
+worms_print_step "Copying Qt frameworks..."
 FRAMEWORKS=(
     "QtCore"
     "QtGui"
@@ -128,12 +108,12 @@ for fw in "${FRAMEWORKS[@]}"; do
         cp -R "$QT_PREFIX/lib/${fw}.framework" "$FRAMEWORKS_DIR/"
         echo "  Copied ${fw}.framework"
     else
-        print_warning "${fw}.framework not found, skipping"
+        worms_print_warning "${fw}.framework not found, skipping"
     fi
 done
 
 # Copy platform plugin
-print_step "Copying platform plugins..."
+worms_print_step "Copying platform plugins..."
 mkdir -p "$PLUGINS_DIR/platforms"
 if [[ -f "$QT_PREFIX/plugins/platforms/libqcocoa.dylib" ]]; then
     cp "$QT_PREFIX/plugins/platforms/libqcocoa.dylib" "$PLUGINS_DIR/platforms/"
@@ -141,7 +121,7 @@ if [[ -f "$QT_PREFIX/plugins/platforms/libqcocoa.dylib" ]]; then
 fi
 
 # Copy image format plugins
-print_step "Copying image format plugins..."
+worms_print_step "Copying image format plugins..."
 mkdir -p "$PLUGINS_DIR/imageformats"
 for plugin in "$QT_PREFIX/plugins/imageformats/"*.dylib; do
     if [[ -f "$plugin" ]]; then
@@ -151,7 +131,7 @@ for plugin in "$QT_PREFIX/plugins/imageformats/"*.dylib; do
 done
 
 # Find and copy all Homebrew dependencies
-print_step "Scanning for Homebrew dependencies..."
+worms_print_step "Scanning for Homebrew dependencies..."
 DEPS_DIR="$WORK_DIR/Dependencies"
 mkdir -p "$DEPS_DIR"
 
@@ -205,7 +185,7 @@ for plugin in "$PLUGINS_DIR"/*/*.dylib; do
 done
 
 # Move dependencies to Frameworks dir (where they'll be installed)
-print_step "Organizing dependencies..."
+worms_print_step "Organizing dependencies..."
 mv "$DEPS_DIR"/* "$FRAMEWORKS_DIR/" 2>/dev/null || true
 rmdir "$DEPS_DIR" 2>/dev/null || true
 
@@ -218,7 +198,7 @@ echo ""
 echo "Packaged: $fw_count frameworks, $dylib_count dylibs, $plugin_count plugins"
 
 # Create metadata file
-print_step "Creating metadata..."
+worms_print_step "Creating metadata..."
 cat > "$WORK_DIR/METADATA.txt" << EOF
 Qt Frameworks Package for Worms W.M.D macOS Fix
 ================================================
@@ -238,7 +218,7 @@ https://github.com/cboyd0319/WormsWMD-macOS-Fix
 EOF
 
 # Create the tarball
-print_step "Creating archive..."
+worms_print_step "Creating archive..."
 mkdir -p "$OUTPUT_DIR"
 ARCHIVE_NAME="${PACKAGE_NAME}-${QT_VERSION}.tar.gz"
 ARCHIVE_PATH="$OUTPUT_DIR/$ARCHIVE_NAME"

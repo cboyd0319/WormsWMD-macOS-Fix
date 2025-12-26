@@ -11,6 +11,8 @@
 # Everything else is automatic!
 #
 
+set -euo pipefail
+
 # Move to a sensible directory (in case we're in Downloads or somewhere weird)
 cd "$HOME" || exit 1
 
@@ -47,33 +49,62 @@ if ! command -v git &>/dev/null; then
     echo ""
     echo "Please wait for the installation to complete, then run this installer again."
     echo ""
-    read -n 1 -s -r -p "Press any key to exit..."
+    read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
     exit 0
 fi
 
+REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 INSTALL_DIR="$HOME/.wormswmd-fix"
+
+backup_install_dir() {
+    local src="$1"
+    local backup
+    backup="${src}.backup.$(date +%s)"
+
+    if mv "$src" "$backup"; then
+        echo -e "${CYAN}Existing install backed up to: $backup${NC}"
+    else
+        echo -e "${RED}Failed to back up existing install at: $src${NC}"
+        exit 1
+    fi
+}
 
 # Clone or update the repository
 if [[ -d "$INSTALL_DIR/.git" ]]; then
     echo -e "${CYAN}Updating fix scripts...${NC}"
-    cd "$INSTALL_DIR" || exit 1
-    git pull --quiet 2>/dev/null || true
+    if git -C "$INSTALL_DIR" pull --quiet --ff-only origin main 2>/dev/null; then
+        :
+    else
+        echo -e "${YELLOW}Update failed; reinstalling...${NC}"
+        backup_install_dir "$INSTALL_DIR"
+        git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
+    fi
 else
     echo -e "${CYAN}Downloading fix scripts...${NC}"
-    rm -rf "$INSTALL_DIR" 2>/dev/null || true
-    if ! git clone --quiet https://github.com/cboyd0319/WormsWMD-macOS-Fix.git "$INSTALL_DIR" 2>/dev/null; then
+    if [[ -d "$INSTALL_DIR" ]]; then
+        backup_install_dir "$INSTALL_DIR"
+    fi
+    if ! git clone --quiet "$REPO_URL.git" "$INSTALL_DIR" 2>/dev/null; then
         echo ""
         echo -e "${RED}Failed to download the fix.${NC}"
         echo ""
         echo "Please check your internet connection and try again."
         echo ""
-        read -n 1 -s -r -p "Press any key to exit..."
+        read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
         exit 1
     fi
-    cd "$INSTALL_DIR" || exit 1
 fi
 
 echo ""
+
+# Sanity check
+if [[ ! -f "$INSTALL_DIR/fix_worms_wmd.sh" ]]; then
+    echo -e "${RED}Download incomplete: fix_worms_wmd.sh not found.${NC}"
+    read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
+    exit 1
+fi
+
+cd "$INSTALL_DIR" || exit 1
 
 # Make the fix script executable and run it
 chmod +x fix_worms_wmd.sh
@@ -85,4 +116,4 @@ echo -e "${CYAN}─────────────────────�
 echo ""
 echo "You can close this window now."
 echo ""
-read -n 1 -s -r -p "Press any key to exit..."
+read -n 1 -s -r -p "Press any key to exit..." < /dev/tty

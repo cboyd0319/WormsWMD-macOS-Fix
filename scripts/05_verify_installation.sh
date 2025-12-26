@@ -10,6 +10,8 @@
 # all errors for a comprehensive report.
 #
 
+set -uo pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
@@ -37,6 +39,8 @@ done
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/common.sh"
 worms_log_init "05_verify_installation"
 worms_debug_init
 
@@ -76,29 +80,6 @@ VERBOSE=false
 if worms_verbose_enabled; then
     VERBOSE=true
 fi
-
-framework_binary() {
-    local fw_dir="$1"
-    local fw_name
-    fw_name=$(basename "$fw_dir" .framework)
-
-    if [ -f "$fw_dir/Versions/5/$fw_name" ]; then
-        echo "$fw_dir/Versions/5/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/Versions/A/$fw_name" ]; then
-        echo "$fw_dir/Versions/A/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/Versions/Current/$fw_name" ]; then
-        echo "$fw_dir/Versions/Current/$fw_name"
-        return
-    fi
-    if [ -f "$fw_dir/$fw_name" ]; then
-        echo "$fw_dir/$fw_name"
-        return
-    fi
-}
 
 print_deps() {
     local bin="$1"
@@ -192,7 +173,7 @@ for fw_dir in "$GAME_FRAMEWORKS"/*.framework; do
         fi
 
         framework_found=true
-        lib=$(framework_binary "$fw_dir")
+        lib=$(worms_framework_binary "$fw_dir" || true)
         if [ -z "$lib" ] || [ ! -f "$lib" ]; then
             echo "ERROR: $fw_name.framework binary not found!"
             ((errors++))

@@ -8,7 +8,7 @@
 # - Updates LSMinimumSystemVersion to a more reasonable value
 #
 
-set -e
+set -euo pipefail
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 INFO_PLIST="$GAME_APP/Contents/Info.plist"

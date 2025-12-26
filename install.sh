@@ -9,7 +9,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash -s -- --dry-run
 #
 
-set -e
+set -euo pipefail
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
@@ -58,9 +58,14 @@ if [[ "$(uname)" != "Darwin" ]]; then
     exit 1
 fi
 
-# Check for git or curl
-if ! command -v git &>/dev/null && ! command -v curl &>/dev/null; then
-    print_error "git or curl is required but not installed."
+# Check for prerequisites
+if ! command -v git &>/dev/null; then
+    print_error "git is required but not installed."
+    exit 1
+fi
+
+if ! command -v curl &>/dev/null; then
+    print_error "curl is required but not installed."
     exit 1
 fi
 
@@ -70,9 +75,14 @@ echo ""
 # Download/update the fix
 print_step "Downloading fix..."
 
+if [[ -f "$INSTALL_DIR" ]]; then
+    print_error "INSTALL_DIR points to a file: $INSTALL_DIR"
+    exit 1
+fi
+
 mkdir -p "$(dirname "$INSTALL_DIR")"
 
-if [[ -d "$INSTALL_DIR/.git" ]] && command -v git &>/dev/null; then
+if [[ -d "$INSTALL_DIR/.git" ]]; then
     print_info "Updating existing installation..."
     # Try fast-forward pull first
     if git -C "$INSTALL_DIR" pull --quiet --ff-only origin main 2>/dev/null; then
@@ -87,20 +97,28 @@ else
     if [[ -d "$INSTALL_DIR" ]]; then
         backup_install_dir "$INSTALL_DIR"
     fi
-    if command -v git &>/dev/null; then
-        git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
-    else
-        mkdir -p "$INSTALL_DIR"
-        curl -fsSL --max-time 60 "$REPO_URL/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
-    fi
+    git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
 fi
 
 print_success "Fix downloaded to: $INSTALL_DIR"
 echo ""
 
+# Sanity check
+if [[ ! -f "$INSTALL_DIR/fix_worms_wmd.sh" ]]; then
+    print_error "Download incomplete: fix_worms_wmd.sh not found."
+    exit 1
+fi
+
 # Make scripts executable
 chmod +x "$INSTALL_DIR/fix_worms_wmd.sh"
-chmod +x "$INSTALL_DIR/scripts/"*.sh
+if [[ -d "$INSTALL_DIR/scripts" ]]; then
+    shopt -s nullglob
+    script_files=("$INSTALL_DIR/scripts/"*.sh)
+    if (( ${#script_files[@]} )); then
+        chmod +x "${script_files[@]}"
+    fi
+    shopt -u nullglob
+fi
 
 # Run the fix
 print_step "Running fix..."

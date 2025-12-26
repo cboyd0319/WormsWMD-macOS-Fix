@@ -14,7 +14,7 @@
 #   ./watch_for_updates.sh --uninstall  # Remove LaunchAgent
 #
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
@@ -23,11 +23,9 @@ LAUNCH_AGENT_ID="com.wormswmd.fix.watcher"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_ID}.plist"
 CHECK_INTERVAL=300  # 5 minutes
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/ui.sh"
+worms_color_init
 
 print_help() {
     cat << 'EOF'
@@ -179,6 +177,7 @@ do_daemon() {
 # Install as LaunchAgent
 do_install() {
     echo "Installing update watcher as LaunchAgent..."
+    local launch_domain="gui/${UID}"
 
     # Create LaunchAgent plist
     cat > "$LAUNCH_AGENT_PATH" << EOF
@@ -209,7 +208,8 @@ EOF
     mkdir -p "$HOME/Library/Logs/WormsWMD-Fix"
 
     # Load the agent
-    launchctl load "$LAUNCH_AGENT_PATH" 2>/dev/null || true
+    launchctl bootout "$launch_domain" "$LAUNCH_AGENT_PATH" 2>/dev/null || true
+    launchctl bootstrap "$launch_domain" "$LAUNCH_AGENT_PATH"
 
     echo -e "${GREEN}Update watcher installed!${NC}"
     echo ""
@@ -222,9 +222,10 @@ EOF
 # Uninstall LaunchAgent
 do_uninstall() {
     echo "Uninstalling update watcher..."
+    local launch_domain="gui/${UID}"
 
     if [[ -f "$LAUNCH_AGENT_PATH" ]]; then
-        launchctl unload "$LAUNCH_AGENT_PATH" 2>/dev/null || true
+        launchctl bootout "$launch_domain" "$LAUNCH_AGENT_PATH" 2>/dev/null || true
         rm -f "$LAUNCH_AGENT_PATH"
         echo -e "${GREEN}Update watcher uninstalled${NC}"
     else
@@ -268,9 +269,9 @@ case "${1:-}" in
             partial|missing)
                 echo -e "${YELLOW}Fix needs to be reapplied.${NC}"
                 echo ""
-                read -p "Reapply now? [Y/n] " -n 1 -r
+                read -p "Reapply now? [Y/n] " -n 1 -r < /dev/tty
                 echo ""
-                if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                if [[ ! "${REPLY:-}" =~ ^[Nn]$ ]]; then
                     cd "$REPO_DIR"
                     ./fix_worms_wmd.sh
                 fi
