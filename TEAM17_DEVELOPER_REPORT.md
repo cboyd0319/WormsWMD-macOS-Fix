@@ -538,10 +538,22 @@ ClientId = "CSK9F3QJZ9MMUAOKLYLC"
 ClientSecret = "s1zekF2SOjY4tSgX4lc6mZZKwe6j4W33"
 ```
 
-**Windows**:
+**Windows** (also Windows GOG):
 ```
 ClientId = "10X6KGOC8WFEO0ZSC2DJ"
 ClientSecret = "8394dc184babd2f1eaf4f1c8a7409ebc"
+```
+
+**macOS** (also Linux):
+```
+ClientId = "CSA2X4I3JPSIU4FJOCV0"
+ClientSecret = "XDCek2eE5pJdZHLs20L4QY6gJ95b9l0X"
+```
+
+**Nintendo Switch** (same as PS4):
+```
+ClientId = "CSG3X9D4R9MX3RSC54KZ"
+ClientSecret = "pgRuiS7t3f8axO4zkIUHaZc7c3xkDZdI"
 ```
 
 **Recommendation**: These secrets should be immediately rotated and removed from shipped builds. Use secure credential storage or server-side authentication.
@@ -598,7 +610,7 @@ The game bundle is completely unsigned, which:
 | Exposed GOG client secrets | Critical | Rotate immediately |
 | Exposed Steam private key | Critical | Rotate immediately |
 | Exposed Twitch client secrets | Critical | Rotate immediately |
-| Exposed HMAC secrets (PS4/XB1/Win) | Critical | Rotate immediately |
+| Exposed HMAC secrets (PS4/XB1/Win/macOS/Linux/Switch) | Critical | Rotate immediately |
 | Internal staging URLs | Medium | Remove from retail builds |
 | Development paths | Low | Remove from retail builds |
 | HTTP endpoints | Medium | Update to HTTPS |
