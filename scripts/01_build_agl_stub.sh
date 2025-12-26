@@ -24,7 +24,7 @@ if [[ -z "$LOGGING_PRESET" ]]; then
     fi
 fi
 
-echo "=== Building AGL Stub Library ==="
+echo "=== Building AGL Stub Library (Universal Binary) ==="
 
 # Create build directory
 mkdir -p "$BUILD_DIR"
@@ -33,12 +33,33 @@ mkdir -p "$BUILD_DIR"
 echo "Compiling agl_stub.c for x86_64..."
 arch -x86_64 clang -arch x86_64 \
     -dynamiclib \
-    -o "$BUILD_DIR/AGL" \
+    -o "$BUILD_DIR/AGL_x86_64" \
     -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \
     -framework OpenGL \
     -compatibility_version 1.0.0 \
     -current_version 1.0.0 \
     "$SRC_DIR/agl_stub.c"
+
+# Compile for arm64 (future-proofing for native Apple Silicon if Rosetta is deprecated)
+echo "Compiling agl_stub.c for arm64..."
+clang -arch arm64 \
+    -dynamiclib \
+    -o "$BUILD_DIR/AGL_arm64" \
+    -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \
+    -framework OpenGL \
+    -compatibility_version 1.0.0 \
+    -current_version 1.0.0 \
+    "$SRC_DIR/agl_stub.c"
+
+# Create universal binary
+echo "Creating universal binary..."
+lipo -create \
+    "$BUILD_DIR/AGL_x86_64" \
+    "$BUILD_DIR/AGL_arm64" \
+    -output "$BUILD_DIR/AGL"
+
+# Clean up architecture-specific files
+rm -f "$BUILD_DIR/AGL_x86_64" "$BUILD_DIR/AGL_arm64"
 
 # Verify the build succeeded
 if [[ ! -f "$BUILD_DIR/AGL" ]]; then
@@ -50,4 +71,5 @@ echo "AGL stub built successfully at: $BUILD_DIR/AGL"
 echo ""
 echo "Library info:"
 file "$BUILD_DIR/AGL"
+lipo -info "$BUILD_DIR/AGL"
 otool -L "$BUILD_DIR/AGL" | head -5

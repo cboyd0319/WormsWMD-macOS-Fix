@@ -244,8 +244,10 @@ else
     arch=$(lipo -archs "$GAME_FRAMEWORKS/AGL.framework/Versions/A/AGL" 2>/dev/null)
     if [ "$arch" = "x86_64" ]; then
         echo "OK: AGL stub (x86_64)"
+    elif echo "$arch" | grep -q "x86_64" && echo "$arch" | grep -q "arm64"; then
+        echo "OK: AGL stub (universal: $arch)"
     else
-        echo "WARNING: AGL stub architecture is $arch (expected x86_64)"
+        echo "WARNING: AGL stub architecture is $arch (expected x86_64 or universal)"
         ((warnings++))
     fi
     print_deps "$GAME_FRAMEWORKS/AGL.framework/Versions/A/AGL" "AGL stub"
@@ -335,6 +337,35 @@ fi
 
 if [ "$warnings" -eq "$warnings_before" ]; then
     echo "OK: Info.plist and config checks complete"
+fi
+
+# Check code signing and quarantine
+echo ""
+echo "--- Checking code signing and quarantine ---"
+warnings_before=$warnings
+
+# Check quarantine
+quarantine_flag=$(xattr -l "$GAME_APP" 2>/dev/null | grep -c "quarantine" || echo "0")
+if [ "$quarantine_flag" != "0" ]; then
+    echo "WARNING: Quarantine flag is set (may cause Gatekeeper warnings)"
+    ((warnings++))
+else
+    echo "OK: No quarantine flags"
+fi
+
+# Check code signing
+codesign_output=$(codesign -dv "$GAME_APP" 2>&1 || echo "not signed")
+if echo "$codesign_output" | grep -q "not signed"; then
+    echo "WARNING: App is not code signed (may cause Gatekeeper warnings)"
+    ((warnings++))
+elif echo "$codesign_output" | grep -q "adhoc"; then
+    echo "OK: Ad-hoc code signature present"
+else
+    echo "OK: Code signature present"
+fi
+
+if [ "$warnings" -eq "$warnings_before" ]; then
+    echo "OK: Signing and quarantine checks complete"
 fi
 
 # Summary

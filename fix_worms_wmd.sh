@@ -24,7 +24,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.2.5"
+VERSION="1.3.0"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -516,6 +516,8 @@ do_dry_run() {
     print_dry_run "Update image format plugins"
     print_dry_run "Update Info.plist metadata (bundle ID, HiDPI, min version)"
     print_dry_run "Secure config URLs (HTTP→HTTPS, disable internal URLs)"
+    print_dry_run "Remove quarantine flags (xattr -rd com.apple.quarantine)"
+    print_dry_run "Apply ad-hoc code signature (codesign --deep --sign -)"
     echo ""
 
     print_success "Dry run complete. No changes were made."
@@ -752,6 +754,28 @@ do_fix() {
         chmod +x "$SCRIPTS_DIR/07_fix_config_urls.sh"
         "$SCRIPTS_DIR/07_fix_config_urls.sh" > /dev/null 2>&1 || true
         print_substep "Config URLs secured (HTTP→HTTPS)"
+    fi
+
+    # ============================================================
+    # Post-fix: Code signing and quarantine removal
+    # ============================================================
+    echo ""
+    print_step "Applying finishing touches..."
+
+    # Remove quarantine flags
+    if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
+        xattr -rd com.apple.quarantine "$GAME_APP" 2>/dev/null || true
+        print_substep "Quarantine flags removed"
+    else
+        print_substep "No quarantine flags present"
+    fi
+
+    # Apply ad-hoc code signature
+    # This reduces Gatekeeper friction without requiring a Developer ID
+    if codesign --force --deep --sign - "$GAME_APP" 2>/dev/null; then
+        print_substep "Ad-hoc code signature applied"
+    else
+        print_warning "Could not apply ad-hoc signature (game will still work)"
     fi
 
     CLEANUP_NEEDED=false  # Success - don't rollback on exit

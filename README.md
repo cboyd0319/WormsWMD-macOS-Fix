@@ -16,6 +16,8 @@ A comprehensive fix for Worms W.M.D black screen issues on macOS 26 (Tahoe) and 
 - [Detailed Installation](#detailed-installation)
 - [Restoring Original Files](#restoring-original-files)
 - [Troubleshooting](#troubleshooting)
+- [Frequently Asked Questions](#frequently-asked-questions)
+- [Known Limitations](#known-limitations)
 - [Technical Details](#technical-details)
 - [Security](#security)
 - [Contributing](#contributing)
@@ -314,6 +316,124 @@ softwareupdate --install-rosetta --agree-to-license
 
 If you still see issues, attach the log file when reporting.
 
+### Collecting diagnostics for bug reports
+
+Use the diagnostics collector to gather system information:
+
+```bash
+# Print to terminal
+./tools/collect_diagnostics.sh
+
+# Save to file for GitHub issue
+./tools/collect_diagnostics.sh --output ~/Desktop/worms-diagnostics.txt
+
+# Copy to clipboard
+./tools/collect_diagnostics.sh --copy
+
+# Full diagnostics (includes library details)
+./tools/collect_diagnostics.sh --full --output ~/Desktop/worms-full-diagnostics.txt
+```
+
+## Frequently Asked Questions
+
+### General
+
+**Q: Does this fix work on macOS 15 (Sequoia) or earlier?**
+
+A: You probably don't need it. This fix is specifically for macOS 26 (Tahoe) where Apple removed the AGL framework. Earlier versions should run the game without modification.
+
+**Q: Will this fix work for the GOG version?**
+
+A: Yes. The fix modifies the app bundle, which is identical between Steam and GOG versions. Just set `GAME_APP` to point to your GOG installation.
+
+**Q: Is this fix safe? Will it harm my computer?**
+
+A: Yes, it's safe. The fix only modifies files inside the game's app bundle, creates a backup first, never requires admin privileges, and is fully open source. See [SECURITY.md](SECURITY.md) for details.
+
+**Q: Can I undo this fix?**
+
+A: Yes. Run `./fix_worms_wmd.sh --restore` to restore from backup, or verify game files in Steam to re-download the original.
+
+### Technical
+
+**Q: Why do I need Intel Homebrew on Apple Silicon?**
+
+A: The game is x86_64-only and runs via Rosetta 2. The Qt frameworks must also be x86_64, which requires Intel Homebrew (`/usr/local/bin/brew`). ARM Homebrew (`/opt/homebrew`) provides arm64 libraries that won't work.
+
+**Q: Why Qt 5.15 instead of Qt 6?**
+
+A: Qt 5.15 maintains binary compatibility with the Qt 5.3 APIs the game uses. Qt 6 changed many APIs and would require source code modifications to the game itself.
+
+**Q: What does the AGL stub actually do?**
+
+A: Nothing, by design. The stub provides empty function implementations that return error codes. The game's binary has a dynamic link to AGL that must be satisfied for macOS to launch it, but the actual game code (via Qt 5.15) never calls these functions.
+
+**Q: Will Apple Silicon native support ever be possible?**
+
+A: Not without source code access. Team17 would need to rebuild the game as a universal binary (x86_64 + arm64). The community fix builds a universal AGL stub for future-proofing, but the main game binary will always require Rosetta 2.
+
+### Performance
+
+**Q: Is performance worse on Apple Silicon compared to Intel?**
+
+A: There's approximately 20-30% overhead from Rosetta 2 translation, but Apple Silicon Macs are fast enough that the game still runs well. Most users report smooth 60 FPS gameplay.
+
+**Q: The game runs slowly on first launch after the fix. Is this normal?**
+
+A: Yes. Rosetta 2 translates x86_64 code on first run and caches it. Subsequent launches will be faster.
+
+**Q: Are there any graphics settings I should change?**
+
+A: The game should work with default settings. If you experience issues, try lowering resolution or disabling some visual effects. The diagnostic launcher has a `--safe-mode` option for troubleshooting.
+
+### Troubleshooting
+
+**Q: I get "app is damaged" or Gatekeeper warnings. What do I do?**
+
+A: This is normal for unsigned apps. Right-click the app and choose "Open", then click "Open" in the dialog. The fix now applies ad-hoc code signing and clears quarantine flags to minimize these warnings.
+
+**Q: Multiplayer/online features don't work. Is this related to the fix?**
+
+A: The fix doesn't modify networking. If online features don't work, it's likely a server-side issue with Team17's infrastructure. Check the Steam community forums for current status.
+
+**Q: My controller doesn't work. Can the fix help?**
+
+A: The fix doesn't modify input handling. Controller support depends on the game's original implementation and macOS controller support. Try using a controller mapping tool like Joystick Doctor.
+
+## Known Limitations
+
+These limitations exist because we don't have access to the game's source code:
+
+### Cannot Be Fixed (Requires Team17)
+
+| Limitation | Impact | Why |
+|------------|--------|-----|
+| **FMOD uses deprecated runtime** | Audio may break in future macOS | FMOD libs link to removed libstdc++; Rosetta 2 provides shims for now |
+| **Steam API uses deprecated runtime** | Networking may break in future macOS | Same as FMOD; needs Steamworks SDK update |
+| **No native Apple Silicon** | ~20-30% performance overhead | Requires rebuilding game binary as universal |
+| **OpenGL only (deprecated)** | May break if Apple removes OpenGL | Needs Metal renderer implementation |
+| **No code signing by Team17** | Gatekeeper warnings | Only Team17 can sign with their Developer ID |
+
+### Workarounds Applied
+
+| Limitation | Our Workaround |
+|------------|----------------|
+| Gatekeeper warnings | Ad-hoc signing + quarantine removal |
+| Missing AGL framework | Stub library that satisfies dynamic linker |
+| Outdated Qt 5.3.2 | Replace with Qt 5.15 from Homebrew |
+| Missing Qt frameworks | Bundle QtDBus and QtSvg |
+| Hardcoded library paths | Rewrite to @executable_path |
+| HTTP config URLs | Upgrade to HTTPS |
+
+### What This Fix Does NOT Change
+
+- Game logic, physics, or gameplay mechanics
+- Save files or game data
+- Steam/GOG DRM or licensing
+- Network protocol or server communication
+- Audio processing or sound effects
+- Original graphics quality or assets
+
 ## Technical Details
 
 ### What Gets Modified
@@ -395,6 +515,7 @@ Please report issues on the [GitHub Issues](https://github.com/cboyd0319/WormsWM
 
 ## Version History
 
+- **1.3.0** (2025-12-25): Universal AGL stub, ad-hoc code signing, quarantine removal, diagnostics tool, expanded FAQ and Known Limitations
 - **1.2.5** (2025-12-25): Dry-run output now reflects Info.plist/config enhancements
 - **1.2.4** (2025-12-25): Verification output clarity for Info.plist/config checks
 - **1.2.3** (2025-12-25): Verification now checks Info.plist/config URLs; logging coverage for new scripts

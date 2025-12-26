@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-12-25
+
+### Added
+- **Universal AGL stub**: Now builds arm64 + x86_64 for future-proofing
+- **Ad-hoc code signing**: Automatically signs app bundle to reduce Gatekeeper friction
+- **Quarantine removal**: Clears macOS quarantine flags after fix
+- **System diagnostics tool**: `tools/collect_diagnostics.sh` for bug reports
+- **Expanded FAQ**: Comprehensive Q&A section in README
+- **Known Limitations section**: Clear documentation of what can/cannot be fixed
+- **Performance expectations**: Documented in Team17 developer report
+- **Compatibility matrix**: Detailed testing matrix in Team17 developer report
+- **Library version analysis**: FMOD, libcurl, Steam API version identification
+
+### Changed
+- Verification now checks code signing status and quarantine flags
+- AGL stub verification accepts universal binaries
+- Team17 developer report expanded to version 2.3
+
 ## [1.2.5] - 2025-12-25
 
 ### Changed
@@ -108,6 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundles dependency libraries from Homebrew
 - Fixes all library paths to use `@executable_path`
 
+[1.3.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.2...v1.2.3
