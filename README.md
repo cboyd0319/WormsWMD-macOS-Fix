@@ -78,5 +78,10 @@ The script installs these if needed (you may see system prompts):
 
 ## Links
 
-- Steam discussion thread: https://steamcommunity.com/app/327030/discussions/2/686363730790074305/
-- Worms W.M.D on Steam: https://store.steampowered.com/app/327030/Worms_WMD/
+- [Worms W.M.D on Steam](https://store.steampowered.com/app/327030/Worms_WMD/)
+
+Steam discussion threads about this issue:
+
+- [Can't open on macOS Tahoe M2](https://steamcommunity.com/app/327030/discussions/2/594035123771846058/)
+- [Black screen on Mac Pro 2019 16](https://steamcommunity.com/app/327030/discussions/2/686363730790074305/)
+- [Black screen on macOS](https://steamcommunity.com/app/327030/discussions/2/686365524184117509/)
