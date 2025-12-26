@@ -24,7 +24,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.3.0"
+VERSION="1.4.0"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -615,32 +615,49 @@ do_fix() {
         print_substep "Rosetta 2: available"
     fi
 
-    # Check Intel Homebrew
-    if [[ ! -f "/usr/local/bin/brew" ]]; then
-        echo ""
-        print_error "Intel Homebrew not found at /usr/local/bin/brew"
-        echo ""
-        echo "This fix requires Intel (x86_64) Homebrew to obtain Qt libraries."
-        echo ""
-        echo "Install Intel Homebrew with:"
-        echo "  arch -x86_64 /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        exit 1
-    fi
-    print_substep "Intel Homebrew: found"
+    # Check Qt source: prefer pre-built, fall back to Homebrew
+    QT_SOURCE=""
+    QT_PREFIX=""
 
-    # Check Qt 5
-    if [[ ! -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]; then
+    # First, try to use/download pre-built Qt frameworks
+    chmod +x "$SCRIPTS_DIR/download_qt_frameworks.sh" 2>/dev/null || true
+    if [[ -x "$SCRIPTS_DIR/download_qt_frameworks.sh" ]]; then
+        local prebuild_check
+        prebuild_check=$("$SCRIPTS_DIR/download_qt_frameworks.sh" --check 2>/dev/null || echo "unavailable")
+
+        if [[ "$prebuild_check" == "available" ]]; then
+            print_substep "Qt source: Pre-built frameworks (no Homebrew needed)"
+            QT_SOURCE="prebuild"
+        fi
+    fi
+
+    # Fall back to Homebrew if pre-built not available
+    if [[ -z "$QT_SOURCE" ]]; then
+        if [[ -f "/usr/local/bin/brew" ]] && [[ -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]; then
+            local qt_version
+            qt_version=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
+            qt_version=${qt_version:-unknown}
+            print_substep "Qt source: Homebrew ($qt_version)"
+            QT_SOURCE="homebrew"
+            QT_PREFIX="/usr/local/opt/qt@5"
+        fi
+    fi
+
+    # If neither available, show installation options
+    if [[ -z "$QT_SOURCE" ]]; then
         echo ""
-        print_error "Qt 5 not found"
+        print_error "Qt frameworks not available"
         echo ""
-        echo "Install Qt 5 with:"
+        echo "Option 1 (Recommended): The fix will automatically download pre-built frameworks."
+        echo "          Just run the fix and it will handle everything."
+        echo ""
+        echo "Option 2: Install Intel Homebrew and Qt manually:"
+        echo "  arch -x86_64 /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
         echo "  arch -x86_64 /usr/local/bin/brew install qt@5"
         exit 1
     fi
-    local qt_version
-    qt_version=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
-    qt_version=${qt_version:-unknown}
-    print_substep "Qt 5: $qt_version"
+
+    export QT_SOURCE QT_PREFIX
 
     # Check disk space (need ~200MB)
     local available_space
@@ -696,12 +713,38 @@ do_fix() {
 
     echo ""
     print_step "Replacing Qt frameworks..."
+
+    # If using pre-built, download first
+    if [[ "$QT_SOURCE" == "prebuild" ]]; then
+        start_spinner "Downloading Qt frameworks..."
+        local qt_extract_dir
+        qt_extract_dir=$("$SCRIPTS_DIR/download_qt_frameworks.sh" 2>/dev/null | tail -1)
+        stop_spinner
+
+        if [[ -d "$qt_extract_dir/Frameworks" ]]; then
+            export QT_PREFIX="$qt_extract_dir"
+            print_substep "Using pre-built Qt 5.15"
+        else
+            print_warning "Pre-built download failed, falling back to Homebrew"
+            QT_SOURCE="homebrew"
+            QT_PREFIX="/usr/local/opt/qt@5"
+        fi
+    fi
+
     chmod +x "$SCRIPTS_DIR/02_replace_qt_frameworks.sh"
-    export GAME_APP
+    export GAME_APP QT_SOURCE QT_PREFIX
     start_spinner "Copying frameworks..."
     "$SCRIPTS_DIR/02_replace_qt_frameworks.sh" > /dev/null
     stop_spinner
-    print_substep "Qt frameworks replaced (5.3.2 → $qt_version)"
+
+    local qt_version_display
+    if [[ "$QT_SOURCE" == "prebuild" ]]; then
+        qt_version_display="5.15 (pre-built)"
+    else
+        qt_version_display=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
+        qt_version_display="${qt_version_display:-5.15}"
+    fi
+    print_substep "Qt frameworks replaced (5.3.2 → $qt_version_display)"
 
     echo ""
     print_step "Copying dependencies..."

@@ -3,19 +3,36 @@
 # 02_replace_qt_frameworks.sh - Replace Qt 5.3 with Qt 5.15
 #
 # Replaces the outdated Qt 5.3.2 frameworks bundled with the game
-# with Qt 5.15 from Intel Homebrew.
+# with Qt 5.15 from pre-built package or Intel Homebrew.
+#
+# Environment Variables:
+#   QT_PREFIX   - Path to Qt installation (pre-built cache or Homebrew)
+#   QT_SOURCE   - "prebuild" or "homebrew"
 #
 
 set -e
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
-NEW_QT="${NEW_QT:-/usr/local/opt/qt@5/lib}"
-NEW_QT_PLUGINS="${NEW_QT_PLUGINS:-/usr/local/opt/qt@5/plugins}"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
+
+# Determine Qt source location
+QT_PREFIX="${QT_PREFIX:-/usr/local/opt/qt@5}"
+QT_SOURCE="${QT_SOURCE:-homebrew}"
+
+# Set paths based on source type
+if [[ "$QT_SOURCE" == "prebuild" ]]; then
+    # Pre-built package structure: Frameworks/ and PlugIns/
+    NEW_QT="$QT_PREFIX/Frameworks"
+    NEW_QT_PLUGINS="$QT_PREFIX/PlugIns"
+else
+    # Homebrew structure: lib/ and plugins/
+    NEW_QT="$QT_PREFIX/lib"
+    NEW_QT_PLUGINS="$QT_PREFIX/plugins"
+fi
 
 source "$SCRIPT_DIR/logging.sh"
 worms_log_init "02_replace_qt_frameworks"
@@ -37,14 +54,18 @@ fi
 mkdir -p "$GAME_FRAMEWORKS" "$GAME_PLUGINS/platforms" "$GAME_PLUGINS/imageformats"
 
 echo "=== Replacing Qt Frameworks ==="
-echo "Source: $NEW_QT"
+echo "Source: $NEW_QT ($QT_SOURCE)"
 echo "Target: $GAME_FRAMEWORKS"
 echo ""
 
 # Verify source exists
 if [ ! -d "$NEW_QT/QtCore.framework" ]; then
     echo "ERROR: Qt 5 not found at $NEW_QT"
-    echo "Install with: arch -x86_64 /usr/local/bin/brew install qt@5"
+    if [[ "$QT_SOURCE" == "homebrew" ]]; then
+        echo "Install with: arch -x86_64 /usr/local/bin/brew install qt@5"
+    else
+        echo "Pre-built package may be corrupted. Try running with --force to re-download."
+    fi
     exit 1
 fi
 

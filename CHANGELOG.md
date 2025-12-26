@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-12-25
+
+### Added
+- **Pre-built Qt frameworks**: Eliminates Homebrew requirement for most users
+  - Automatic download of pre-packaged Qt 5.15 x86_64 frameworks
+  - Falls back to Homebrew if pre-built not available
+  - `tools/package_qt_frameworks.sh` for creating distribution packages
+- **Steam update watcher**: `tools/watch_for_updates.sh`
+  - Monitors for Steam updates that overwrite the fix
+  - Optional LaunchAgent for automatic monitoring on login
+  - Prompts to reapply fix when needed
+- **Enhanced game launcher**: `tools/launch_worms.sh` improvements
+  - Crash detection and automatic crash reports
+  - Steam launch options integration (`--steam %command%`)
+  - Fix verification before launch (`--check-fix`)
+- **Save game backup tool**: `tools/backup_saves.sh`
+  - Backup and restore save games, settings, replays
+  - Supports both Steam Cloud and local saves
+- **Update checker**: `tools/check_updates.sh`
+  - Checks GitHub for new fix versions
+  - Optional automatic download of updates
+- **Controller helper**: `tools/controller_helper.sh`
+  - Diagnoses controller connectivity issues
+  - Configuration tips for Xbox, PlayStation, Switch Pro controllers
+  - Steam Input configuration guidance
+
+### Changed
+- Fix script now prefers pre-built Qt (no Homebrew needed)
+- Qt replacement script supports both pre-built and Homebrew sources
+- Crash reports saved to `~/Library/Logs/WormsWMD/crashes/`
+
 ## [1.3.0] - 2025-12-25
 
 ### Added
@@ -126,6 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundles dependency libraries from Homebrew
 - Fixes all library paths to use `@executable_path`
 
+[1.4.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.3...v1.2.4

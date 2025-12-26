@@ -21,6 +21,7 @@ A comprehensive fix for Worms W.M.D black screen issues on macOS 26 (Tahoe) and 
 - [Technical Details](#technical-details)
 - [Security](#security)
 - [Contributing](#contributing)
+- [Additional Tools](#additional-tools)
 - [License](#license)
 
 ## The Problem
@@ -49,13 +50,20 @@ This fix:
 
 Before running the fix, you need:
 
+- macOS 26 (Tahoe) or later
+- Worms W.M.D installed via Steam or GOG
+- Internet connection (for downloading pre-built Qt frameworks, ~50MB one-time download)
+- Approximately 200MB free disk space
+
+**Good news:** Homebrew is no longer required! The fix automatically downloads pre-built Qt frameworks. Homebrew is only used as a fallback if the download fails.
+
 ### 1. Rosetta 2 (Apple Silicon Macs only)
 
 ```bash
 softwareupdate --install-rosetta
 ```
 
-### 2. Intel Homebrew
+### 2. Intel Homebrew (Optional - Fallback Only)
 
 The fix requires Intel (x86_64) Homebrew to obtain x86_64 Qt libraries. This is separate from ARM Homebrew (`/opt/homebrew`).
 
@@ -513,8 +521,64 @@ Contributions are welcome! If you find issues or have improvements:
 
 Please report issues on the [GitHub Issues](https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues) page.
 
+## Additional Tools
+
+The fix includes several helpful utilities in the `tools/` directory:
+
+### Save Game Backup
+```bash
+# Backup your saves before making changes
+./tools/backup_saves.sh
+
+# List available backups
+./tools/backup_saves.sh --list
+
+# Restore from backup
+./tools/backup_saves.sh --restore
+```
+
+### Steam Update Watcher
+Steam's "Verify Integrity" will overwrite the fix. The watcher monitors for this:
+```bash
+# Check if fix is still applied
+./tools/watch_for_updates.sh --check
+
+# Run watcher in background
+./tools/watch_for_updates.sh --daemon &
+
+# Install to run automatically on login
+./tools/watch_for_updates.sh --install
+```
+
+### Steam Launch Options Integration
+Use the enhanced launcher with Steam for crash reporting:
+1. Right-click Worms W.M.D in Steam → Properties
+2. In "Launch Options", enter:
+   ```
+   "/path/to/WormsWMD-macOS-Fix/tools/launch_worms.sh" --steam %command%
+   ```
+
+### Update Checker
+```bash
+# Check for new versions
+./tools/check_updates.sh
+
+# Silent check (for scripts)
+./tools/check_updates.sh --quiet
+```
+
+### Controller Helper
+```bash
+# Diagnose controller issues
+./tools/controller_helper.sh
+
+# Show detailed controller info
+./tools/controller_helper.sh --info
+```
+
 ## Version History
 
+- **1.4.0** (2025-12-25): Pre-built Qt (no Homebrew needed), Steam update watcher, crash reporter, save backup, update checker, controller helper
 - **1.3.0** (2025-12-25): Universal AGL stub, ad-hoc code signing, quarantine removal, diagnostics tool, expanded FAQ and Known Limitations
 - **1.2.5** (2025-12-25): Dry-run output now reflects Info.plist/config enhancements
 - **1.2.4** (2025-12-25): Verification output clarity for Info.plist/config checks
