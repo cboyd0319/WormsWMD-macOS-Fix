@@ -72,13 +72,13 @@ if [ ! -d "$NEW_QT/QtCore.framework" ]; then
     exit 1
 fi
 
-FRAMEWORKS=()
+declare -a FRAMEWORKS=()
 
 append_unique() {
     local name="$1"
     local item
 
-    for item in "${FRAMEWORKS[@]}"; do
+    for item in "${FRAMEWORKS[@]:-}"; do
         if [[ "$item" == "$name" ]]; then
             return
         fi
