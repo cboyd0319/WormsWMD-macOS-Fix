@@ -48,44 +48,33 @@ This fix:
 
 ## Requirements
 
-Before running the fix, you need:
-
 - macOS 26 (Tahoe) or later
 - Worms W.M.D installed via Steam or GOG
-- Internet connection (for downloading pre-built Qt frameworks, ~50MB one-time download)
+- Internet connection (one-time ~50MB download)
 - Approximately 200MB free disk space
 
-**Good news:** Homebrew is no longer required! The fix automatically downloads pre-built Qt frameworks. Homebrew is only used as a fallback if the download fails.
-
-### 1. Rosetta 2 (Apple Silicon Macs only)
+### Rosetta 2 (Apple Silicon Macs only)
 
 ```bash
 softwareupdate --install-rosetta
 ```
 
-### 2. Intel Homebrew (Optional - Fallback Only)
+That's it! The fix automatically downloads pre-built Qt frameworks - no Homebrew or manual setup needed.
 
-The fix requires Intel (x86_64) Homebrew to obtain x86_64 Qt libraries. This is separate from ARM Homebrew (`/opt/homebrew`).
+<details>
+<summary><strong>Advanced: Manual Homebrew Setup (Optional Fallback)</strong></summary>
 
-**Check if installed:**
+If the pre-built Qt download fails, the fix will fall back to using Intel Homebrew. This is rarely needed, but if you want to set it up manually:
+
 ```bash
-/usr/local/bin/brew --version
-```
-
-**If not installed:**
-```bash
+# Install Intel Homebrew (if not present)
 arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
 
-### 3. Qt 5.15 (x86_64)
-
-Install Qt 5 using Intel Homebrew:
-```bash
+# Install Qt 5
 arch -x86_64 /usr/local/bin/brew install qt@5
 ```
 
-This installs required dependencies (glib, pcre2, libpng, freetype, etc.). The fix
-scans the Qt frameworks/plugins and bundles any Homebrew dylibs they reference.
+</details>
 
 ## Quick Start
 
@@ -228,28 +217,6 @@ fi
 
 ## Troubleshooting
 
-### "Intel Homebrew not found"
-
-Install Intel Homebrew:
-```bash
-arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-### "Qt 5 not found"
-
-Install Qt 5 via Intel Homebrew:
-```bash
-arch -x86_64 /usr/local/bin/brew install qt@5
-```
-
-### "Permission denied" errors during Homebrew install
-
-Fix directory permissions:
-```bash
-sudo mkdir -p /usr/local/var/homebrew/locks /usr/local/etc /usr/local/Frameworks
-sudo chown -R $(whoami) /usr/local/var /usr/local/etc /usr/local/Frameworks
-```
-
 ### Game still shows black screen after fix
 
 1. **Verify game files in Steam:**
@@ -324,6 +291,22 @@ softwareupdate --install-rosetta --agree-to-license
 
 If you still see issues, attach the log file when reporting.
 
+### Pre-built Qt download failed (Homebrew fallback)
+
+If the automatic Qt download fails, the fix will try to use Intel Homebrew as a fallback. If you see Homebrew-related errors:
+
+```bash
+# Install Intel Homebrew (Apple Silicon)
+arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Qt 5
+arch -x86_64 /usr/local/bin/brew install qt@5
+
+# If permission errors occur
+sudo mkdir -p /usr/local/var/homebrew/locks /usr/local/etc /usr/local/Frameworks
+sudo chown -R $(whoami) /usr/local/var /usr/local/etc /usr/local/Frameworks
+```
+
 ### Collecting diagnostics for bug reports
 
 Use the diagnostics collector to gather system information:
@@ -364,9 +347,9 @@ A: Yes. Run `./fix_worms_wmd.sh --restore` to restore from backup, or verify gam
 
 ### Technical
 
-**Q: Why do I need Intel Homebrew on Apple Silicon?**
+**Q: Does this fix require Homebrew?**
 
-A: The game is x86_64-only and runs via Rosetta 2. The Qt frameworks must also be x86_64, which requires Intel Homebrew (`/usr/local/bin/brew`). ARM Homebrew (`/opt/homebrew`) provides arm64 libraries that won't work.
+A: No! As of v1.4.0, the fix downloads pre-built Qt frameworks automatically. Homebrew is only used as a fallback if the download fails. If you do need the fallback, you'll need Intel Homebrew (`/usr/local/bin/brew`) on Apple Silicon because the game requires x86_64 libraries.
 
 **Q: Why Qt 5.15 instead of Qt 6?**
 
@@ -428,7 +411,7 @@ These limitations exist because we don't have access to the game's source code:
 |------------|----------------|
 | Gatekeeper warnings | Ad-hoc signing + quarantine removal |
 | Missing AGL framework | Stub library that satisfies dynamic linker |
-| Outdated Qt 5.3.2 | Replace with Qt 5.15 from Homebrew |
+| Outdated Qt 5.3.2 | Replace with Qt 5.15 (pre-built or Homebrew) |
 | Missing Qt frameworks | Bundle QtDBus and QtSvg |
 | Hardcoded library paths | Rewrite to @executable_path |
 | HTTP config URLs | Upgrade to HTTPS |
@@ -460,8 +443,8 @@ QtWidgets, QtOpenGL, QtPrintSupport).
 
 ### Libraries Added
 
-The fix bundles any Homebrew dylibs referenced by the Qt frameworks/plugins
-(`otool -L` scan of `/usr/local` and `@rpath` entries). Common libraries include:
+The fix bundles dylibs required by the Qt frameworks/plugins (detected via
+`otool -L` scan). Common libraries include:
 
 - **Regex:** libpcre2-8.0.dylib, libpcre2-16.0.dylib
 - **Compression:** libzstd.1.dylib, liblzma.5.dylib
@@ -470,7 +453,7 @@ The fix bundles any Homebrew dylibs referenced by the Qt frameworks/plugins
 - **Images:** libjpeg.8.dylib, libtiff.6.dylib
 - **WebP:** libwebp.7.dylib, libwebpdemux.2.dylib, libwebpmux.3.dylib, libsharpyuv.0.dylib
 
-The exact list can vary depending on your Homebrew versions and plugin set.
+The exact list can vary depending on the Qt version and plugin set.
 
 ### Plugins Updated
 
@@ -493,7 +476,7 @@ The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL fun
 This fix is designed to be transparent, safe, and reversible. Key security features:
 
 - **Open source**: All code is auditable
-- **No network access**: Scripts never connect to the internet
+- **Minimal network access**: One-time download of Qt frameworks from GitHub (~50MB)
 - **No elevated privileges**: Never requires `sudo`
 - **Reversible**: Full backup created before any changes
 - **Minimal scope**: Only modifies files inside the game bundle
