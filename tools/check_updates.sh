@@ -2,7 +2,7 @@
 #
 # check_updates.sh - Check for fix updates on GitHub
 #
-# Compares the installed version with the latest release on GitHub
+# Compares the installed version with the latest version on GitHub (main branch)
 # and notifies if an update is available.
 #
 # Usage:
@@ -16,7 +16,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 GITHUB_REPO="cboyd0319/WormsWMD-macOS-Fix"
-API_URL="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
+RAW_FIX_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/fix_worms_wmd.sh"
+ZIP_URL="https://github.com/${GITHUB_REPO}/archive/refs/heads/main.zip"
 
 # Colors
 RED='\033[0;31m'
@@ -32,14 +33,14 @@ print_help() {
     cat << 'EOF'
 Worms W.M.D Fix - Update Checker
 
-Checks for new versions of the fix on GitHub.
+Checks for new versions of the fix on GitHub (main branch).
 
 USAGE:
     ./check_updates.sh [OPTIONS]
 
 OPTIONS:
     --quiet, -q     Silent mode (exit code only: 0=up to date, 1=update available)
-    --download, -d  Download latest version if available
+    --download, -d  Download latest main-branch snapshot if available
     --help, -h      Show this help
 
 EXIT CODES:
@@ -73,19 +74,24 @@ get_current_version() {
 # Get latest version from GitHub
 get_latest_version() {
     local response
-    response=$(curl -sf "$API_URL" 2>/dev/null) || return 1
+    response=$(curl -sf "$RAW_FIX_URL" 2>/dev/null) || return 1
 
-    # Extract tag_name (e.g., "v1.3.0")
-    echo "$response" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/^v//'
+    # Extract VERSION="x.y.z"
+    local version
+    version=$(echo "$response" | grep -m1 'VERSION=' | cut -d'"' -f2)
+    if [[ -z "$version" ]]; then
+        return 2
+    fi
+    echo "$version"
 }
 
-# Get download URL for latest release
+# Get download URL for latest version
 get_download_url() {
-    local response
-    response=$(curl -sf "$API_URL" 2>/dev/null) || return 1
-
-    # Get the zipball URL
-    echo "$response" | grep -o '"zipball_url": *"[^"]*"' | head -1 | cut -d'"' -f4
+    if curl -sfI "$ZIP_URL" >/dev/null 2>&1; then
+        echo "$ZIP_URL"
+    else
+        return 1
+    fi
 }
 
 # Compare versions (returns 0 if v1 >= v2, 1 if v1 < v2)
@@ -98,9 +104,21 @@ version_compare() {
     IFS='.' read -ra v1_parts <<< "$v1"
     IFS='.' read -ra v2_parts <<< "$v2"
 
-    for i in 0 1 2; do
+    local max_parts=${#v1_parts[@]}
+    if [[ ${#v2_parts[@]} -gt $max_parts ]]; then
+        max_parts=${#v2_parts[@]}
+    fi
+
+    for ((i=0; i<max_parts; i++)); do
         local p1="${v1_parts[$i]:-0}"
         local p2="${v2_parts[$i]:-0}"
+
+        if [[ ! "$p1" =~ ^[0-9]+$ ]]; then
+            p1=0
+        fi
+        if [[ ! "$p2" =~ ^[0-9]+$ ]]; then
+            p2=0
+        fi
 
         if [[ "$p1" -gt "$p2" ]]; then
             return 0
@@ -136,7 +154,19 @@ done
 
 # Get versions
 current=$(get_current_version)
-latest=$(get_latest_version)
+if latest=$(get_latest_version); then
+    :
+else
+    status=$?
+    if ! $QUIET; then
+        if [[ "$status" -eq 2 ]]; then
+            echo -e "${YELLOW}Could not determine latest version (VERSION not found)${NC}"
+        else
+            echo -e "${RED}Could not check for updates (network error?)${NC}"
+        fi
+    fi
+    exit 2
+fi
 
 if [[ -z "$latest" ]] || [[ "$latest" == "null" ]]; then
     if ! $QUIET; then
@@ -166,21 +196,25 @@ if version_compare "$current" "$latest"; then
 else
     echo -e "${YELLOW}Update available!${NC}"
     echo ""
-    echo "Release page: https://github.com/${GITHUB_REPO}/releases/latest"
+    echo "Repo: https://github.com/${GITHUB_REPO}"
     echo ""
 
     if $DOWNLOAD; then
         echo "Downloading latest version..."
 
-        local download_url
-        download_url=$(get_download_url)
+        if download_url=$(get_download_url); then
+            :
+        else
+            echo -e "${RED}Could not get download URL${NC}"
+            exit 2
+        fi
 
         if [[ -z "$download_url" ]]; then
             echo -e "${RED}Could not get download URL${NC}"
             exit 2
         fi
 
-        local download_file="$HOME/Downloads/WormsWMD-Fix-${latest}.zip"
+        download_file="$HOME/Downloads/WormsWMD-Fix-${latest}.zip"
         if curl -L -o "$download_file" "$download_url"; then
             echo -e "${GREEN}Downloaded: $download_file${NC}"
             echo ""

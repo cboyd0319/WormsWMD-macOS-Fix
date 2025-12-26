@@ -19,6 +19,7 @@ BUILD_DIR="/tmp/agl_stub_build"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 worms_log_init "04_fix_library_paths"
 worms_debug_init
@@ -46,8 +47,31 @@ echo "--- Installing AGL stub framework ---"
 if [ -f "$BUILD_DIR/AGL" ]; then
     mkdir -p "$GAME_FRAMEWORKS/AGL.framework/Versions/A"
     cp "$BUILD_DIR/AGL" "$GAME_FRAMEWORKS/AGL.framework/Versions/A/AGL"
+    mkdir -p "$GAME_FRAMEWORKS/AGL.framework/Versions/A/Resources"
+    cat > "$GAME_FRAMEWORKS/AGL.framework/Versions/A/Resources/Info.plist" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.wormswmd.aglstub</string>
+    <key>CFBundleName</key>
+    <string>AGL</string>
+    <key>CFBundleExecutable</key>
+    <string>AGL</string>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+</dict>
+</plist>
+EOF
+    rm -f "$GAME_FRAMEWORKS/AGL.framework/Versions/A/A"
     ln -sf A "$GAME_FRAMEWORKS/AGL.framework/Versions/Current"
     ln -sf Versions/Current/AGL "$GAME_FRAMEWORKS/AGL.framework/AGL"
+    ln -sf Versions/Current/Resources "$GAME_FRAMEWORKS/AGL.framework/Resources"
     echo "AGL stub installed"
 else
     echo "WARNING: AGL stub not found at $BUILD_DIR/AGL"

@@ -34,6 +34,7 @@ else
     NEW_QT_PLUGINS="$QT_PREFIX/plugins"
 fi
 
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 worms_log_init "02_replace_qt_frameworks"
 worms_debug_init

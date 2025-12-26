@@ -9,7 +9,7 @@ This fix is a community-developed solution to make Worms W.M.D playable on macOS
 - **Transparent**: All source code is open and auditable
 - **Minimal**: Only modifies what's necessary to fix the game
 - **Reversible**: Creates backups before any changes
-- **Safe**: No network access, no elevated privileges, no system modifications
+- **Safe**: Minimal network access, no sudo required, no system modifications
 
 ---
 
@@ -43,7 +43,7 @@ This fix is a community-developed solution to make Worms W.M.D playable on macOS
 ## What This Fix Does NOT Do
 
 - **No system modifications**: Does not touch `/System`, `/Library`, or any system files
-- **No elevated privileges**: Never requires `sudo` or admin password
+- **No elevated privileges**: No `sudo` required (Apple installers may prompt for admin approval)
 - **No data collection**: Does not collect, transmit, or store any personal data
 - **No executables outside game**: Only modifies files inside the game bundle
 - **No persistent changes**: Can be fully reversed with `--restore`
@@ -51,11 +51,12 @@ This fix is a community-developed solution to make Worms W.M.D playable on macOS
 ### Network Access (Minimal)
 
 The fix makes limited network connections:
-- **Qt framework download**: One-time download of pre-built Qt frameworks from GitHub Releases (~50MB)
+- **Qt framework download**: One-time download of pre-built Qt frameworks from the repo dist/ folder (~50MB)
 - **Update checker** (optional): Checks GitHub API for new versions
 - **One-liner installer**: Downloads from GitHub
+- **Rosetta 2 / Xcode CLT** (if needed): Downloads from Apple software update servers
 
-All connections are to GitHub only. No third-party servers, no telemetry, no user data transmitted.
+Connections are limited to GitHub and Apple. No third-party servers, no telemetry, no user data transmitted.
 
 ### Optional Background Process
 
@@ -183,11 +184,11 @@ This fix uses the following external components:
 
 | Component | Source | Purpose |
 |-----------|--------|---------|
-| Qt 5.15 | Pre-built package from GitHub Releases, or Homebrew (`qt@5`) | Replace outdated Qt 5.3.2 |
+| Qt 5.15 | Pre-built package from repo dist/, or Homebrew (`qt@5`) | Replace outdated Qt 5.3.2 |
 | GLib, PCRE2, etc. | Bundled with Qt package or from Homebrew | Required by Qt 5.15 |
 
 All components are obtained from:
-- **GitHub Releases**: Pre-built Qt frameworks hosted on this repository's releases
+- **GitHub repository dist/**: Pre-built Qt frameworks hosted in this repository
 - **Homebrew** (fallback): Official macOS package manager (https://brew.sh)
 
 The AGL stub is compiled from source on your machine using Apple's Clang compiler.
@@ -197,7 +198,7 @@ The AGL stub is compiled from source on your machine using Apple's Clang compile
 The pre-built Qt package (`qt-frameworks-x86_64-*.tar.gz`) is:
 - Built from official Homebrew Qt 5.15
 - Packaged using `tools/package_qt_frameworks.sh` (you can inspect this script)
-- Hosted on GitHub Releases with SHA256 checksums
+- Hosted in repo dist/ with SHA256 checksums
 - Downloaded over HTTPS only
 - Verified with checksum before extraction
 
@@ -207,11 +208,10 @@ The pre-built Qt package (`qt-frameworks-x86_64-*.tar.gz`) is:
 
 ### Static Analysis
 
-All scripts pass ShellCheck with only cosmetic warnings:
+ShellCheck can report warnings (for example, sourced helper files or unused color vars). Run it to review the current set:
 
 ```bash
 $ shellcheck --severity=warning *.sh scripts/*.sh tools/*.sh
-# Only unused variable warnings (false positives for color constants)
 ```
 
 ### Syntax Validation
@@ -244,10 +244,9 @@ OK
 | Execute compiler | To build AGL stub | Runs `clang` (Xcode CLT) |
 
 **Not Required:**
-- No `sudo` or admin password
+- No `sudo` required for the fix itself
 - No System Preferences changes
 - No Keychain access
-- No network access
 - No microphone, camera, or location access
 
 ---
@@ -315,10 +314,10 @@ You can verify file integrity by comparing checksums:
 # Generate checksums for all scripts
 shasum -a 256 fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh src/*.c
 
-# Compare with known good values (published in releases)
+# Compare with known good values (published alongside dist/ tarballs)
 ```
 
-Checksums for each release are published on the [GitHub Releases](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases) page.
+Checksums are committed alongside the tarball in `dist/`.
 
 ---
 

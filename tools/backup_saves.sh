@@ -74,6 +74,21 @@ find_steam_saves() {
     printf '%s\n' "${found[@]}"
 }
 
+latest_path_by_mtime() {
+    local search_dir="$1"
+    local name_glob="$2"
+    local type="${3:-f}"
+
+    find "$search_dir" -mindepth 1 -maxdepth 1 -type "$type" -name "$name_glob" -print0 2>/dev/null \
+        | while IFS= read -r -d '' item; do
+            mtime=$(stat -f "%m" "$item" 2>/dev/null || echo 0)
+            printf '%s\t%s\n' "$mtime" "$item"
+        done \
+        | sort -nr \
+        | head -1 \
+        | cut -f2-
+}
+
 # Create backup
 do_backup() {
     echo -e "${BLUE}Creating save game backup...${NC}"
@@ -154,7 +169,7 @@ do_restore() {
 
     # If no file specified, use latest
     if [[ -z "$backup_file" ]]; then
-        backup_file=$(ls -t "$BACKUP_DIR"/saves-*.tar.gz 2>/dev/null | head -1)
+        backup_file=$(latest_path_by_mtime "$BACKUP_DIR" "saves-*.tar.gz" "f")
 
         if [[ -z "$backup_file" ]]; then
             echo -e "${RED}No backups found in $BACKUP_DIR${NC}"
@@ -222,18 +237,20 @@ do_list() {
     echo -e "${BLUE}Available backups:${NC}"
     echo ""
 
-    if [[ ! -d "$BACKUP_DIR" ]] || [[ -z "$(ls -A "$BACKUP_DIR" 2>/dev/null)" ]]; then
+    if [[ ! -d "$BACKUP_DIR" ]] || [[ -z "$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type f -name "saves-*.tar.gz" -print -quit 2>/dev/null)" ]]; then
         echo "No backups found in $BACKUP_DIR"
         exit 0
     fi
 
-    ls -lh "$BACKUP_DIR"/saves-*.tar.gz 2>/dev/null | while read -r line; do
-        echo "  $line"
-    done
-
     echo ""
-    local count
-    count=$(ls -1 "$BACKUP_DIR"/saves-*.tar.gz 2>/dev/null | wc -l | tr -d ' ')
+    local count=0
+    while IFS= read -r backup; do
+        [[ -n "$backup" ]] || continue
+        if ls_line=$(ls -lh "$backup" 2>/dev/null); then
+            echo "  $ls_line"
+            count=$((count + 1))
+        fi
+    done < <(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type f -name "saves-*.tar.gz" -print 2>/dev/null | sort)
     echo "Total: $count backup(s)"
 }
 

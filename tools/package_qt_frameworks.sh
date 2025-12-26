@@ -3,8 +3,8 @@
 # package_qt_frameworks.sh - Package Qt frameworks for distribution
 #
 # This script packages the required Qt 5.15 x86_64 frameworks and dependencies
-# into a tarball that can be hosted on GitHub Releases. This eliminates the
-# need for users to install Homebrew.
+# into a tarball that can be committed to the repo (dist/) for download.
+# This eliminates the need for users to install Homebrew.
 #
 # Usage:
 #   ./package_qt_frameworks.sh [--output DIR]
@@ -40,6 +40,21 @@ print_warning() {
     echo -e "${YELLOW}WARNING:${NC} ${1}"
 }
 
+latest_path_by_mtime() {
+    local search_dir="$1"
+    local name_glob="$2"
+    local type="${3:-d}"
+
+    find "$search_dir" -mindepth 1 -maxdepth 1 -type "$type" -name "$name_glob" -print0 2>/dev/null \
+        | while IFS= read -r -d '' item; do
+            mtime=$(stat -f "%m" "$item" 2>/dev/null || echo 0)
+            printf '%s\t%s\n' "$mtime" "$item"
+        done \
+        | sort -nr \
+        | head -1 \
+        | cut -f2-
+}
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -68,7 +83,12 @@ if [[ ! -d "$QT_PREFIX" ]]; then
     exit 1
 fi
 
-QT_VERSION=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
+QT_VERSION_PATH=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+if [[ -n "$QT_VERSION_PATH" ]]; then
+    QT_VERSION=$(basename "$QT_VERSION_PATH")
+else
+    QT_VERSION=""
+fi
 if [[ -z "$QT_VERSION" ]]; then
     print_error "Could not determine Qt version"
     exit 1
@@ -135,7 +155,8 @@ print_step "Scanning for Homebrew dependencies..."
 DEPS_DIR="$WORK_DIR/Dependencies"
 mkdir -p "$DEPS_DIR"
 
-declare -A COPIED_DEPS
+COPIED_DEPS_FILE="$WORK_DIR/.copied_deps"
+touch "$COPIED_DEPS_FILE"
 
 copy_deps() {
     local binary="$1"
@@ -147,13 +168,13 @@ copy_deps() {
             dep_name=$(basename "$dep")
 
             # Skip if already copied
-            if [[ -n "${COPIED_DEPS[$dep_name]}" ]]; then
+            if grep -Fqx -- "$dep_name" "$COPIED_DEPS_FILE"; then
                 continue
             fi
 
             if [[ -f "$dep" ]]; then
                 cp "$dep" "$DEPS_DIR/"
-                COPIED_DEPS[$dep_name]=1
+                echo "$dep_name" >> "$COPIED_DEPS_FILE"
                 echo "  Copied $dep_name"
 
                 # Recursively check this dependency
@@ -239,5 +260,6 @@ echo "Archive: $ARCHIVE_PATH"
 echo "Size: $SIZE"
 echo "SHA256: $CHECKSUM"
 echo ""
-echo "Upload this file to GitHub Releases and update the download URL in:"
-echo "  scripts/download_qt_frameworks.sh"
+echo "Commit these files to the repo dist/ folder:"
+echo "  $ARCHIVE_PATH"
+echo "  ${ARCHIVE_PATH}.sha256"

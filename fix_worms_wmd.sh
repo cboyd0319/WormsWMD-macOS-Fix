@@ -31,6 +31,7 @@ TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
 WORMSWMD_VERBOSE="${WORMSWMD_VERBOSE:-false}"
 
+# shellcheck source=./scripts/logging.sh
 source "$SCRIPTS_DIR/logging.sh"
 
 # Default game location (uses $HOME instead of ~ for reliability)
@@ -108,6 +109,21 @@ print_dry_run() {
     echo -e "${DIM}   [dry-run] $1${NC}"
 }
 
+latest_path_by_mtime() {
+    local search_dir="$1"
+    local name_glob="$2"
+    local type="${3:-d}"
+
+    find "$search_dir" -mindepth 1 -maxdepth 1 -type "$type" -name "$name_glob" -print0 2>/dev/null \
+        | while IFS= read -r -d '' item; do
+            mtime=$(stat -f "%m" "$item" 2>/dev/null || echo 0)
+            printf '%s\t%s\n' "$mtime" "$item"
+        done \
+        | sort -nr \
+        | head -1 \
+        | cut -f2-
+}
+
 init_logging() {
     local script_name="$1"
     local was_logging="${WORMSWMD_LOGGING_INITIALIZED:-}"
@@ -134,7 +150,7 @@ start_spinner() {
     local msg="$1"
     if [[ -t 1 ]] && ! $DRY_RUN; then
         (
-            frames=('|' '/' '-' '\\')
+            frames=("|" "/" "-" "\\")
             i=0
             while true; do
                 printf "\r    ${CYAN}%s${NC} %s" "${frames[i]}" "$msg"
@@ -148,7 +164,6 @@ start_spinner() {
 }
 
 stop_spinner() {
-    local success="${1:-true}"
     if [[ -n "$spinner_pid" ]]; then
         kill "$spinner_pid" 2>/dev/null || true
         wait "$spinner_pid" 2>/dev/null || true
@@ -607,7 +622,7 @@ do_restore() {
     echo "Looking for backups..."
     echo ""
 
-    backups=$(ls -d "$HOME/Documents/WormsWMD-Backup-"* 2>/dev/null || true)
+    backups=$(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print 2>/dev/null)
     if [[ -z "$backups" ]]; then
         print_error "No backups found in $HOME/Documents/"
         echo ""
@@ -621,7 +636,7 @@ do_restore() {
     echo ""
 
     # Use the most recent backup
-    latest=$(ls -dt "$HOME/Documents/WormsWMD-Backup-"* 2>/dev/null | head -1)
+    latest=$(latest_path_by_mtime "$HOME/Documents" "WormsWMD-Backup-*" "d")
     echo "Most recent backup: $latest"
     echo ""
 
@@ -733,8 +748,13 @@ do_dry_run() {
         exit 1
     fi
     local qt_version
-    qt_version=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
-    qt_version=${qt_version:-unknown}
+    local qt_version_path
+    qt_version_path=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+    if [[ -n "$qt_version_path" ]]; then
+        qt_version=$(basename "$qt_version_path")
+    else
+        qt_version="unknown"
+    fi
     print_dry_run "Qt 5: $qt_version"
 
     echo ""
@@ -878,8 +898,13 @@ do_fix() {
     if [[ -z "$QT_SOURCE" ]]; then
         if [[ -f "/usr/local/bin/brew" ]] && [[ -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]; then
             local qt_version
-            qt_version=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
-            qt_version=${qt_version:-unknown}
+            local qt_version_path
+            qt_version_path=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+            if [[ -n "$qt_version_path" ]]; then
+                qt_version=$(basename "$qt_version_path")
+            else
+                qt_version="unknown"
+            fi
             print_substep "Qt source: Homebrew ($qt_version)"
             QT_SOURCE="homebrew"
             QT_PREFIX="/usr/local/opt/qt@5"
@@ -984,8 +1009,13 @@ do_fix() {
     if [[ "$QT_SOURCE" == "prebuild" ]]; then
         qt_version_display="5.15 (pre-built)"
     else
-        qt_version_display=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
-        qt_version_display="${qt_version_display:-5.15}"
+        local qt_version_display_path
+        qt_version_display_path=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+        if [[ -n "$qt_version_display_path" ]]; then
+            qt_version_display=$(basename "$qt_version_display_path")
+        else
+            qt_version_display="5.15"
+        fi
     fi
     print_substep "Qt frameworks replaced (5.3.2 → $qt_version_display)"
 
@@ -1049,9 +1079,9 @@ do_fix() {
     print_step "Applying finishing touches..."
 
     # Remove quarantine flags
+    xattr -rd com.apple.quarantine "$GAME_APP" 2>/dev/null || true
     if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
-        xattr -rd com.apple.quarantine "$GAME_APP" 2>/dev/null || true
-        print_substep "Quarantine flags removed"
+        print_warning "Quarantine flag still present (may cause Gatekeeper warnings)"
     else
         print_substep "No quarantine flags present"
     fi

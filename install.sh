@@ -18,12 +18,11 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
 if [[ -t 1 ]]; then
     RED='\033[0;31m'
     GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
     BLUE='\033[0;34m'
     BOLD='\033[1m'
     NC='\033[0m'
 else
-    RED='' GREEN='' YELLOW='' BLUE='' BOLD='' NC=''
+    RED='' GREEN='' BLUE='' BOLD='' NC=''
 fi
 
 print_step() { echo -e "${GREEN}==>${NC} ${BOLD}$1${NC}"; }
@@ -64,45 +63,6 @@ if ! command -v git &>/dev/null && ! command -v curl &>/dev/null; then
     print_error "git or curl is required but not installed."
     exit 1
 fi
-
-# Check architecture and Rosetta
-arch_name=$(uname -m)
-if [[ "$arch_name" == "arm64" ]]; then
-    if ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
-        echo ""
-        print_error "Rosetta 2 is required but not installed."
-        echo ""
-        echo "Install Rosetta 2 with:"
-        echo "  softwareupdate --install-rosetta"
-        echo ""
-        echo "Then run this installer again."
-        exit 1
-    fi
-    print_info "Rosetta 2: available"
-fi
-
-# Check Intel Homebrew
-if [[ ! -f "/usr/local/bin/brew" ]]; then
-    echo ""
-    print_error "Intel Homebrew is required but not installed."
-    echo ""
-    echo "Install Intel Homebrew with:"
-    echo "  arch -x86_64 /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-    echo ""
-    echo "Then run this installer again."
-    exit 1
-fi
-print_info "Intel Homebrew: found"
-
-# Check Qt 5
-if [[ ! -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]; then
-    echo ""
-    print_info "Qt 5 not found. Installing..."
-    echo ""
-    arch -x86_64 /usr/local/bin/brew install qt@5
-    echo ""
-fi
-print_info "Qt 5: installed"
 
 print_success "Prerequisites OK!"
 echo ""

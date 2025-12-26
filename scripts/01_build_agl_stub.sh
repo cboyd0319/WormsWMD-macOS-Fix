@@ -13,6 +13,7 @@ SRC_DIR="$(dirname "$SCRIPT_DIR")/src"
 BUILD_DIR="/tmp/agl_stub_build"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 worms_log_init "01_build_agl_stub"
 worms_debug_init

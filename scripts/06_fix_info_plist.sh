@@ -15,6 +15,7 @@ INFO_PLIST="$GAME_APP/Contents/Info.plist"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 worms_log_init "06_fix_info_plist"
 worms_debug_init

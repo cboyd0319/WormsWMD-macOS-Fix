@@ -17,8 +17,6 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 OUTPUT_FILE=""
 FULL_MODE=false
@@ -95,6 +93,21 @@ fail() {
 
 info() {
     echo "  $1"
+}
+
+latest_path_by_mtime() {
+    local search_dir="$1"
+    local name_glob="$2"
+    local type="${3:-d}"
+
+    find "$search_dir" -mindepth 1 -maxdepth 1 -type "$type" -name "$name_glob" -print0 2>/dev/null \
+        | while IFS= read -r -d '' item; do
+            mtime=$(stat -f "%m" "$item" 2>/dev/null || echo 0)
+            printf '%s\t%s\n' "$mtime" "$item"
+        done \
+        | sort -nr \
+        | head -1 \
+        | cut -f2-
 }
 
 # Parse arguments
@@ -287,7 +300,13 @@ collect_diagnostics() {
     if [[ -d "/usr/local/opt/qt@5" ]]; then
         ok "Qt 5 found"
         local qt5_version
-        qt5_version=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1 || echo "unknown")
+        local qt5_version_path
+        qt5_version_path=$(latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
+        if [[ -n "$qt5_version_path" ]]; then
+            qt5_version=$(basename "$qt5_version_path")
+        else
+            qt5_version="unknown"
+        fi
         info "Version: $qt5_version"
 
         if [[ -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]; then
@@ -366,9 +385,9 @@ collect_diagnostics() {
 
         subsection "All Frameworks"
         if [[ -d "$GAME_APP/Contents/Frameworks" ]]; then
-            ls -la "$GAME_APP/Contents/Frameworks/" 2>/dev/null | while read -r line; do
-                info "$line"
-            done
+            while IFS= read -r -d '' entry; do
+                info "$(ls -la -d "$entry" 2>/dev/null || true)"
+            done < <(find "$GAME_APP/Contents/Frameworks" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
         fi
 
         subsection "All Bundled Libraries"
@@ -416,12 +435,21 @@ collect_diagnostics() {
 
         subsection "Fix Tool Backups"
         local backup_count
-        backup_count=$(ls -d "$HOME/Documents/WormsWMD-Backup-"* 2>/dev/null | wc -l | tr -d ' ')
+        backup_count=$(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print 2>/dev/null | wc -l | tr -d ' ')
         info "Backup directories found: $backup_count"
         if [[ "$backup_count" -gt 0 ]]; then
-            ls -dt "$HOME/Documents/WormsWMD-Backup-"* 2>/dev/null | head -3 | while read -r backup; do
-                info "  $(basename "$backup")"
-            done
+            find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null \
+                | while IFS= read -r -d '' backup; do
+                    mtime=$(stat -f "%m" "$backup" 2>/dev/null || echo 0)
+                    printf '%s\t%s\n' "$mtime" "$backup"
+                done \
+                | sort -nr \
+                | head -3 \
+                | cut -f2- \
+                | while IFS= read -r backup; do
+                    [[ -n "$backup" ]] || continue
+                    info "  $(basename "$backup")"
+                done
         fi
     fi
 

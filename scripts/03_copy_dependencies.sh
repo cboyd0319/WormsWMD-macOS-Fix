@@ -16,6 +16,7 @@ GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 worms_log_init "03_copy_dependencies"
 worms_debug_init

@@ -3,7 +3,6 @@
 [![CI](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml/badge.svg)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![macOS](https://img.shields.io/badge/macOS-26.0%2B-blue.svg)](https://www.apple.com/macos/)
-[![GitHub release](https://img.shields.io/github/v/release/cboyd0319/WormsWMD-macOS-Fix?include_prereleases)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases)
 
 A comprehensive community fix for Worms W.M.D on macOS 26 (Tahoe) and later. Fixes the black screen issue, improves stability, and includes tools for crash reporting, save backups, and more.
 
@@ -80,10 +79,10 @@ This is a comprehensive fix that not only makes the game playable, but also impr
 - Worms W.M.D installed via Steam or GOG
 - Internet connection
 
-**That's it!** Everything else is installed automatically:
+**That's it!** Everything else is installed automatically (you may see system prompts for Apple components):
 - Rosetta 2 (for Apple Silicon Macs)
 - Xcode Command Line Tools (for building components)
-- Qt frameworks (downloaded automatically)
+- Qt frameworks (downloaded from GitHub; Homebrew fallback if needed)
 
 ## Quick Start
 
@@ -465,8 +464,8 @@ The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL fun
 This fix is designed to be transparent, safe, and reversible. Key security features:
 
 - **Open source**: All code is auditable
-- **Minimal network access**: One-time download of Qt frameworks from GitHub (~50MB)
-- **No elevated privileges**: Never requires `sudo`
+- **Minimal network access**: Downloads from GitHub and Apple (Rosetta/CLT), no telemetry
+- **No elevated privileges**: No `sudo` required (Rosetta/CLT may prompt for admin approval)
 - **Reversible**: Full backup created before any changes
 - **Minimal scope**: Only modifies files inside the game bundle
 

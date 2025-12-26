@@ -16,12 +16,12 @@ LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --verbose)
-            WORMSWMD_VERBOSE=1
+            export WORMSWMD_VERBOSE=1
             shift
             ;;
         --debug)
-            WORMSWMD_DEBUG=1
-            WORMSWMD_VERBOSE=1
+            export WORMSWMD_DEBUG=1
+            export WORMSWMD_VERBOSE=1
             shift
             ;;
         --help|-h)
@@ -35,6 +35,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 worms_log_init "05_verify_installation"
 worms_debug_init
@@ -345,8 +346,7 @@ echo "--- Checking code signing and quarantine ---"
 warnings_before=$warnings
 
 # Check quarantine
-quarantine_flag=$(xattr -l "$GAME_APP" 2>/dev/null | grep -c "quarantine" || echo "0")
-if [ "$quarantine_flag" != "0" ]; then
+if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
     echo "WARNING: Quarantine flag is set (may cause Gatekeeper warnings)"
     ((warnings++))
 else

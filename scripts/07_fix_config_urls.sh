@@ -14,6 +14,7 @@ DATA_DIR="$GAME_APP/Contents/Resources/DataOSX"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 worms_log_init "07_fix_config_urls"
 worms_debug_init
