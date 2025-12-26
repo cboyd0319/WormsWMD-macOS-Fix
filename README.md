@@ -5,7 +5,7 @@
 [![macOS](https://img.shields.io/badge/macOS-26.0%2B-blue.svg)](https://www.apple.com/macos/)
 [![GitHub release](https://img.shields.io/github/v/release/cboyd0319/WormsWMD-macOS-Fix?include_prereleases)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases)
 
-A comprehensive fix for Worms W.M.D black screen issues on macOS 26 (Tahoe) and later.
+A comprehensive community fix for Worms W.M.D on macOS 26 (Tahoe) and later. Fixes the black screen issue, improves stability, and includes tools for crash reporting, save backups, and more.
 
 ## Table of Contents
 
@@ -40,11 +40,39 @@ Starting with macOS 26 (Tahoe), Apple removed the AGL (Apple OpenGL) framework t
 
 ## The Solution
 
-This fix:
-1. **Creates an AGL stub library** that satisfies the game's AGL dependency
-2. **Replaces outdated Qt 5.3.2 frameworks** with Qt 5.15 (which has better OpenGL compatibility)
-3. **Bundles all required dependencies** so the game is fully self-contained
-4. **Fixes all library path references** to use `@executable_path` for portability
+This is a comprehensive fix that not only makes the game playable, but also improves stability, security, and the overall experience.
+
+### Core Fixes
+
+| Fix | What It Does |
+|-----|--------------|
+| **AGL Stub Library** | Provides a stub for the removed AGL framework so macOS will launch the game |
+| **Qt 5.15 Upgrade** | Replaces outdated Qt 5.3.2 (2014) with Qt 5.15 for modern OpenGL compatibility |
+| **Dependency Bundling** | Bundles all required libraries so the game is fully self-contained |
+| **Library Path Fixes** | Rewrites all paths to use `@executable_path` for portability |
+
+### Enhancements
+
+| Enhancement | What It Does |
+|-------------|--------------|
+| **Ad-hoc Code Signing** | Signs the app bundle to reduce Gatekeeper warnings |
+| **Quarantine Removal** | Clears macOS quarantine flags that cause "damaged app" dialogs |
+| **Info.plist Fixes** | Adds missing CFBundleIdentifier, enables HiDPI/Retina, GPU switching |
+| **Config URL Security** | Upgrades HTTP→HTTPS, disables defunct internal Team17 URLs |
+| **Universal AGL Stub** | Builds arm64 + x86_64 binary for future macOS compatibility |
+| **Pre-built Qt Packages** | No Homebrew required - downloads ready-to-use Qt frameworks |
+
+### Tools Included
+
+| Tool | What It Does |
+|------|--------------|
+| **Crash Reporter** | Detects crashes and saves diagnostic reports automatically |
+| **Steam Update Watcher** | Monitors for Steam updates that overwrite the fix, prompts to reapply |
+| **Save Game Backup** | Backup and restore saves, settings, and replays |
+| **Update Checker** | Checks GitHub for new versions of this fix |
+| **Controller Helper** | Diagnoses controller connectivity, provides configuration tips |
+| **Diagnostics Collector** | Gathers system info for bug reports |
+| **Enhanced Launcher** | Launch with logging, safe mode, Steam integration |
 
 ## Requirements
 
