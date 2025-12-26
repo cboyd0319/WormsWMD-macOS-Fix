@@ -1,5 +1,37 @@
 # Troubleshooting
 
+## Install Fix.command won't run
+
+Gatekeeper blocks `.command` files downloaded from the internet. Try these options:
+
+1. **Right-click method:**
+   - Right-click `Install Fix.command` → select **Open** → select **Open** again in the dialog
+
+2. **Remove quarantine flag:**
+   ```bash
+   xattr -d com.apple.quarantine ~/Downloads/Install\ Fix.command
+   ```
+   Then double-click the file.
+
+3. **Run from Terminal:**
+   ```bash
+   bash ~/Downloads/Install\ Fix.command
+   ```
+
+4. **Use the one-liner instead:**
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
+   ```
+
+## Small window on first launch
+
+The game window may appear very small on the first launch after applying the fix. This is normal and resolves on subsequent launches.
+
+If the window stays small:
+1. Press **Esc** or go to **Help & Options** → **Settings** → **Display**
+2. Change **Resolution** to your preferred size
+3. Select **Apply** and restart the game
+
 ## Game still shows a black screen
 
 1. Verify game files in Steam:

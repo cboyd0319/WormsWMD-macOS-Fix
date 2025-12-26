@@ -12,7 +12,8 @@ Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibilit
 
 1. Download [`Install Fix.command`](https://github.com/cboyd0319/WormsWMD-macOS-Fix/raw/main/Install%20Fix.command).
 2. Double-click the file.
-3. If macOS blocks it, right-click and select **Open**.
+3. If macOS blocks it, right-click → **Open** → **Open** again.
+4. If it still won't run, see [Troubleshooting](docs/TROUBLESHOOTING.md#install-fixcommand-wont-run).
 
 ### Option 2: One-liner (Terminal)
 
