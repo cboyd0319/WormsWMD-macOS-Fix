@@ -11,6 +11,18 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SRC_DIR="$(dirname "$SCRIPT_DIR")/src"
 BUILD_DIR="/tmp/agl_stub_build"
+LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
+
+source "$SCRIPT_DIR/logging.sh"
+worms_log_init "01_build_agl_stub"
+worms_debug_init
+
+if [[ -z "$LOGGING_PRESET" ]]; then
+    echo "Log file: $LOG_FILE"
+    if worms_bool_true "${WORMSWMD_DEBUG:-}"; then
+        echo "Trace log: $TRACE_FILE"
+    fi
+fi
 
 echo "=== Building AGL Stub Library ==="
 

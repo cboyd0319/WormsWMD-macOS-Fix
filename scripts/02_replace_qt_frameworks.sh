@@ -14,6 +14,19 @@ NEW_QT="${NEW_QT:-/usr/local/opt/qt@5/lib}"
 NEW_QT_PLUGINS="${NEW_QT_PLUGINS:-/usr/local/opt/qt@5/plugins}"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
+
+source "$SCRIPT_DIR/logging.sh"
+worms_log_init "02_replace_qt_frameworks"
+worms_debug_init
+
+if [[ -z "$LOGGING_PRESET" ]]; then
+    echo "Log file: $LOG_FILE"
+    if worms_bool_true "${WORMSWMD_DEBUG:-}"; then
+        echo "Trace log: $TRACE_FILE"
+    fi
+fi
 
 if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]] || [[ ! -f "$GAME_EXEC" ]]; then
     echo "ERROR: Invalid GAME_APP: $GAME_APP"
@@ -35,10 +48,67 @@ if [ ! -d "$NEW_QT/QtCore.framework" ]; then
     exit 1
 fi
 
-# Frameworks to replace
-FRAMEWORKS="QtCore QtGui QtWidgets QtOpenGL QtPrintSupport"
+framework_binary() {
+    local fw_dir="$1"
+    local fw_name="$2"
 
-for fw in $FRAMEWORKS; do
+    if [ -f "$fw_dir/Versions/5/$fw_name" ]; then
+        echo "$fw_dir/Versions/5/$fw_name"
+        return
+    fi
+    if [ -f "$fw_dir/Versions/Current/$fw_name" ]; then
+        echo "$fw_dir/Versions/Current/$fw_name"
+        return
+    fi
+    if [ -f "$fw_dir/Versions/A/$fw_name" ]; then
+        echo "$fw_dir/Versions/A/$fw_name"
+        return
+    fi
+    if [ -f "$fw_dir/$fw_name" ]; then
+        echo "$fw_dir/$fw_name"
+        return
+    fi
+}
+
+FRAMEWORKS=()
+
+append_unique() {
+    local name="$1"
+    local item
+
+    for item in "${FRAMEWORKS[@]}"; do
+        if [[ "$item" == "$name" ]]; then
+            return
+        fi
+    done
+
+    FRAMEWORKS+=("$name")
+}
+
+for fw_dir in "$GAME_FRAMEWORKS"/Qt*.framework; do
+    if [ -d "$fw_dir" ]; then
+        fw_name=$(basename "$fw_dir" .framework)
+        append_unique "$fw_name"
+    fi
+done
+
+if [ ${#FRAMEWORKS[@]} -eq 0 ]; then
+    for fw_name in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport; do
+        append_unique "$fw_name"
+    done
+fi
+
+# QtDBus is required by libqcocoa on modern Qt
+append_unique "QtDBus"
+# QtSvg is required by the imageformats/libqsvg plugin
+append_unique "QtSvg"
+
+for fw in "${FRAMEWORKS[@]}"; do
+    if [ ! -d "$NEW_QT/$fw.framework" ]; then
+        echo "WARNING: $fw.framework not found in $NEW_QT"
+        continue
+    fi
+
     echo "Replacing $fw.framework..."
 
     # Remove old framework
@@ -48,16 +118,14 @@ for fw in $FRAMEWORKS; do
     cp -R "$NEW_QT/$fw.framework" "$GAME_FRAMEWORKS/"
 
     # Update install name to use @executable_path
-    install_name_tool -id "@executable_path/../Frameworks/$fw.framework/Versions/5/$fw" \
-        "$GAME_FRAMEWORKS/$fw.framework/Versions/5/$fw"
+    fw_path="$GAME_FRAMEWORKS/$fw.framework"
+    fw_bin=$(framework_binary "$fw_path" "$fw")
+    if [ -n "$fw_bin" ]; then
+        rel_path="${fw_bin#"$fw_path"/}"
+        install_name_tool -id "@executable_path/../Frameworks/$fw.framework/$rel_path" \
+            "$fw_bin"
+    fi
 done
-
-# Add QtDBus (required by libqcocoa)
-echo "Adding QtDBus.framework..."
-rm -rf "$GAME_FRAMEWORKS/QtDBus.framework"
-cp -R "$NEW_QT/QtDBus.framework" "$GAME_FRAMEWORKS/"
-install_name_tool -id "@executable_path/../Frameworks/QtDBus.framework/Versions/5/QtDBus" \
-    "$GAME_FRAMEWORKS/QtDBus.framework/Versions/5/QtDBus"
 
 echo ""
 echo "=== Replacing Qt Plugins ==="

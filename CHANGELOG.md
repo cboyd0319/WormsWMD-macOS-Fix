@@ -5,13 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2025-12-25
+
+### Added
+- Comprehensive Team17 developer report (`TEAM17_DEVELOPER_REPORT.md`) for official fix guidance
+- Verification now reports missing `@executable_path`/`@loader_path` dependencies
+- Per-run log files in `~/Library/Logs/WormsWMD-Fix` with `--log-file` override
+- Debug tracing (`--debug`) and verbose verification output (`--verbose`)
+- QtSvg.framework is bundled when missing (required by SVG image plugin)
+- Verification now checks binary architectures for x86_64 compatibility
+
+### Changed
+- Qt framework replacement now targets the frameworks present in the game bundle and adjusts install names based on their layout
+- Dependency bundling and install-name fixes now scan bundled binaries instead of relying on a hardcoded list
+- Verification output includes system info to help diagnose environment-specific failures
 
 ### Fixed
+- ShellCheck warnings resolved (SC2155, SC2295)
 - AGL stub now compiles cleanly with stricter warnings enabled
 - Dependency copy step no longer fails early under `set -e`
 - More reliable Rosetta detection (checks actual x86_64 execution)
 - Stronger validation that `GAME_APP` points to a real app bundle before running destructive operations
+- Installer no longer resets or removes existing installs; it backs up and re-clones instead
 
 ## [1.1.0] - 2025-12-25
 
@@ -53,8 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 - Replaces 5 Qt frameworks (QtCore, QtGui, QtWidgets, QtOpenGL, QtPrintSupport)
 - Adds QtDBus.framework (required by libqcocoa.dylib)
-- Bundles 16 dependency libraries from Homebrew
+- Bundles dependency libraries from Homebrew
 - Fixes all library paths to use `@executable_path`
 
+[1.2.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/tag/v1.0.0

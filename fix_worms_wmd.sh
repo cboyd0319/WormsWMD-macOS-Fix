@@ -24,7 +24,13 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.1.0"
+VERSION="1.2.0"
+LOG_FILE="${LOG_FILE:-}"
+TRACE_FILE="${TRACE_FILE:-}"
+WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
+WORMSWMD_VERBOSE="${WORMSWMD_VERBOSE:-false}"
+
+source "$SCRIPTS_DIR/logging.sh"
 
 # Default game location (uses $HOME instead of ~ for reliability)
 DEFAULT_GAME_PATH="$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
@@ -101,6 +107,25 @@ print_dry_run() {
     echo -e "${DIM}   [dry-run] $1${NC}"
 }
 
+init_logging() {
+    local script_name="$1"
+    local was_logging="${WORMSWMD_LOGGING_INITIALIZED:-}"
+
+    worms_log_init "$script_name"
+    worms_debug_init
+    export WORMSWMD_DEBUG WORMSWMD_VERBOSE TRACE_FILE
+
+    if [[ -z "$was_logging" ]]; then
+        print_info "Log file: $LOG_FILE"
+        if worms_bool_true "${WORMSWMD_DEBUG:-}"; then
+            print_info "Trace log: $TRACE_FILE"
+        fi
+        if worms_verbose_enabled; then
+            print_info "Verbose logging: enabled"
+        fi
+    fi
+}
+
 # Spinner for long-running operations
 spinner_pid=""
 
@@ -108,10 +133,11 @@ start_spinner() {
     local msg="$1"
     if [[ -t 1 ]] && ! $DRY_RUN; then
         (
-            spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+            frames=('|' '/' '-' '\\')
             i=0
             while true; do
-                printf "\r    ${CYAN}%s${NC} %s" "${spin:i++%${#spin}:1}" "$msg"
+                printf "\r    ${CYAN}%s${NC} %s" "${frames[i]}" "$msg"
+                i=$(( (i + 1) % ${#frames[@]} ))
                 sleep 0.1
             done
         ) &
@@ -205,46 +231,53 @@ validate_game_app() {
 
 check_already_applied() {
     local game_frameworks="$GAME_APP/Contents/Frameworks"
-    local applied=false
-    local partial=false
+    local has_agl=false
+    local has_qt=false
+    local has_deps=false
 
     # Check for AGL stub
     if [[ -f "$game_frameworks/AGL.framework/Versions/A/AGL" ]]; then
         local agl_arch
         agl_arch=$(lipo -archs "$game_frameworks/AGL.framework/Versions/A/AGL" 2>/dev/null || echo "")
         if [[ "$agl_arch" == "x86_64" ]]; then
-            # Check if it's our stub (small file size, ~50KB or less)
             local agl_size
             agl_size=$(stat -f%z "$game_frameworks/AGL.framework/Versions/A/AGL" 2>/dev/null || echo "0")
             if [[ "$agl_size" -lt 100000 ]]; then
-                applied=true
+                has_agl=true
             fi
         fi
     fi
 
     # Check for Qt 5.15 (vs original 5.3)
-    if [[ -f "$game_frameworks/QtCore.framework/Versions/5/QtCore" ]]; then
+    local qt_core="$game_frameworks/QtCore.framework/Versions/Current/QtCore"
+    if [[ ! -f "$qt_core" ]]; then
+        qt_core="$game_frameworks/QtCore.framework/Versions/5/QtCore"
+    fi
+    if [[ -f "$qt_core" ]]; then
         local qt_info
-        qt_info=$(otool -L "$game_frameworks/QtCore.framework/Versions/5/QtCore" 2>/dev/null | head -2 || echo "")
+        qt_info=$(otool -L "$qt_core" 2>/dev/null | head -2 || echo "")
         if echo "$qt_info" | grep -q "5.15"; then
-            applied=true
-        elif echo "$qt_info" | grep -q "5.3"; then
-            if $applied; then
-                partial=true
-                applied=false
-            fi
+            has_qt=true
         fi
     fi
 
-    # Check for bundled dependencies
-    if [[ -f "$game_frameworks/libglib-2.0.0.dylib" ]]; then
-        applied=true
+    # Check for bundled dependencies (match common Homebrew Qt deps)
+    local has_pcre2=false
+    local lib
+    for lib in "$game_frameworks"/libpcre2-16*.dylib "$game_frameworks"/libpcre2-8*.dylib; do
+        if [[ -f "$lib" ]]; then
+            has_pcre2=true
+            break
+        fi
+    done
+    if [[ -f "$game_frameworks/libglib-2.0.0.dylib" ]] && $has_pcre2; then
+        has_deps=true
     fi
 
-    if $partial; then
-        echo "partial"
-    elif $applied; then
+    if $has_agl && $has_qt && $has_deps; then
         echo "yes"
+    elif $has_agl || $has_qt || $has_deps; then
+        echo "partial"
     else
         echo "no"
     fi
@@ -267,9 +300,16 @@ ${BOLD}OPTIONS:${NC}
     --restore, -r   Restore game from backup
     --dry-run, -n   Preview changes without applying them
     --force, -f     Skip confirmation prompts
+    --log-file      Write logs to a specific file path
+    --verbose       Show full verification output
+    --debug         Enable debug tracing (writes a .trace log)
 
 ${BOLD}ENVIRONMENT VARIABLES:${NC}
     GAME_APP        Path to "Worms W.M.D.app" (for non-standard locations)
+    LOG_FILE        Override the log file path
+    LOG_DIR         Override the log directory
+    WORMSWMD_DEBUG  Enable debug tracing (1/true/yes)
+    WORMSWMD_VERBOSE Enable verbose output (1/true/yes)
 
 ${BOLD}EXAMPLES:${NC}
     # Apply the fix (default Steam location)
@@ -308,6 +348,7 @@ EOF
 # ============================================================
 
 do_restore() {
+    init_logging "fix_worms_wmd"
     print_header
     echo "Looking for backups..."
     echo ""
@@ -362,6 +403,7 @@ do_restore() {
 # ============================================================
 
 do_verify() {
+    init_logging "fix_worms_wmd"
     print_header
     export GAME_APP
     chmod +x "$SCRIPTS_DIR/05_verify_installation.sh"
@@ -374,6 +416,7 @@ do_verify() {
 # ============================================================
 
 do_dry_run() {
+    init_logging "fix_worms_wmd"
     print_header
 
     print_step "Pre-flight checks..."
@@ -442,17 +485,12 @@ do_dry_run() {
     print_dry_run "  Target: $GAME_APP/Contents/Frameworks/AGL.framework/"
     echo ""
 
-    print_dry_run "Replace Qt frameworks:"
-    for fw in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus; do
-        print_dry_run "  $fw.framework (5.3.2 → $qt_version)"
-    done
+    print_dry_run "Replace Qt frameworks found in the game bundle"
+    print_dry_run "  (upgrade to Qt $qt_version and add QtDBus if missing)"
     echo ""
 
-    print_dry_run "Copy dependencies from /usr/local/opt/:"
-    local deps="libpcre2-16 libpcre2-8 libzstd libgthread-2.0 libglib-2.0 libintl libpng16 libfreetype libmd4c libjpeg libtiff liblzma libwebp libwebpdemux libwebpmux libsharpyuv"
-    for dep in $deps; do
-        print_dry_run "  ${dep}.dylib"
-    done
+    print_dry_run "Copy dependencies referenced by Qt frameworks/plugins"
+    print_dry_run "  (resolved from /usr/local and @rpath entries)"
     echo ""
 
     print_dry_run "Update library paths to use @executable_path"
@@ -472,6 +510,7 @@ do_dry_run() {
 # ============================================================
 
 do_fix() {
+    init_logging "fix_worms_wmd"
     print_header
 
     # ============================================================
@@ -632,9 +671,26 @@ do_fix() {
     print_step "Copying dependencies..."
     chmod +x "$SCRIPTS_DIR/03_copy_dependencies.sh"
     start_spinner "Copying libraries..."
-    "$SCRIPTS_DIR/03_copy_dependencies.sh" > /dev/null
+    local copy_output
+    copy_output=$("$SCRIPTS_DIR/03_copy_dependencies.sh" 2>&1)
     stop_spinner
-    print_substep "16 libraries bundled"
+
+    local copied missing
+    copied=$(echo "$copy_output" | awk -F= '/^COPIED_LIBS=/{print $2}' | tail -1)
+    missing=$(echo "$copy_output" | awk -F= '/^MISSING_LIBS=/{print $2}' | tail -1)
+
+    if [[ -n "$copied" ]]; then
+        print_substep "Dependencies bundled: $copied"
+    else
+        print_substep "Dependencies bundled"
+    fi
+
+    if [[ -n "$missing" ]] && [[ "$missing" =~ ^[0-9]+$ ]] && [[ "$missing" -gt 0 ]]; then
+        print_warning "$missing dependencies were not found"
+        echo "$copy_output" | grep -E "^WARNING:" | head -5 | while read -r line; do
+            print_substep "$line"
+        done
+    fi
 
     echo ""
     print_step "Fixing library paths..."
@@ -655,13 +711,21 @@ do_fix() {
 
     # Capture verification output
     local verify_output
-    if verify_output=$("$SCRIPTS_DIR/05_verify_installation.sh" 2>&1); then
-        print_substep "All checks passed"
+    if worms_verbose_enabled; then
+        if "$SCRIPTS_DIR/05_verify_installation.sh"; then
+            print_substep "All checks passed"
+        else
+            print_warning "Some verification checks had warnings"
+        fi
     else
-        print_warning "Some verification checks had warnings"
-        echo "$verify_output" | grep -E "WARNING|ERROR" | head -5 | while read -r line; do
-            print_substep "$line"
-        done
+        if verify_output=$("$SCRIPTS_DIR/05_verify_installation.sh" 2>&1); then
+            print_substep "All checks passed"
+        else
+            print_warning "Some verification checks had warnings"
+            echo "$verify_output" | grep -E "WARNING|ERROR" | head -5 | while read -r line; do
+                print_substep "$line"
+            done
+        fi
     fi
 
     # ============================================================
@@ -703,6 +767,23 @@ while [[ $# -gt 0 ]]; do
             ;;
         --force|-f)
             FORCE=true
+            shift
+            ;;
+        --log-file)
+            if [[ -z "${2:-}" ]]; then
+                print_error "--log-file requires a path"
+                exit 1
+            fi
+            LOG_FILE="$2"
+            shift 2
+            ;;
+        --verbose)
+            WORMSWMD_VERBOSE=1
+            shift
+            ;;
+        --debug)
+            WORMSWMD_DEBUG=1
+            WORMSWMD_VERBOSE=1
             shift
             ;;
         *)

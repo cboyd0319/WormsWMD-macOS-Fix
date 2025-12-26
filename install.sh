@@ -31,6 +31,19 @@ print_error() { echo -e "${RED}✗${NC}  ${RED}ERROR:${NC} $1"; }
 print_success() { echo -e "${GREEN}✓${NC}  ${GREEN}SUCCESS:${NC} $1"; }
 print_info() { echo -e "${BLUE}ℹ${NC}  $1"; }
 
+backup_install_dir() {
+    local src="$1"
+    local backup
+    backup="${src}.backup.$(date +%s)"
+
+    if mv "$src" "$backup"; then
+        print_info "Existing install backed up to: $backup"
+    else
+        print_error "Failed to back up existing install at: $src"
+        exit 1
+    fi
+}
+
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║${NC}     ${GREEN}Worms W.M.D - macOS Tahoe Fix Installer${NC}                 ${BLUE}║${NC}"
@@ -104,22 +117,15 @@ if [[ -d "$INSTALL_DIR/.git" ]] && command -v git &>/dev/null; then
     # Try fast-forward pull first
     if git -C "$INSTALL_DIR" pull --quiet --ff-only origin main 2>/dev/null; then
         : # Success
-    elif git -C "$INSTALL_DIR" fetch --quiet origin main && \
-         git -C "$INSTALL_DIR" reset --quiet --hard origin/main 2>/dev/null; then
-        # If fast-forward fails, try reset (handles diverged branches)
-        print_info "Reset to latest version"
     else
-        # As last resort, backup and re-clone
         print_info "Update failed; reinstalling..."
-        if [[ -d "$INSTALL_DIR" ]]; then
-            mv "$INSTALL_DIR" "${INSTALL_DIR}.backup.$(date +%s)" 2>/dev/null || rm -rf "$INSTALL_DIR"
-        fi
+        backup_install_dir "$INSTALL_DIR"
         git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
     fi
 else
     # Fresh installation
     if [[ -d "$INSTALL_DIR" ]]; then
-        rm -rf "$INSTALL_DIR"
+        backup_install_dir "$INSTALL_DIR"
     fi
     if command -v git &>/dev/null; then
         git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"

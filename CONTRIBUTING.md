@@ -24,6 +24,7 @@ Before creating an issue, please:
 - macOS version (`sw_vers -productVersion`)
 - Mac model and chip (Intel or Apple Silicon)
 - Complete error message or terminal output
+- Log file path from `~/Library/Logs/WormsWMD-Fix/` (and `.trace` log if using `--debug`)
 - Steps to reproduce the issue
 - Whether you tried `--restore` and re-applying
 
@@ -44,6 +45,12 @@ Before creating an issue, please:
 ```
 [Paste output here]
 ```
+
+**Log file:**
+`~/Library/Logs/WormsWMD-Fix/your-log-file.log`
+
+**Trace file (if using --debug):**
+`~/Library/Logs/WormsWMD-Fix/your-log-file.log.trace`
 
 **Steps to reproduce:**
 1. Step one

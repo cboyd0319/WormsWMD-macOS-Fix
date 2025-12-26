@@ -73,7 +73,8 @@ Install Qt 5 using Intel Homebrew:
 arch -x86_64 /usr/local/bin/brew install qt@5
 ```
 
-This automatically installs all required dependencies (glib, pcre2, libpng, freetype, etc.)
+This installs required dependencies (glib, pcre2, libpng, freetype, etc.). The fix
+scans the Qt frameworks/plugins and bundles any Homebrew dylibs they reference.
 
 ## Quick Start
 
@@ -244,6 +245,23 @@ Run the verification script to identify missing dependencies:
 ./scripts/05_verify_installation.sh
 ```
 
+### Logging and debugging
+
+The fix now writes a log file for each run:
+
+- Default: `~/Library/Logs/WormsWMD-Fix/`
+- Override: `./fix_worms_wmd.sh --log-file /path/to/log.txt`
+
+For deeper diagnostics:
+
+```bash
+# Full shell tracing to a .trace log
+./fix_worms_wmd.sh --debug
+
+# Show full verification details
+./fix_worms_wmd.sh --verify --verbose
+```
+
 ### Rosetta 2 issues
 
 Ensure Rosetta is installed and working:
@@ -259,19 +277,20 @@ softwareupdate --install-rosetta --agree-to-license
 
 ### What Gets Modified
 
+Qt frameworks already bundled with the game are replaced (commonly QtCore, QtGui,
+QtWidgets, QtOpenGL, QtPrintSupport).
+
 | Component | Original | Fixed |
 |-----------|----------|-------|
-| QtCore.framework | 5.3.2 | 5.15.x |
-| QtGui.framework | 5.3.2 | 5.15.x |
-| QtWidgets.framework | 5.3.2 | 5.15.x |
-| QtOpenGL.framework | 5.3.2 | 5.15.x |
-| QtPrintSupport.framework | 5.3.2 | 5.15.x |
+| Qt*.framework (bundled) | 5.3.2 | 5.15.x |
 | AGL.framework | System (removed) | Stub library |
-| QtDBus.framework | Not present | Added (required by plugins) |
+| QtDBus.framework | Not present (if missing) | Added (required by plugins) |
+| QtSvg.framework | Not present (if missing) | Added (required by SVG plugin) |
 
 ### Libraries Added
 
-The fix bundles these libraries from Homebrew:
+The fix bundles any Homebrew dylibs referenced by the Qt frameworks/plugins
+(`otool -L` scan of `/usr/local` and `@rpath` entries). Common libraries include:
 
 - **Regex:** libpcre2-8.0.dylib, libpcre2-16.0.dylib
 - **Compression:** libzstd.1.dylib, liblzma.5.dylib
@@ -280,10 +299,12 @@ The fix bundles these libraries from Homebrew:
 - **Images:** libjpeg.8.dylib, libtiff.6.dylib
 - **WebP:** libwebp.7.dylib, libwebpdemux.2.dylib, libwebpmux.3.dylib, libsharpyuv.0.dylib
 
+The exact list can vary depending on your Homebrew versions and plugin set.
+
 ### Plugins Updated
 
 - `platforms/libqcocoa.dylib` - Cocoa platform integration
-- `imageformats/*.dylib` - Image format support
+- `imageformats/*.dylib` - Image format support (including `libqsvg.dylib`)
 
 ### How the AGL Stub Works
 
@@ -310,6 +331,7 @@ Please report issues on the [GitHub Issues](https://github.com/cboyd0319/WormsWM
 
 ## Version History
 
+- **1.2.0** (2025-12-25): Dynamic framework scanning, improved logging/debugging, Team17 developer report, shellcheck fixes
 - **1.1.0** (2025-12-25): Added dry-run mode, force mode, already-applied detection, automatic rollback, progress spinners, one-liner installer, and CI/CD pipeline
 - **1.0.0** (2025-12-25): Initial release for macOS 26 (Tahoe)
 
