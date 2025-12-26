@@ -2,6 +2,23 @@
 
 The `tools/` directory includes helper utilities for backups, diagnostics, and launch options.
 
+## Pre-flight check
+
+Verify your system is ready before launching the game:
+
+```bash
+./tools/preflight_check.sh
+./tools/preflight_check.sh --verbose
+./tools/preflight_check.sh --quick
+```
+
+This checks:
+- macOS version and architecture
+- Rosetta 2 status (Apple Silicon)
+- Game installation and fix status
+- Runtime dependencies (FMOD, Steam API, libcurl)
+- Network connectivity to Team17 services (skip with `--quick`)
+
 ## Save game backup
 
 Back up and restore your save games, settings, and replays:

@@ -30,6 +30,7 @@ worms_color_init() {
         BOLD='\033[1m'
         DIM='\033[2m'
         NC='\033[0m'
+        RESET='\033[0m'
     else
         RED=''
         GREEN=''
@@ -39,7 +40,11 @@ worms_color_init() {
         BOLD=''
         DIM=''
         NC=''
+        RESET=''
     fi
+
+    # Export for use in subshells
+    export RED GREEN YELLOW BLUE CYAN BOLD DIM NC RESET
 }
 
 worms_print_error() {

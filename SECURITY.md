@@ -21,6 +21,7 @@ This fix is designed to be safe against:
 | Malicious code injection | All scripts use `set -euo pipefail`, no `eval` on user input |
 | Path traversal attacks | Archive validation rejects `../` and absolute paths |
 | Man-in-the-middle attacks | HTTPS with TLS 1.2+ required, checksums verified |
+| Insecure game URLs | HTTP URLs upgraded to HTTPS, staging URLs disabled |
 | Privilege escalation | No `sudo`, no SUID, runs entirely as current user |
 | Symlink attacks | Temp files use `mktemp`, cleanup traps prevent dangling files |
 | Supply chain attacks | Pre-built packages require SHA256 verification |
@@ -37,6 +38,7 @@ This fix is designed to be safe against:
 | `Contents/PlugIns/` | Replace Qt plugins | Update platform and image plugins |
 | `Contents/Info.plist` | Update metadata | Add bundle ID, HiDPI flags, min version |
 | `Contents/Resources/DataOSX/*.txt` | Update URLs | Use HTTPS, disable internal staging URLs |
+| `Contents/Resources/CommonData/*.txt` | Update URLs | Use HTTPS for analytics/HTTP config |
 
 ### Files created outside the game bundle
 
@@ -169,6 +171,7 @@ All interactive prompts:
 | Run `launchctl` | Install/remove update watcher | LaunchAgents |
 | Run `osascript` | Notifications (optional tools) | None |
 | Run `pbcopy` | Copy diagnostics (optional) | Clipboard |
+| Run `curl` (preflight) | Test network connectivity | None |
 
 ## Security audit checklist
 
@@ -182,10 +185,11 @@ Last audit: 2025-12-26
 | Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
 | Symlink attacks | Pass | `mktemp` for temp files, cleanup traps |
 | Race conditions | Pass | Atomic operations where possible |
-| Secret exposure | Pass | No credentials, tokens, or keys in code |
+| Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
 | Dependency security | Pass | Checksums for downloads, Homebrew fallback |
 | Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
 | Input validation | Pass | Environment variables and user input validated |
+| Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
 
 ## Verifying the fix
 
@@ -224,6 +228,19 @@ shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
 ```bash
 ./fix_worms_wmd.sh --verify
 ```
+
+### Run pre-flight check
+
+```bash
+./tools/preflight_check.sh
+```
+
+This verifies:
+- macOS version and architecture
+- Rosetta 2 installation (Apple Silicon)
+- Game installation and fix status
+- Runtime dependencies (FMOD, Steam API, libcurl)
+- Network connectivity to Team17 services
 
 ### Inspect the AGL stub
 
@@ -278,6 +295,8 @@ Pre-built Qt packages:
 3. **Ad-hoc code signature**: The app is signed with an ad-hoc signature, not a Developer ID. This may trigger Gatekeeper warnings on some systems.
 
 4. **Backup restore is not validated**: `backup_saves.sh` does not validate tar archive contents before extraction. Only restore backups you created yourself.
+
+5. **Game config secrets**: The original game ships with API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
 
 ## Reporting security issues
 

@@ -19,7 +19,7 @@ These changes improve the security posture of the game.
 
 | Issue | What was wrong | What the fix does |
 |-------|----------------|-------------------|
-| HTTP config URLs | Config files use unencrypted HTTP URLs | Upgrades all URLs to HTTPS |
+| HTTP config URLs | Config files use unencrypted HTTP URLs | Upgrades all URLs to HTTPS in DataOSX and CommonData |
 | Internal URLs exposed | Defunct internal Team17 URLs are in config files | Comments out internal/staging URLs (with backup) |
 | No code signing | The game binary is completely unsigned | Applies ad-hoc code signing to reduce warnings |
 | Quarantine flags | macOS marks downloaded files as quarantined | Clears quarantine flags to prevent "damaged app" dialogs |
@@ -57,6 +57,7 @@ The fix includes utilities to help manage the game.
 
 | Tool | What it does |
 |------|--------------|
+| Pre-flight check | Verifies system requirements, Rosetta 2, and network connectivity |
 | Save game backup | Back up and restore saves, settings, and replays |
 | Steam update watcher | Detects when Steam overwrites the fix and alerts you |
 | Enhanced launcher | Launch with logging, safe mode, and debug options |

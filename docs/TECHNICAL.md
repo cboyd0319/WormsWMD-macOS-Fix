@@ -23,7 +23,7 @@ These limitations exist because the game is closed-source.
 | Outdated Qt 5.3.2 | Replace with Qt 5.15 (pre-built or Homebrew) |
 | Missing Qt frameworks | Bundle QtDBus and QtSvg |
 | Hardcoded library paths | Rewrite to @executable_path |
-| HTTP config URLs | Upgrade to HTTPS |
+| HTTP config URLs | Upgrade to HTTPS (DataOSX and CommonData) |
 
 ### What this fix doesn't change
 
@@ -46,6 +46,7 @@ The fix replaces Qt frameworks bundled with the game (commonly QtCore, QtGui, Qt
 | QtSvg.framework | Not present (if missing) | Added (required by SVG plugin) |
 | Info.plist | Missing identifiers and HiDPI flags | Adds CFBundleIdentifier, HiDPI flags, graphics switching, updates minimum version |
 | DataOSX configs | HTTP/internal URLs | HTTPS; internal URLs commented out (with .backup) |
+| CommonData configs | HTTP URLs | HTTPS (analytics, HTTP config) |
 
 ## Libraries added
 

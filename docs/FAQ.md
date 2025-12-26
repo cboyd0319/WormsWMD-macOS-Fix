@@ -63,3 +63,7 @@ The fix doesn't modify networking. Check Team17 or Steam community status for se
 **Q: My controller doesn't work. Can the fix help?**
 
 Run `./tools/controller_helper.sh` to check controller connectivity and get configuration tips.
+
+**Q: How can I verify my system is ready before launching?**
+
+Run `./tools/preflight_check.sh` to check system requirements, Rosetta 2 status, fix status, and network connectivity.

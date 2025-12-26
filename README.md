@@ -44,8 +44,27 @@ The script installs these if needed (you may see system prompts):
 - Adds an AGL stub framework so the game launches on macOS 26+.
 - Replaces Qt 5.3.2 with Qt 5.15.
 - Bundles required dependencies and fixes install names.
-- Updates Info.plist and config URLs.
-- Clears quarantine flags and applies ad-hoc signing to reduce Gatekeeper warnings.
+- Updates Info.plist (bundle ID, HiDPI support, minimum version).
+- Fixes HTTP URLs to HTTPS in config files.
+- Comments out internal/staging URLs that shouldn't be in retail builds.
+- Clears quarantine flags and applies ad-hoc signing.
+
+## Pre-flight check
+
+Before launching, you can verify your system is ready:
+
+```bash
+./tools/preflight_check.sh
+```
+
+This checks:
+- macOS version and architecture
+- Rosetta 2 status (Apple Silicon)
+- Game installation and fix status
+- Runtime dependencies
+- Network connectivity to Team17 services
+
+Use `--quick` to skip network checks, or `--verbose` for detailed output.
 
 ## Documentation
 

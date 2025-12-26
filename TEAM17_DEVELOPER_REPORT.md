@@ -509,52 +509,36 @@ jobs:
 
 **CRITICAL**: The shipped game contains exposed API secrets in plaintext configuration files.
 
+*Note: Actual secret values have been redacted from this public report. The secrets are visible to anyone who inspects the game bundle.*
+
 #### GOGConfig.txt
 ```
-GOGClientIDString = "48607626978620551"
-GOGClientID = 48607626978620551
-GOGClientSec = "782dcdee6376a94e1caf819bb30f3e5cd4052f457c073e10eed8d80d4bdcae00"
+GOGClientIDString = "[REDACTED - 17 digits]"
+GOGClientID = [REDACTED - 17 digits]
+GOGClientSec = "[REDACTED - 64 char hex string]"
 SteamAppID = 270910
-SteamPrivateKey = "3f3e6b15fa503bd034e678c60058eb59542ca4746a2acdfbd6ae4443671eff70"
+SteamPrivateKey = "[REDACTED - 64 char hex string]"
 ```
 
 #### SteamConfig.txt and GOGConfig.txt
 ```
-TwitchClientID = "k1z0wyavwprt02fjz5r6qpi8d92hzhf"
-TwitchClientSec = "g60yhl1xvtvnqrgofbxqy65rmvsjo0i"
+TwitchClientID = "[REDACTED - 30 chars]"
+TwitchClientSec = "[REDACTED - 30 chars]"
 ```
 
 #### HttpConfig.txt (platform-specific HMAC secrets)
 
-**PS4**:
-```
-ClientId = "CSG3X9D4R9MX3RSC54KZ"
-ClientSecret = "pgRuiS7t3f8axO4zkIUHaZc7c3xkDZdI"
-```
+The following platforms have exposed HMAC client credentials:
 
-**Xbox One**:
-```
-ClientId = "CSK9F3QJZ9MMUAOKLYLC"
-ClientSecret = "s1zekF2SOjY4tSgX4lc6mZZKwe6j4W33"
-```
-
-**Windows** (also Windows GOG):
-```
-ClientId = "10X6KGOC8WFEO0ZSC2DJ"
-ClientSecret = "8394dc184babd2f1eaf4f1c8a7409ebc"
-```
-
-**macOS** (also Linux):
-```
-ClientId = "CSA2X4I3JPSIU4FJOCV0"
-ClientSecret = "XDCek2eE5pJdZHLs20L4QY6gJ95b9l0X"
-```
-
-**Nintendo Switch** (same as PS4):
-```
-ClientId = "CSG3X9D4R9MX3RSC54KZ"
-ClientSecret = "pgRuiS7t3f8axO4zkIUHaZc7c3xkDZdI"
-```
+| Platform | ClientId | ClientSecret |
+|----------|----------|--------------|
+| PS4 | [REDACTED - 20 chars] | [REDACTED - 32 chars] |
+| Xbox One | [REDACTED - 20 chars] | [REDACTED - 32 chars] |
+| Windows | [REDACTED - 20 chars] | [REDACTED - 32 chars] |
+| Windows GOG | (same as Windows) | (same as Windows) |
+| macOS | [REDACTED - 20 chars] | [REDACTED - 32 chars] |
+| Linux | (same as macOS) | (same as macOS) |
+| Nintendo Switch | (same as PS4) | (same as PS4) |
 
 **Recommendation**: These secrets should be immediately rotated and removed from shipped builds. Use secure credential storage or server-side authentication.
 

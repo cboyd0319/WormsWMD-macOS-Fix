@@ -1,5 +1,21 @@
 # Troubleshooting
 
+## First: Run pre-flight check
+
+Before troubleshooting specific issues, run the pre-flight check to verify your system:
+
+```bash
+./tools/preflight_check.sh
+```
+
+This will identify common problems with:
+- macOS version and Rosetta 2 status
+- Game installation and fix status
+- Runtime dependencies
+- Network connectivity
+
+Use `--verbose` for detailed output or `--quick` to skip network checks.
+
 ## Install Fix.command won't run
 
 Gatekeeper blocks `.command` files downloaded from the internet. Try these options:
