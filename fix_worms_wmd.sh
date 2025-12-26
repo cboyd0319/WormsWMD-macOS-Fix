@@ -1017,7 +1017,14 @@ do_fix() {
     chmod +x "$SCRIPTS_DIR/03_copy_dependencies.sh"
     start_spinner "Copying libraries..."
     local copy_output
-    copy_output=$("$SCRIPTS_DIR/03_copy_dependencies.sh" 2>&1)
+    if ! copy_output=$("$SCRIPTS_DIR/03_copy_dependencies.sh" 2>&1); then
+        stop_spinner
+        print_error "Copying dependencies failed"
+        if [[ -n "$copy_output" ]]; then
+            echo "$copy_output"
+        fi
+        exit 1
+    fi
     stop_spinner
 
     local copied missing

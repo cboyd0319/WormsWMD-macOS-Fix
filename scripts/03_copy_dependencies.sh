@@ -40,7 +40,7 @@ mkdir -p "$GAME_FRAMEWORKS" "$GAME_PLUGINS/platforms" "$GAME_PLUGINS/imageformat
 
 echo "=== Copying Qt External Dependencies ==="
 
-scan_bins=()
+declare -a scan_bins=()
 
 for fw_dir in "$GAME_FRAMEWORKS"/*.framework; do
     if [ -d "$fw_dir" ]; then
@@ -70,14 +70,14 @@ fi
 copied=0
 missing=0
 
-scanned_bins=()
-queue=("${scan_bins[@]}")
+declare -a scanned_bins=()
+declare -a queue=("${scan_bins[@]}")
 
 bin_scanned() {
     local search="$1"
     local item
 
-    for item in "${scanned_bins[@]}"; do
+    for item in "${scanned_bins[@]:-}"; do
         if [[ "$item" == "$search" ]]; then
             return 0
         fi
