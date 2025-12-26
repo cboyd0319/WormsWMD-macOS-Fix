@@ -46,7 +46,13 @@ COMMON ISSUES:
     1. Controller not detected → Try re-pairing via Bluetooth
     2. Wrong button mapping → Use Steam Big Picture mode for remapping
     3. Stick drift → Calibrate in System Preferences
-    4. Input lag → Use wired connection if possible
+    4. Input lag → Use wired connection, disable V-Sync, disable Steam Input
+
+APPLE SILICON PERFORMANCE:
+    If you experience lag or unresponsive input on M1/M2/M3/M4 Macs:
+    - Disable V-Sync in game settings (most effective fix)
+    - Disable Steam Input: Steam → Settings → Controller
+    - Use Windowed mode instead of Fullscreen
 
 EOF
 }
@@ -245,6 +251,23 @@ show_tips() {
     echo "  - Wrong buttons? Use Steam's controller remapping"
     echo "  - Input lag? Use wired connection instead of Bluetooth"
     echo "  - Drift issues? Check System Settings → Game Controllers (macOS 13+)"
+    echo ""
+    echo -e "${CYAN}Performance Tips (Apple Silicon):${NC}"
+    echo "  If you experience input lag or unresponsive controls:"
+    echo ""
+    echo "  1. Disable V-Sync (most effective):"
+    echo "     In-game: Help & Options → Settings → Disable Vertical Sync"
+    echo ""
+    echo "  2. Disable Steam Input:"
+    echo "     Steam → Settings → Controller"
+    echo "     Turn OFF all 'Enable Steam Input for...' options"
+    echo "     Restart Steam and the game"
+    echo ""
+    echo "  3. Use Windowed Mode:"
+    echo "     In-game: Help & Options → Settings → Display"
+    echo "     Change to 'Windowed' mode (not fullscreen)"
+    echo ""
+    echo "  These settings reduce overhead when running under Rosetta 2."
 }
 
 # Parse arguments

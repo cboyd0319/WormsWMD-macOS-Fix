@@ -266,6 +266,28 @@ For advanced troubleshooting, use the diagnostic launcher:
 
 Logs are saved to `~/Library/Logs/WormsWMD/`.
 
+### Performance issues on Apple Silicon (lag, stuttering)
+
+If you experience input lag, stuttering, or slow performance on Apple Silicon Macs:
+
+1. **Disable V-Sync** (most effective):
+   - In-game: Help & Options → Settings → Disable Vertical Sync
+   - Apply and restart the game
+
+2. **Use Windowed Mode**:
+   - In-game: Help & Options → Settings → Display
+   - Change Fullscreen to "Windowed"
+   - Set your desired resolution
+   - Do NOT expand to fit screen
+   - Apply and restart
+
+3. **Disable Steam Input** (if controller issues):
+   - Steam → Settings → Controller
+   - Disable all "Enable Steam Input for..." options
+   - Restart Steam and the game
+
+These settings help reduce the overhead when running under Rosetta 2 translation.
+
 ### Rosetta 2 issues
 
 Ensure Rosetta is installed and working:
