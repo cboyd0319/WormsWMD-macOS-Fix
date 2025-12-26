@@ -29,6 +29,7 @@ VERBOSE=false
 QUICK=false
 ERRORS=0
 WARNINGS=0
+CURL_BASE=(--proto '=https' --tlsv1.2 --max-time 5 --silent)
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -61,28 +62,28 @@ done
 
 # Helper functions
 check_pass() {
-    echo "${GREEN}[PASS]${RESET} $1"
+    printf '%b\n' "${GREEN}[PASS]${RESET} $1"
 }
 
 check_fail() {
-    echo "${RED}[FAIL]${RESET} $1"
+    printf '%b\n' "${RED}[FAIL]${RESET} $1"
     ((ERRORS++)) || true
 }
 
 check_warn() {
-    echo "${YELLOW}[WARN]${RESET} $1"
+    printf '%b\n' "${YELLOW}[WARN]${RESET} $1"
     ((WARNINGS++)) || true
 }
 
 check_info() {
     if $VERBOSE; then
-        echo "${BLUE}[INFO]${RESET} $1"
+        printf '%b\n' "${BLUE}[INFO]${RESET} $1"
     fi
 }
 
 section() {
     echo ""
-    echo "${BOLD}=== $1 ===${RESET}"
+    printf '%b\n' "${BOLD}=== $1 ===${RESET}"
 }
 
 # ============================================================================
@@ -90,6 +91,20 @@ section() {
 # ============================================================================
 
 section "System Requirements"
+
+# Check required tools
+HAVE_OTOOL=true
+if ! command -v otool >/dev/null 2>&1; then
+    HAVE_OTOOL=false
+    check_warn "otool not available - skipping Qt/AGL library checks"
+fi
+
+if ! $QUICK; then
+    if ! command -v curl >/dev/null 2>&1; then
+        check_warn "curl not available - skipping network checks"
+        QUICK=true
+    fi
+fi
 
 # Check macOS version
 macos_version=$(sw_vers -productVersion)
@@ -197,24 +212,36 @@ fi
 
 # Check Qt version
 if [[ -f "$FRAMEWORKS_DIR/QtCore.framework/Versions/5/QtCore" ]]; then
-    qt_version=$(otool -L "$FRAMEWORKS_DIR/QtCore.framework/Versions/5/QtCore" 2>/dev/null | grep "QtCore" | grep -o "5\.[0-9]*\.[0-9]*" | head -1 || echo "unknown")
+    if $HAVE_OTOOL; then
+        qt_version=$(otool -L "$FRAMEWORKS_DIR/QtCore.framework/Versions/5/QtCore" 2>/dev/null | grep "QtCore" | grep -o "5\.[0-9]*\.[0-9]*" | head -1 || echo "unknown")
 
-    if [[ "$qt_version" == "5.15"* ]]; then
-        check_pass "Qt version: $qt_version (updated)"
-    elif [[ "$qt_version" == "5.3"* ]]; then
-        check_warn "Qt version: $qt_version (outdated - fix needed)"
+        if [[ "$qt_version" == "5.15"* ]]; then
+            check_pass "Qt version: $qt_version (updated)"
+        elif [[ "$qt_version" == "5.3"* ]]; then
+            check_warn "Qt version: $qt_version (outdated - fix needed)"
+        else
+            check_info "Qt version: $qt_version"
+        fi
     else
-        check_info "Qt version: $qt_version"
+        check_warn "QtCore present but version could not be checked (otool missing)"
     fi
 else
     check_fail "QtCore framework not found"
 fi
 
 # Check for AGL dependencies in Qt
-if otool -L "$FRAMEWORKS_DIR/QtGui.framework/Versions/5/QtGui" 2>/dev/null | grep -q "/System/Library/Frameworks/AGL.framework"; then
-    check_warn "QtGui still references system AGL (fix may not be complete)"
+if [[ -f "$FRAMEWORKS_DIR/QtGui.framework/Versions/5/QtGui" ]]; then
+    if $HAVE_OTOOL; then
+        if otool -L "$FRAMEWORKS_DIR/QtGui.framework/Versions/5/QtGui" 2>/dev/null | grep -q "/System/Library/Frameworks/AGL.framework"; then
+            check_warn "QtGui still references system AGL (fix may not be complete)"
+        else
+            check_pass "QtGui does not reference system AGL"
+        fi
+    else
+        check_warn "QtGui present but AGL reference check skipped (otool missing)"
+    fi
 else
-    check_pass "QtGui does not reference system AGL"
+    check_warn "QtGui framework not found"
 fi
 
 # Check code signing
@@ -267,14 +294,14 @@ if ! $QUICK; then
     section "Network Connectivity"
 
     # Check Team17 services
-    if curl -s --max-time 5 -o /dev/null -w "%{http_code}" "https://ads.t17service.com" 2>/dev/null | grep -q "^[23]"; then
+    if curl "${CURL_BASE[@]}" -o /dev/null -w "%{http_code}" "https://ads.t17service.com" 2>/dev/null | grep -q "^[23]"; then
         check_pass "Team17 directory service reachable"
     else
         check_warn "Team17 directory service not reachable (multiplayer may not work)"
     fi
 
     # Check Steam
-    if curl -s --max-time 5 -o /dev/null "https://steamcommunity.com" 2>/dev/null; then
+    if curl "${CURL_BASE[@]}" -o /dev/null "https://steamcommunity.com" 2>/dev/null; then
         check_pass "Steam community reachable"
     else
         check_warn "Steam community not reachable"

@@ -19,6 +19,8 @@ This checks:
 - Runtime dependencies (FMOD, Steam API, libcurl)
 - Network connectivity to Team17 services (skip with `--quick`)
 
+Note: Network checks require `curl`. Use `--quick` to skip them.
+
 ## Save game backup
 
 Back up and restore your save games, settings, and replays:

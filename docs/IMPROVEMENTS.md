@@ -19,8 +19,8 @@ These changes improve the security posture of the game.
 
 | Issue | What was wrong | What the fix does |
 |-------|----------------|-------------------|
-| HTTP config URLs | Config files use unencrypted HTTP URLs | Upgrades all URLs to HTTPS in DataOSX and CommonData |
-| Internal URLs exposed | Defunct internal Team17 URLs are in config files | Comments out internal/staging URLs (with backup) |
+| HTTP config URLs | Config files use unencrypted HTTP URLs | Upgrades known HTTP URLs to HTTPS in DataOSX and CommonData config files |
+| Internal URLs exposed | Defunct internal Team17 URLs are in config files | Comments out internal/staging URLs in DataOSX config files (with backup) |
 | No code signing | The game binary is completely unsigned | Applies ad-hoc code signing to reduce warnings |
 | Quarantine flags | macOS marks downloaded files as quarantined | Clears quarantine flags to prevent "damaged app" dialogs |
 

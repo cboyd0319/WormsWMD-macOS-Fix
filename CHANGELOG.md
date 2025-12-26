@@ -9,11 +9,14 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 - Pre-flight check verifies Rosetta 2 status, game installation, fix status, and network connectivity.
 - Added Rosetta 2 optimization hints for Apple Silicon users.
 - Extended URL fixes to cover CommonData config files (AnalyticsConfig.txt, HttpConfig.txt).
+- Added graceful fallbacks when `otool` or `curl` are unavailable in preflight check.
 
 ### Changed
 - Redacted exposed API secrets in TEAM17_DEVELOPER_REPORT.md for responsible disclosure.
 - Updated SECURITY.md with new mitigations and audit checklist.
 - Updated documentation across README, TOOLS, and IMPROVEMENTS to reflect new features.
+- Preflight check now uses `printf` for consistent output formatting.
+- Preflight network checks enforce HTTPS with TLS 1.2 minimum.
 
 ### Security
 - Game config secrets are now documented (redacted) rather than published in full.

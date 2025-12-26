@@ -70,6 +70,7 @@ This fix is designed to be safe against:
 | Qt framework download | `github.com` (repo dist/) | HTTPS + SHA256 checksum |
 | Repository clone/update | `github.com` | HTTPS via git |
 | Update check (optional) | `raw.githubusercontent.com` | HTTPS |
+| Pre-flight network check (optional) | `ads.t17service.com`, `steamcommunity.com` | HTTPS |
 | Rosetta 2 install | Apple servers | System-managed |
 | Xcode CLT install | Apple servers | System-managed |
 
@@ -83,7 +84,7 @@ All network operations use:
 - **Timeouts**: All requests have `--max-time` limits (10-300 seconds)
 - **Checksum verification**: SHA256 required for pre-built packages
 
-No third-party servers, analytics, or telemetry are used.
+No analytics or telemetry are used, and network access is limited to the endpoints listed above.
 
 ### Security note on updates
 
