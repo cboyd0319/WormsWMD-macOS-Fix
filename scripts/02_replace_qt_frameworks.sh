@@ -13,6 +13,15 @@ GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 NEW_QT="${NEW_QT:-/usr/local/opt/qt@5/lib}"
 NEW_QT_PLUGINS="${NEW_QT_PLUGINS:-/usr/local/opt/qt@5/plugins}"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
+GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
+
+if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]] || [[ ! -f "$GAME_EXEC" ]]; then
+    echo "ERROR: Invalid GAME_APP: $GAME_APP"
+    echo "Expected a Worms W.M.D.app bundle containing: $GAME_EXEC"
+    exit 1
+fi
+
+mkdir -p "$GAME_FRAMEWORKS" "$GAME_PLUGINS/platforms" "$GAME_PLUGINS/imageformats"
 
 echo "=== Replacing Qt Frameworks ==="
 echo "Source: $NEW_QT"
@@ -58,13 +67,17 @@ echo "Replacing libqcocoa.dylib..."
 rm -f "$GAME_PLUGINS/platforms/libqcocoa.dylib"
 cp "$NEW_QT_PLUGINS/platforms/libqcocoa.dylib" "$GAME_PLUGINS/platforms/"
 
-# Replace image format plugins (only those that exist in the game)
+# Replace image format plugins
+# Copy all plugins from Qt 5.15 to ensure compatibility, as some plugins
+# may have been renamed or restructured between Qt 5.3 and 5.15
 echo "Replacing image format plugins..."
+# First, remove old plugins
+rm -f "$GAME_PLUGINS/imageformats/"*.dylib 2>/dev/null || true
+# Then copy all new plugins
 for plugin in "$NEW_QT_PLUGINS/imageformats/"*.dylib; do
-    name=$(basename "$plugin")
-    if [ -f "$GAME_PLUGINS/imageformats/$name" ]; then
-        echo "  Replacing $name..."
-        rm -f "$GAME_PLUGINS/imageformats/$name"
+    if [ -f "$plugin" ]; then
+        name=$(basename "$plugin")
+        echo "  Copying $name..."
         cp "$plugin" "$GAME_PLUGINS/imageformats/"
     fi
 done

@@ -55,7 +55,7 @@ fi
 # Check architecture and Rosetta
 arch_name=$(uname -m)
 if [[ "$arch_name" == "arm64" ]]; then
-    if ! /usr/bin/pgrep -q oahd 2>/dev/null; then
+    if ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
         echo ""
         print_error "Rosetta 2 is required but not installed."
         echo ""
@@ -65,7 +65,7 @@ if [[ "$arch_name" == "arm64" ]]; then
         echo "Then run this installer again."
         exit 1
     fi
-    print_info "Rosetta 2: installed"
+    print_info "Rosetta 2: available"
 fi
 
 # Check Intel Homebrew
@@ -97,18 +97,33 @@ echo ""
 # Download/update the fix
 print_step "Downloading fix..."
 
-if [[ -d "$INSTALL_DIR/.git" ]]; then
-    # Update existing installation
+mkdir -p "$(dirname "$INSTALL_DIR")"
+
+if [[ -d "$INSTALL_DIR/.git" ]] && command -v git &>/dev/null; then
     print_info "Updating existing installation..."
-    cd "$INSTALL_DIR"
-    git pull --quiet origin main
+    # Try fast-forward pull first
+    if git -C "$INSTALL_DIR" pull --quiet --ff-only origin main 2>/dev/null; then
+        : # Success
+    elif git -C "$INSTALL_DIR" fetch --quiet origin main && \
+         git -C "$INSTALL_DIR" reset --quiet --hard origin/main 2>/dev/null; then
+        # If fast-forward fails, try reset (handles diverged branches)
+        print_info "Reset to latest version"
+    else
+        # As last resort, backup and re-clone
+        print_info "Update failed; reinstalling..."
+        if [[ -d "$INSTALL_DIR" ]]; then
+            mv "$INSTALL_DIR" "${INSTALL_DIR}.backup.$(date +%s)" 2>/dev/null || rm -rf "$INSTALL_DIR"
+        fi
+        git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
+    fi
 else
-    # Fresh clone
-    rm -rf "$INSTALL_DIR"
+    # Fresh installation
+    if [[ -d "$INSTALL_DIR" ]]; then
+        rm -rf "$INSTALL_DIR"
+    fi
     if command -v git &>/dev/null; then
         git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
     else
-        # Fallback to curl + tar
         mkdir -p "$INSTALL_DIR"
         curl -fsSL "$REPO_URL/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
     fi

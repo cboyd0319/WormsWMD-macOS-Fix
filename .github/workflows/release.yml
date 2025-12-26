@@ -18,14 +18,14 @@ jobs:
 
       - name: Get version
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Build AGL stub
         run: |
           mkdir -p build
 
           # Build x86_64 version
-          clang -arch x86_64 \
+          clang -Wall -Wextra -Werror -arch x86_64 \
             -dynamiclib \
             -o build/AGL_x86_64.dylib \
             -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \

@@ -116,7 +116,7 @@ start_spinner() {
             done
         ) &
         spinner_pid=$!
-        disown
+        disown 2>/dev/null || true
     fi
 }
 
@@ -181,6 +181,27 @@ trap cleanup EXIT
 # ============================================================
 # Detection Functions
 # ============================================================
+
+validate_game_app() {
+    if [[ -z "${GAME_APP:-}" ]]; then
+        print_error "GAME_APP is empty"
+        exit 1
+    fi
+
+    if [[ ! -d "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]]; then
+        print_error "Game not found at: $GAME_APP"
+        exit 1
+    fi
+
+    local game_exec="$GAME_APP/Contents/MacOS/Worms W.M.D"
+    if [[ ! -f "$game_exec" ]]; then
+        print_error "Invalid app bundle (missing main executable): $game_exec"
+        echo ""
+        echo "Set GAME_APP if your game is in a different location:"
+        echo "  GAME_APP=\"/path/to/Worms W.M.D.app\" ./fix_worms_wmd.sh"
+        exit 1
+    fi
+}
 
 check_already_applied() {
     local game_frameworks="$GAME_APP/Contents/Frameworks"
@@ -291,9 +312,9 @@ do_restore() {
     echo "Looking for backups..."
     echo ""
 
-    backups=$(ls -d ~/Documents/WormsWMD-Backup-* 2>/dev/null || true)
+    backups=$(ls -d "$HOME/Documents/WormsWMD-Backup-"* 2>/dev/null || true)
     if [[ -z "$backups" ]]; then
-        print_error "No backups found in ~/Documents/"
+        print_error "No backups found in $HOME/Documents/"
         echo ""
         echo "Backups are created automatically when running the fix."
         echo "If you haven't run the fix yet, there's nothing to restore."
@@ -305,7 +326,7 @@ do_restore() {
     echo ""
 
     # Use the most recent backup
-    latest=$(ls -dt ~/Documents/WormsWMD-Backup-* 2>/dev/null | head -1)
+    latest=$(ls -dt "$HOME/Documents/WormsWMD-Backup-"* 2>/dev/null | head -1)
     echo "Most recent backup: $latest"
     echo ""
 
@@ -318,14 +339,7 @@ do_restore() {
         fi
     fi
 
-    # Check game exists
-    if [[ ! -d "$GAME_APP" ]]; then
-        print_error "Game not found at: $GAME_APP"
-        echo ""
-        echo "Set GAME_APP if your game is in a different location:"
-        echo "  GAME_APP=\"/path/to/Worms W.M.D.app\" ./fix_worms_wmd.sh --restore"
-        exit 1
-    fi
+    validate_game_app
 
     print_step "Restoring Frameworks..."
     rm -rf "$GAME_APP/Contents/Frameworks"
@@ -364,12 +378,13 @@ do_dry_run() {
 
     print_step "Pre-flight checks..."
 
-    # Check game exists
-    if [[ ! -d "$GAME_APP" ]]; then
-        print_error "Game not found at: $GAME_APP"
-        exit 1
+    if [[ -d "$GAME_APP/Contents" ]] && [[ -f "$GAME_APP/Contents/MacOS/Worms W.M.D" ]]; then
+        print_dry_run "Game found: $GAME_APP"
+    else
+        print_warning "Game not found at: $GAME_APP"
+        print_info "Set GAME_APP to preview against a custom location."
+        echo ""
     fi
-    print_dry_run "Game found: $GAME_APP"
 
     # Check macOS version
     local macos_version major_version
@@ -387,10 +402,13 @@ do_dry_run() {
     print_dry_run "Architecture: $arch_name"
 
     if [[ "$arch_name" == "arm64" ]]; then
-        if /usr/bin/pgrep -q oahd 2>/dev/null; then
-            print_dry_run "Rosetta 2: installed"
+        if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+            print_dry_run "Rosetta 2: available"
         else
-            print_error "Rosetta 2 is not running"
+            print_error "Rosetta 2 is required but not installed"
+            echo ""
+            echo "Install Rosetta 2 with:"
+            echo "  softwareupdate --install-rosetta"
             exit 1
         fi
     fi
@@ -408,7 +426,8 @@ do_dry_run() {
         exit 1
     fi
     local qt_version
-    qt_version=$(ls /usr/local/Cellar/qt@5/ 2>/dev/null | head -1 || echo "unknown")
+    qt_version=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
+    qt_version=${qt_version:-unknown}
     print_dry_run "Qt 5: $qt_version"
 
     echo ""
@@ -493,14 +512,7 @@ do_fix() {
     # ============================================================
     print_step "Running pre-flight checks..."
 
-    # Check game exists
-    if [[ ! -d "$GAME_APP" ]]; then
-        print_error "Game not found at: $GAME_APP"
-        echo ""
-        echo "If your game is in a different location, set GAME_APP:"
-        echo "  GAME_APP=\"/path/to/Worms W.M.D.app\" ./fix_worms_wmd.sh"
-        exit 1
-    fi
+    validate_game_app
     print_substep "Game found: $GAME_APP"
 
     # Check macOS version
@@ -531,15 +543,15 @@ do_fix() {
 
     if [[ "$arch_name" == "arm64" ]]; then
         # Check Rosetta
-        if ! /usr/bin/pgrep -q oahd; then
+        if ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
             echo ""
-            print_error "Rosetta 2 is not running."
+            print_error "Rosetta 2 is required but not installed."
             echo ""
             echo "Rosetta 2 is required to run x86_64 applications on Apple Silicon."
             echo "Install with: softwareupdate --install-rosetta"
             exit 1
         fi
-        print_substep "Rosetta 2: installed"
+        print_substep "Rosetta 2: available"
     fi
 
     # Check Intel Homebrew
@@ -565,7 +577,8 @@ do_fix() {
         exit 1
     fi
     local qt_version
-    qt_version=$(ls /usr/local/Cellar/qt@5/ 2>/dev/null | head -1 || echo "unknown")
+    qt_version=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
+    qt_version=${qt_version:-unknown}
     print_substep "Qt 5: $qt_version"
 
     # Check disk space (need ~200MB)
@@ -584,7 +597,7 @@ do_fix() {
     echo ""
     print_step "Creating backup..."
 
-    BACKUP_DIR=~/Documents/WormsWMD-Backup-$(date +%Y%m%d-%H%M%S)
+    BACKUP_DIR="$HOME/Documents/WormsWMD-Backup-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$BACKUP_DIR"
 
     start_spinner "Backing up Frameworks..."

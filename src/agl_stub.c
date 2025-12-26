@@ -7,11 +7,15 @@
  *
  * The functions return appropriate error values since modern
  * applications should use Core OpenGL (CGL) or Metal instead.
+ *
+ * NOTE: This stub is NOT thread-safe. The global agl_last_error state
+ * could experience race conditions if called from multiple threads.
+ * This is acceptable because the stub only returns errors anyway -
+ * no actual AGL functionality is provided.
  */
 
 #include <OpenGL/gl.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <stddef.h>
 
 /* AGL Types */
 typedef void* AGLPixelFormat;
@@ -20,10 +24,6 @@ typedef void* AGLDevice;
 typedef void* AGLDrawable;
 typedef void* AGLRendererInfo;
 typedef void* AGLPbuffer;
-typedef int32_t GLint;
-typedef uint32_t GLuint;
-typedef uint32_t GLenum;
-typedef unsigned char GLboolean;
 
 /* AGL Error Codes */
 #define AGL_NO_ERROR           0

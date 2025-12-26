@@ -10,6 +10,15 @@ set -e
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
+GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
+
+if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]] || [[ ! -f "$GAME_EXEC" ]]; then
+    echo "ERROR: Invalid GAME_APP: $GAME_APP"
+    echo "Expected a Worms W.M.D.app bundle containing: $GAME_EXEC"
+    exit 1
+fi
+
+mkdir -p "$GAME_FRAMEWORKS"
 
 echo "=== Copying Qt External Dependencies ==="
 
@@ -51,10 +60,10 @@ for dep in "${DEPS[@]}"; do
         chmod 755 "$GAME_FRAMEWORKS/$name"
         # Set install name
         install_name_tool -id "@executable_path/../Frameworks/$name" "$GAME_FRAMEWORKS/$name" 2>/dev/null || true
-        ((copied++))
+        ((++copied))
     else
         echo "WARNING: $name not found at $dep"
-        ((missing++))
+        ((++missing))
     fi
 done
 

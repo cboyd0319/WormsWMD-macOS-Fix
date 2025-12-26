@@ -60,7 +60,7 @@ jobs:
       - name: Check AGL stub compiles
         run: |
           echo "Compiling AGL stub..."
-          clang -arch x86_64 \
+          clang -Wall -Wextra -Werror -arch x86_64 \
             -dynamiclib \
             -o /tmp/AGL_test \
             -framework OpenGL \

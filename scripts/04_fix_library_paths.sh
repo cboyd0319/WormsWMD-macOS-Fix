@@ -19,9 +19,17 @@ BUILD_DIR="/tmp/agl_stub_build"
 
 echo "=== Fixing Library Path References ==="
 
+if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]] || [[ ! -f "$GAME_EXEC" ]]; then
+    echo "ERROR: Invalid GAME_APP: $GAME_APP"
+    echo "Expected a Worms W.M.D.app bundle containing: $GAME_EXEC"
+    exit 1
+fi
+
+mkdir -p "$GAME_FRAMEWORKS" "$GAME_PLUGINS/platforms" "$GAME_PLUGINS/imageformats"
+
 # Dynamically detect installed versions
-QT_VERSION=$(ls /usr/local/Cellar/qt@5/ 2>/dev/null | head -1 || echo "")
-GLIB_VERSION=$(ls /usr/local/Cellar/glib/ 2>/dev/null | head -1 || echo "")
+QT_VERSION=$(ls -1t /usr/local/Cellar/qt@5 2>/dev/null | head -1)
+GLIB_VERSION=$(ls -1t /usr/local/Cellar/glib 2>/dev/null | head -1)
 
 # Build list of prefixes dynamically
 PREFIXES="/usr/local/opt/qt@5/lib"

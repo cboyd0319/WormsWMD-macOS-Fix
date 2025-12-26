@@ -28,6 +28,12 @@ arch -x86_64 clang -arch x86_64 \
     -current_version 1.0.0 \
     "$SRC_DIR/agl_stub.c"
 
+# Verify the build succeeded
+if [[ ! -f "$BUILD_DIR/AGL" ]]; then
+    echo "ERROR: Failed to build AGL stub - output file not found"
+    exit 1
+fi
+
 echo "AGL stub built successfully at: $BUILD_DIR/AGL"
 echo ""
 echo "Library info:"

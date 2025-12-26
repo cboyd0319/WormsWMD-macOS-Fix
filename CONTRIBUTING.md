@@ -75,7 +75,7 @@ shellcheck fix_worms_wmd.sh install.sh scripts/*.sh
 # Test the help command
 ./fix_worms_wmd.sh --help
 
-# Test dry-run mode (doesn't require the game)
+# Test dry-run mode (doesn't modify the game)
 ./fix_worms_wmd.sh --dry-run
 ```
 
@@ -118,7 +118,7 @@ Types: `fix`, `feat`, `docs`, `refactor`, `test`, `chore`
 
 3. **Test the AGL stub compiles:**
    ```bash
-   clang -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
+   clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
    ```
 
 4. **Test on a real installation (if possible):**

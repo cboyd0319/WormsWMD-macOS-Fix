@@ -5,11 +5,21 @@
 # Checks all libraries for problematic references and verifies
 # the game should be able to load all dependencies.
 #
+# NOTE: This script intentionally does NOT use 'set -e' because it needs
+# to continue checking all components even if some fail, and collect
+# all errors for a comprehensive report.
+#
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
+
+if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]]; then
+    echo "ERROR: Game not found at: $GAME_APP"
+    echo "Set GAME_APP to your Worms W.M.D.app bundle and re-run."
+    exit 1
+fi
 
 echo "=== Worms W.M.D Installation Verification ==="
 echo ""
@@ -93,7 +103,7 @@ echo "--- Checking plugins ---"
 for plugin in "$GAME_PLUGINS/platforms/"*.dylib "$GAME_PLUGINS/imageformats/"*.dylib; do
     if [ -f "$plugin" ]; then
         name=$(basename "$plugin")
-        bad_refs=$(otool -L "$plugin" 2>/dev/null | grep -E "/usr/local" | grep -v "@executable_path" || true)
+        bad_refs=$(otool -L "$plugin" 2>/dev/null | grep -E "/usr/local|@rpath" | grep -v "@executable_path" || true)
         if [ -n "$bad_refs" ]; then
             echo "WARNING: $name has unresolved references:"
             echo "$bad_refs"

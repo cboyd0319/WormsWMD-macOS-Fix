@@ -89,6 +89,12 @@ This will automatically download and run the fix. Add `--dry-run` to preview cha
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash -s -- --dry-run
 ```
 
+You can customize where the installer clones the repo:
+
+```bash
+INSTALL_DIR="$HOME/.wormswmd-fix" curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
+```
+
 ### Manual Install
 
 ```bash
@@ -242,8 +248,8 @@ Run the verification script to identify missing dependencies:
 
 Ensure Rosetta is installed and working:
 ```bash
-# Check if Rosetta is running
-pgrep -q oahd && echo "Rosetta is running" || echo "Rosetta is NOT running"
+# Check if Rosetta is available
+/usr/bin/arch -x86_64 /usr/bin/true && echo "Rosetta is available" || echo "Rosetta is NOT available"
 
 # Reinstall if needed
 softwareupdate --install-rosetta --agree-to-license
@@ -281,7 +287,7 @@ The fix bundles these libraries from Homebrew:
 
 ### How the AGL Stub Works
 
-The AGL stub (`src/agl_stub.c`) provides empty implementations of all 47 AGL functions. Since Qt 5.15 doesn't actually use AGL (it uses Core OpenGL directly), the stub just needs to exist and return appropriate error values to satisfy the dynamic linker.
+The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL functions. Since Qt 5.15 doesn't actually use AGL (it uses Core OpenGL directly), the stub just needs to exist and return appropriate error values to satisfy the dynamic linker.
 
 ### Why Qt 5.15?
 
@@ -304,6 +310,7 @@ Please report issues on the [GitHub Issues](https://github.com/cboyd0319/WormsWM
 
 ## Version History
 
+- **1.1.0** (2025-12-25): Added dry-run mode, force mode, already-applied detection, automatic rollback, progress spinners, one-liner installer, and CI/CD pipeline
 - **1.0.0** (2025-12-25): Initial release for macOS 26 (Tahoe)
 
 ## Credits
