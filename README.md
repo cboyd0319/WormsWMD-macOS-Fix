@@ -273,6 +273,23 @@ Ensure Rosetta is installed and working:
 softwareupdate --install-rosetta --agree-to-license
 ```
 
+### Using the Diagnostic Launcher
+
+For advanced troubleshooting, use the diagnostic launcher:
+
+```bash
+# Launch with logging
+./tools/launch_worms.sh --log
+
+# Safe mode (for graphics issues)
+./tools/launch_worms.sh --safe-mode --log
+
+# Full debug mode
+./tools/launch_worms.sh --qt-debug --opengl-debug --log --verbose
+```
+
+Logs are saved to `~/Library/Logs/WormsWMD/`.
+
 ## Technical Details
 
 ### What Gets Modified
@@ -331,7 +348,7 @@ Please report issues on the [GitHub Issues](https://github.com/cboyd0319/WormsWM
 
 ## Version History
 
-- **1.2.0** (2025-12-25): Dynamic framework scanning, improved logging/debugging, Team17 developer report, shellcheck fixes
+- **Unreleased**: Info.plist fixes (HiDPI, bundle ID), config URL security fixes, diagnostic game launcher, dynamic framework scanning, improved logging/debugging
 - **1.1.0** (2025-12-25): Added dry-run mode, force mode, already-applied detection, automatic rollback, progress spinners, one-liner installer, and CI/CD pipeline
 - **1.0.0** (2025-12-25): Initial release for macOS 26 (Tahoe)
 

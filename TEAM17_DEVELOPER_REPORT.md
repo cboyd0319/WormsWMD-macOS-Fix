@@ -1,6 +1,6 @@
 # Worms W.M.D - macOS Compatibility Report for Team17
 
-**Document Version:** 2.0
+**Document Version:** 2.1
 **Date:** December 25, 2025
 **Prepared for:** Team17 Digital Ltd.
 **Platform:** macOS 26 (Tahoe) and later
@@ -9,21 +9,33 @@
 
 ## Executive Summary
 
-Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a black screen. This report provides a comprehensive technical analysis of **all issues** affecting the game, required fixes, recommended improvements, and suggestions for long-term maintainability.
+Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a black screen. This report provides a comprehensive technical analysis of **all known issues** affecting the game, required fixes, recommended improvements, and suggestions for long-term maintainability.
 
 **Severity:** Critical (Game Unplayable)
 **Affected Users:** All macOS 26+ users
-**Root Causes:** Multiple deprecated framework dependencies, outdated libraries, and legacy build configuration
+**Root Causes:** Multiple deprecated framework dependencies, outdated libraries, legacy build configuration, and missing platform compliance updates (signing, notarization, diagnostics)
+
+**Verified on this machine:** macOS 26.2 (Apple Silicon via Rosetta) with the community fix applied and full verification passing.
 
 ### Issue Summary
 
 | Category | Issues Found | Severity |
 |----------|--------------|----------|
-| Framework Dependencies | 3 | Critical |
+| Framework Dependencies | 4 | Critical |
 | Audio Libraries | 2 | High |
-| Build Configuration | 4 | Medium |
-| Security | 3 | Medium |
-| Performance | 2 | Low |
+| Build Configuration | 5 | Medium |
+| Security & Compliance | 5 | Medium |
+| Platform/Performance | 4 | Medium |
+| Diagnostics/Observability | 2 | Medium |
+
+---
+
+## Scope and Evidence
+
+- Static analysis of the shipped macOS app bundle (Steam build) on macOS 26.2
+- Dynamic dependency inspection (`otool -L`, `lipo`, `codesign`)
+- Community fix verification logs (AGL stub + Qt 5.15 + dependency bundling)
+- No access to original game source code; all code-level recommendations are based on binary and packaging behavior
 
 ---
 
@@ -36,8 +48,9 @@ Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a bla
 5. [Required Fixes](#5-required-fixes)
 6. [Recommended Improvements](#6-recommended-improvements)
 7. [Long-Term Recommendations](#7-long-term-recommendations)
-8. [Testing Verification](#8-testing-verification)
-9. [Appendix: Technical Details](#9-appendix-technical-details)
+8. [Security and Malware Assessment](#8-security-and-malware-assessment)
+9. [Testing Verification](#9-testing-verification)
+10. [Appendix: Technical Details](#10-appendix-technical-details)
 
 ---
 
@@ -95,6 +108,8 @@ Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a bla
 /usr/lib/libgcc_s.1.dylib     ← REMOVED from macOS
 ```
 
+**Verified:** Both libraries are absent on macOS 26.2 (`/usr/lib`).
+
 **Current Workaround:** Rosetta 2 appears to provide compatibility shims for these libraries, but this is undocumented and unreliable.
 
 **Impact:** Potential audio failures or crashes, especially in future macOS versions.
@@ -149,7 +164,7 @@ code object is not signed at all
 
 **Impact:**
 - Gatekeeper warnings on first launch
-- Cannot be notarized
+- Cannot be notarized (current state)
 - Reduced user trust
 - May be blocked by enterprise security policies
 
@@ -198,6 +213,64 @@ Mach-O universal binary with 2 architectures: [i386:...] [x86_64:...]
 - Unnecessary file size increase
 - 32-bit support was removed in macOS 10.15 Catalina (2019)
 - No functional benefit
+
+### 3.7 No Apple Silicon Native Binary (PERFORMANCE)
+
+**Issue:** The macOS build is x86_64 only and runs under Rosetta 2 on Apple Silicon.
+
+**Impact:**
+- Performance and battery penalties (often 2x+ slower)
+- Increased risk of incompatibility if Rosetta is deprecated in a future macOS
+
+**Fix Required:** Provide universal binaries (x86_64 + arm64).
+
+### 3.8 OpenGL-Only Renderer (DEPRECATED)
+
+**Issue:** Rendering relies on OpenGL, which is deprecated on macOS and may be removed in a future release.
+
+**Impact:**
+- Future compatibility risk
+- Performance limitations compared to Metal
+
+**Fix Required:** Provide a Metal backend (direct Metal or via Qt 6 RHI).
+
+### 3.9 Limited Diagnostic Logging (MEDIUM)
+
+**Issue:** There is no documented, user-accessible logging for startup failures or rendering issues.
+
+**Impact:** Support and QA cannot reliably reproduce or diagnose failures, especially black-screen or crash-on-startup cases.
+
+**Fix Required:** Add structured logging with configurable verbosity and file output (see section 6.8).
+
+### 3.10 No Crash Reporting / Symbolication Pipeline (MEDIUM)
+
+**Issue:** Crash logs are not symbolicated and there is no integrated crash reporting pipeline.
+
+**Impact:** High MTTR (mean time to resolution) for regressions and platform-specific issues.
+
+**Fix Required:** Ship dSYMs and integrate crash reporting (see section 7.6).
+
+### 3.11 Insecure HTTP Endpoints in Config (SECURITY)
+
+**Issue:** Configuration files reference HTTP endpoints:
+- `http://www.team17.com/wormsrevolution/`
+- `http://xom.team17.com/revolutiontest/` (internal)
+
+**Impact:**
+- Mixed-content and MITM risk
+- Internal endpoints should not ship in public builds
+
+**Fix Required:** Update to HTTPS and remove internal/staging URLs from retail builds.
+
+### 3.12 Missing Bundle Identifier (COMPLIANCE)
+
+**Issue:** `CFBundleIdentifier` is missing in the Info.plist.
+
+**Impact:**
+- App identity and preferences are not properly namespaced
+- Complicates notarization, signing, and crash symbolication
+
+**Fix Required:** Set a stable bundle identifier (e.g., `com.team17.wormswmd`).
 
 ---
 
@@ -449,6 +522,39 @@ clang -arch x86_64 -arch arm64 -mmacosx-version-min=12.0 ...
 <integer>3</integer>
 ```
 
+### 6.8 Diagnostic Logging and Supportability
+
+**Recommendation:** Add a configurable logging system with file output and log levels:
+- Default log location: `~/Library/Logs/Team17/WormsWMD/`
+- Launch args: `-log-level`, `-log-file`, `-safe-mode`
+- Capture Qt plugin loading, OpenGL/Metal initialization, and Steamworks init status
+
+**Benefit:** Faster support triage and reproducible diagnostics.
+
+### 6.9 Crash Reporting and Symbolication
+
+**Recommendation:** Ship dSYMs and integrate crash reporting:
+- Centralized symbol server for each release build
+- Automatic crash submission (opt-in) with privacy controls
+
+**Benefit:** Dramatically reduces time to diagnose macOS-specific regressions.
+
+### 6.10 Secure Networking and ATS Compliance
+
+**Recommendation:**
+- Remove HTTP endpoints from retail builds
+- Enforce HTTPS and update ATS exceptions only if required
+- Audit network calls for TLS 1.2+ compatibility
+
+### 6.11 Safe-Mode / Fallback Rendering
+
+**Recommendation:** Add a safe-mode option that:
+- Disables hardware acceleration
+- Forces a compatibility renderer
+- Resets graphics settings to defaults
+
+**Benefit:** Provides a recovery path for graphics initialization failures.
+
 ---
 
 ## 7. Long-Term Recommendations
@@ -525,19 +631,38 @@ Implement crash reporting to catch issues early:
 
 ---
 
-## 8. Testing Verification
+## 8. Security and Malware Assessment
 
-### 8.1 Test Matrix
+**Scope:** Static inspection of the installed macOS app bundle and configuration files on macOS 26.2. No source code was available for review.
+
+**Findings (static):**
+- No LaunchAgents/Daemons or autostart entries found (only `Contents/Info.plist` exists).
+- No script files with valid shebangs were detected; occurrences of `#!` are within binary data files (false positives).
+- URL strings are limited to expected Team17 endpoints in `DataOSX/SteamConfig.txt` and `DataOSX/GOGConfig.txt` (HTTP, not HTTPS) plus icon metadata.
+- Binaries are unsigned (confirmed via `codesign`), which is a distribution/security concern but not evidence of malware.
+
+**Conclusion:** No obvious indicators of malicious payloads were found in the static scan performed on this machine. This does **not** rule out runtime-only behaviors.
+
+**Recommended additional checks (for Team17):**
+- Runtime network monitoring (e.g., `lsof -i`, Little Snitch) to validate outbound connections.
+- Binary scanning with internal security tooling and reproducible build verification.
+- Dependency SBOM and provenance checks for Qt, FMOD, Steamworks, and bundled third-party libraries.
+
+---
+
+## 9. Testing Verification
+
+### 9.1 Test Matrix
 
 | Configuration | Status | Notes |
 |--------------|--------|-------|
-| macOS 26.2 (arm64 via Rosetta) | PASS | Community fix applied |
+| macOS 26.2 (arm64 via Rosetta) | PASS | Community fix applied and verified on this machine |
 | macOS 26.0 (arm64 via Rosetta) | Expected PASS | Same fixes required |
 | macOS 15.x (Sequoia) | Needs Testing | May work without fixes |
 | macOS 14.x (Sonoma) | Expected PASS | Fixes may not be required |
 | macOS 13.x (Ventura) | Expected PASS | Fixes may not be required |
 
-### 8.2 Verification Commands
+### 9.2 Verification Commands
 
 ```bash
 # Check executable architecture
@@ -552,6 +677,10 @@ otool -L "Contents/MacOS/Worms W.M.D" | grep -E "@rpath|/usr/local"
 otool -L "Contents/Frameworks/QtCore.framework/Versions/5/QtCore" | head -2
 # Expected: 5.15.x
 
+# Check QtSvg and QtDBus presence
+test -d "Contents/Frameworks/QtSvg.framework" && echo "QtSvg present"
+test -d "Contents/Frameworks/QtDBus.framework" && echo "QtDBus present"
+
 # Check AGL stub
 file "Contents/Frameworks/AGL.framework/Versions/A/AGL"
 # Expected: Mach-O 64-bit dynamically linked shared library x86_64
@@ -563,9 +692,12 @@ codesign -dv --verbose=4 "Worms W.M.D.app"
 # Verify entitlements
 codesign -d --entitlements - "Worms W.M.D.app"
 # Expected: required entitlements present
+
+# (If implemented) Verify log file creation
+ls ~/Library/Logs/Team17/WormsWMD/ 2>/dev/null || true
 ```
 
-### 8.3 Runtime Testing
+### 9.3 Runtime Testing
 
 1. **Launch test:** Game launches without black screen
 2. **Audio test:** Sound effects and music play correctly
@@ -579,9 +711,9 @@ codesign -d --entitlements - "Worms W.M.D.app"
 
 ---
 
-## 9. Appendix: Technical Details
+## 10. Appendix: Technical Details
 
-### 9.1 AGL Stub Implementation
+### 10.1 AGL Stub Implementation
 
 A complete AGL stub implementation is provided in `src/agl_stub.c`. This provides no-op implementations of all 41 AGL functions:
 
@@ -598,7 +730,7 @@ A complete AGL stub implementation is provided in `src/agl_stub.c`. This provide
 - Display functions (2)
 - PBuffer functions (6)
 
-### 9.2 Complete Build Information
+### 10.2 Complete Build Information
 
 From the current game bundle:
 
@@ -622,7 +754,7 @@ NSPrincipalClass: NSApplication
 BuildMachineOSBuild: 16G1618
 ```
 
-### 9.3 Required Dependency Versions
+### 10.3 Required Dependency Versions
 
 For the community fix (Homebrew reference):
 
@@ -639,7 +771,7 @@ zstd: 1.5.x
 xz: 5.4.x
 ```
 
-### 9.4 Original Game Bundle Contents
+### 10.4 Original Game Bundle Contents
 
 ```
 Frameworks/
@@ -661,7 +793,7 @@ PlugIns/
     └── *.dylib
 ```
 
-### 9.5 Deprecated APIs Summary
+### 10.5 Deprecated APIs Summary
 
 | API/Framework | Deprecated | Notes |
 |--------------|------------|-------|

@@ -700,6 +700,24 @@ do_fix() {
     stop_spinner
     print_substep "All paths updated to @executable_path"
 
+    # ============================================================
+    # Apply enhancements
+    # ============================================================
+    echo ""
+    print_step "Applying enhancements..."
+
+    # Fix Info.plist
+    if [[ -x "$SCRIPTS_DIR/06_fix_info_plist.sh" ]]; then
+        "$SCRIPTS_DIR/06_fix_info_plist.sh" > /dev/null 2>&1 || true
+        print_substep "Info.plist updated (HiDPI, bundle ID)"
+    fi
+
+    # Fix config URLs
+    if [[ -x "$SCRIPTS_DIR/07_fix_config_urls.sh" ]]; then
+        "$SCRIPTS_DIR/07_fix_config_urls.sh" > /dev/null 2>&1 || true
+        print_substep "Config URLs secured (HTTP→HTTPS)"
+    fi
+
     CLEANUP_NEEDED=false  # Success - don't rollback on exit
 
     # ============================================================
