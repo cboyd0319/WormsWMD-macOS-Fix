@@ -40,14 +40,23 @@ Gatekeeper blocks `.command` files downloaded from the internet. Try these optio
    ```
    Requires `git` (installed by Xcode Command Line Tools).
 
-## Small window on first launch
+## Small window that won't resize
 
-The game window may appear very small on the first launch after applying the fix. This is normal and resolves on subsequent launches.
+The game window may appear very small after applying the fix. This happens because old Qt 5.3 window geometry settings are incompatible with Qt 5.15.
 
-If the window stays small:
-1. Press **Esc** or go to **Help & Options** → **Settings** → **Display**
-2. Change **Resolution** to your preferred size
-3. Select **Apply** and restart the game
+**The fix script now resets this automatically**, but if you still experience this issue:
+
+1. **Reset window geometry manually:**
+   ```bash
+   defaults delete "com.team17.Worms W.M.D" "QtSystem_GameWindow.geometry"
+   defaults delete "com.team17.Worms W.M.D" "QtSystem_GameWindow.windowState"
+   ```
+   Then relaunch the game.
+
+2. **If the above doesn't work**, try changing resolution in-game:
+   - Press **Esc** or go to **Help & Options** → **Settings** → **Display**
+   - Change **Resolution** to your preferred size
+   - Select **Apply** and restart the game
 
 ## Game still shows a black screen
 

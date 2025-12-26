@@ -776,6 +776,7 @@ do_dry_run() {
     print_dry_run "Secure config URLs (HTTP→HTTPS, disable internal URLs)"
     print_dry_run "Remove quarantine flags (xattr -rd com.apple.quarantine)"
     print_dry_run "Apply ad-hoc code signature (codesign --deep --sign -)"
+    print_dry_run "Reset incompatible Qt window geometry (if present)"
     echo ""
 
     print_success "Dry run complete. No changes were made."
@@ -1092,6 +1093,14 @@ do_fix() {
         print_substep "Ad-hoc code signature applied"
     else
         print_warning "Could not apply ad-hoc signature (game will still work)"
+    fi
+
+    # Reset Qt window geometry (old Qt 5.3 settings are incompatible with 5.15)
+    # This prevents the "small window" issue on first launch after the fix
+    if defaults read "com.team17.Worms W.M.D" "QtSystem_GameWindow.geometry" &>/dev/null; then
+        defaults delete "com.team17.Worms W.M.D" "QtSystem_GameWindow.geometry" 2>/dev/null || true
+        defaults delete "com.team17.Worms W.M.D" "QtSystem_GameWindow.windowState" 2>/dev/null || true
+        print_substep "Reset incompatible Qt window geometry"
     fi
 
     CLEANUP_NEEDED=false  # Success - don't rollback on exit

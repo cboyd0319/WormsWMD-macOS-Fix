@@ -18,6 +18,9 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 - Preflight check now uses `printf` for consistent output formatting.
 - Preflight network checks enforce HTTPS with TLS 1.2 minimum.
 
+### Fixed
+- Fixed small/unresizable window issue by resetting incompatible Qt 5.3 window geometry after applying the fix.
+
 ### Security
 - Game config secrets are now documented (redacted) rather than published in full.
 - Added Game URL security to the security audit checklist.

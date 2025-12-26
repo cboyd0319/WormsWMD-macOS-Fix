@@ -48,6 +48,7 @@ The script installs these if needed (you may see system prompts):
 - Fixes HTTP URLs to HTTPS in config files.
 - Comments out internal/staging URLs that shouldn't be in retail builds.
 - Clears quarantine flags and applies ad-hoc signing.
+- Resets incompatible Qt window geometry to fix small window issues.
 
 ## Pre-flight check
 

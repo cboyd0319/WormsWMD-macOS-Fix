@@ -32,6 +32,7 @@ These changes improve how the game looks and behaves on modern Macs.
 |-------|----------------|-------------------|
 | No HiDPI support declared | Info.plist lacks `NSHighResolutionCapable` | Adds the flag for proper Retina display support |
 | No GPU switching | Info.plist lacks `NSSupportsAutomaticGraphicsSwitching` | Adds the flag so laptops can use integrated graphics and save battery |
+| Small/unresizable window | Old Qt 5.3 window geometry incompatible with Qt 5.15 | Resets saved window geometry on fix application |
 
 ## Metadata fixes
 
