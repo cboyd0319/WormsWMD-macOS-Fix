@@ -284,6 +284,23 @@ For deeper diagnostics:
 ./fix_worms_wmd.sh --verify --verbose
 ```
 
+### Diagnostic game launcher
+
+For advanced troubleshooting, use the diagnostic launcher:
+
+```bash
+# Launch with logging
+./tools/launch_worms.sh --log
+
+# Safe mode (for graphics issues)
+./tools/launch_worms.sh --safe-mode --log
+
+# Full debug mode
+./tools/launch_worms.sh --qt-debug --opengl-debug --log --verbose
+```
+
+Logs are saved to `~/Library/Logs/WormsWMD/`.
+
 ### Rosetta 2 issues
 
 Ensure Rosetta is installed and working:
