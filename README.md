@@ -78,88 +78,49 @@ This is a comprehensive fix that not only makes the game playable, but also impr
 
 - macOS 26 (Tahoe) or later
 - Worms W.M.D installed via Steam or GOG
-- Internet connection (one-time ~50MB download)
-- Approximately 200MB free disk space
+- Internet connection
 
-### Rosetta 2 (Apple Silicon Macs only)
-
-```bash
-softwareupdate --install-rosetta
-```
-
-That's it! The fix automatically downloads pre-built Qt frameworks - no Homebrew or manual setup needed.
-
-<details>
-<summary><strong>Advanced: Manual Homebrew Setup (Optional Fallback)</strong></summary>
-
-If the pre-built Qt download fails, the fix will fall back to using Intel Homebrew. This is rarely needed, but if you want to set it up manually:
-
-```bash
-# Install Intel Homebrew (if not present)
-arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install Qt 5
-arch -x86_64 /usr/local/bin/brew install qt@5
-```
-
-</details>
+**That's it!** Everything else is installed automatically:
+- Rosetta 2 (for Apple Silicon Macs)
+- Xcode Command Line Tools (for building components)
+- Qt frameworks (downloaded automatically)
 
 ## Quick Start
 
-### One-Liner Install (Easiest)
+### Option 1: Double-Click Installer (Easiest)
+
+1. **Download** [`Install Fix.command`](https://github.com/cboyd0319/WormsWMD-macOS-Fix/raw/main/Install%20Fix.command)
+2. **Double-click** the downloaded file
+3. If macOS says it can't be opened: **Right-click** → **Open** → **Open**
+4. **Done!** Everything else is automatic
+
+### Option 2: One-Liner (Terminal)
+
+Open Terminal and paste:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
 ```
 
-This will automatically download and run the fix. Add `--dry-run` to preview changes first:
+### Option 3: Manual Clone
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash -s -- --dry-run
-```
-
-You can customize where the installer clones the repo:
-
-```bash
-INSTALL_DIR="$HOME/.wormswmd-fix" curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
-```
-
-### Manual Install
-
-```bash
-# Clone the repository
 git clone https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
-
-# Preview changes (optional)
-./fix_worms_wmd.sh --dry-run
-
-# Run the fix
 ./fix_worms_wmd.sh
-
-# Optional: Verify only
-./fix_worms_wmd.sh --verify
 ```
 
-The script will automatically:
-- Verify all prerequisites are met
-- Create a backup of original game files
-- Apply all necessary fixes
-- Verify the installation was successful
-- Apply optional Info.plist and config URL enhancements (if scripts are present)
+The fix automatically:
+- Finds your game (Steam, GOG, or custom locations)
+- Installs Rosetta 2 if needed (Apple Silicon)
+- Installs Xcode tools if needed
+- Creates a backup of original files
+- Downloads and applies all fixes
+- Verifies everything worked
 
 ## Detailed Installation
 
-### Option 1: Automatic (Recommended)
-
-```bash
-# Clone and run
-git clone https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
-cd WormsWMD-macOS-Fix
-./fix_worms_wmd.sh
-```
-
-### Option 2: Manual Installation
+### Step-by-Step Manual Installation
 
 If you prefer to run each step manually:
 
@@ -589,6 +550,7 @@ Use the enhanced launcher with Steam for crash reporting:
 
 ## Version History
 
+- **1.5.0** (2025-12-26): **Zero-setup installer!** Double-click installer, auto-install Rosetta/Xcode, auto-detect game location, friendlier error messages
 - **1.4.0** (2025-12-25): Pre-built Qt (no Homebrew needed), Steam update watcher, crash reporter, save backup, update checker, controller helper
 - **1.3.0** (2025-12-25): Universal AGL stub, ad-hoc code signing, quarantine removal, diagnostics tool, expanded FAQ and Known Limitations
 - **1.2.5** (2025-12-25): Dry-run output now reflects Info.plist/config enhancements

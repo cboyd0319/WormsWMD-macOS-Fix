@@ -16,15 +16,16 @@
 #   GAME_APP - Path to Worms W.M.D.app (if non-standard location)
 #
 # Requirements:
-#   - Intel Homebrew (/usr/local/bin/brew)
-#   - Qt 5 (arch -x86_64 /usr/local/bin/brew install qt@5)
+#   - Rosetta 2 on Apple Silicon (auto-installed if missing)
+#   - Xcode Command Line Tools (auto-installed if missing)
+#   - Pre-built Qt frameworks are downloaded automatically
 #
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.4.0"
+VERSION="1.5.0"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -157,6 +158,228 @@ stop_spinner() {
 }
 
 # ============================================================
+# Auto-Detection and Auto-Install Functions
+# ============================================================
+
+# Search for game in common locations
+auto_detect_game() {
+    local found_games=()
+    local search_paths=(
+        "$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+        "/Applications/Worms W.M.D.app"
+        "$HOME/Applications/Worms W.M.D.app"
+        "$HOME/Games/Worms W.M.D.app"
+        "$HOME/Library/Application Support/GOG.com/Games/Worms W.M.D/Worms W.M.D.app"
+    )
+
+    # Also check for custom Steam library locations
+    local steam_config="$HOME/Library/Application Support/Steam/steamapps/libraryfolders.vdf"
+    if [[ -f "$steam_config" ]]; then
+        while IFS= read -r line; do
+            if [[ "$line" =~ \"path\"[[:space:]]*\"([^\"]+)\" ]]; then
+                local lib_path="${BASH_REMATCH[1]}"
+                if [[ -d "$lib_path" ]]; then
+                    search_paths+=("$lib_path/steamapps/common/WormsWMD/Worms W.M.D.app")
+                fi
+            fi
+        done < "$steam_config"
+    fi
+
+    # Search all paths
+    for path in "${search_paths[@]}"; do
+        if [[ -d "$path" ]] && [[ -f "$path/Contents/MacOS/Worms W.M.D" ]]; then
+            found_games+=("$path")
+        fi
+    done
+
+    # Remove duplicates using associative array
+    local -A seen_games
+    local unique_games=()
+    for game in "${found_games[@]}"; do
+        if [[ -z "${seen_games[$game]:-}" ]]; then
+            unique_games+=("$game")
+            seen_games[$game]=1
+        fi
+    done
+
+    if [[ ${#unique_games[@]} -eq 0 ]]; then
+        echo ""
+    elif [[ ${#unique_games[@]} -eq 1 ]]; then
+        echo "${unique_games[0]}"
+    else
+        # Multiple installations found - let user choose
+        echo ""
+        print_info "Multiple game installations found:"
+        echo ""
+        local i=1
+        for game in "${unique_games[@]}"; do
+            echo "    $i) $game"
+            ((i++))
+        done
+        echo ""
+
+        while true; do
+            read -r -p "Which installation do you want to fix? [1-${#unique_games[@]}] " choice
+            if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -le ${#unique_games[@]} ]]; then
+                echo "${unique_games[$((choice-1))]}"
+                return
+            fi
+            echo "Please enter a number between 1 and ${#unique_games[@]}"
+        done
+    fi
+}
+
+# Check and install Rosetta 2 if needed (Apple Silicon only)
+ensure_rosetta() {
+    local arch_name
+    arch_name=$(uname -m)
+
+    if [[ "$arch_name" != "arm64" ]]; then
+        return 0  # Not Apple Silicon, no Rosetta needed
+    fi
+
+    # Check if Rosetta is already installed
+    if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+        return 0  # Rosetta is available
+    fi
+
+    echo ""
+    print_info "Rosetta 2 is required to run this game on Apple Silicon."
+    echo ""
+    echo "    Rosetta 2 is Apple's translation layer that allows Intel apps"
+    echo "    to run on M1/M2/M3/M4 Macs. It's safe, free, and made by Apple."
+    echo ""
+
+    if $FORCE; then
+        echo "Installing Rosetta 2..."
+    else
+        read -p "Install Rosetta 2 now? [Y/n] " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            print_error "Rosetta 2 is required. Cannot continue without it."
+            exit 1
+        fi
+    fi
+
+    echo ""
+    start_spinner "Installing Rosetta 2 (this may take a minute)..."
+
+    if softwareupdate --install-rosetta --agree-to-license 2>/dev/null; then
+        stop_spinner
+        print_success "Rosetta 2 installed successfully!"
+        echo ""
+    else
+        stop_spinner false
+        print_error "Failed to install Rosetta 2."
+        echo ""
+        echo "Please try installing manually:"
+        echo "    softwareupdate --install-rosetta"
+        exit 1
+    fi
+}
+
+# Check and install Xcode Command Line Tools if needed
+ensure_xcode_clt() {
+    # Check if clang is available
+    if command -v clang &>/dev/null; then
+        return 0  # Already installed
+    fi
+
+    # Check if xcode-select path exists
+    if xcode-select -p &>/dev/null; then
+        return 0  # CLT installed but maybe not in PATH
+    fi
+
+    echo ""
+    print_info "Xcode Command Line Tools are required to build a component."
+    echo ""
+    echo "    These are free developer tools from Apple that include the"
+    echo "    compiler needed to build the AGL compatibility library."
+    echo ""
+
+    if $FORCE; then
+        echo "Installing Xcode Command Line Tools..."
+    else
+        read -p "Install Xcode Command Line Tools now? [Y/n] " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            print_error "Xcode Command Line Tools are required. Cannot continue without them."
+            exit 1
+        fi
+    fi
+
+    echo ""
+    print_info "A system dialog will appear. Click 'Install' to continue."
+    echo "    (This download is about 130MB and may take a few minutes)"
+    echo ""
+
+    # Trigger the install dialog
+    xcode-select --install 2>/dev/null || true
+
+    echo ""
+    echo "Waiting for installation to complete..."
+    echo "(Press any key once the installation dialog has finished)"
+    echo ""
+
+    # Wait for user to complete the installation
+    read -n 1 -s -r
+
+    # Verify installation
+    if ! command -v clang &>/dev/null; then
+        if ! xcode-select -p &>/dev/null; then
+            print_error "Xcode Command Line Tools installation was not completed."
+            echo ""
+            echo "Please complete the installation dialog, then run this fix again."
+            exit 1
+        fi
+    fi
+
+    print_success "Xcode Command Line Tools installed!"
+    echo ""
+}
+
+# Offer to install Steam update watcher
+offer_steam_watcher() {
+    local watcher_script="$SCRIPT_DIR/tools/watch_for_updates.sh"
+
+    if [[ ! -f "$watcher_script" ]]; then
+        return 0  # Watcher script doesn't exist
+    fi
+
+    # Check if already installed
+    if [[ -f "$HOME/Library/LaunchAgents/com.wormswmd.fix.watcher.plist" ]]; then
+        return 0  # Already installed
+    fi
+
+    echo ""
+    print_info "Would you like to be notified when Steam updates overwrite this fix?"
+    echo ""
+    echo "    Steam's 'Verify Integrity' feature will restore original files,"
+    echo "    which means you'll need to re-run this fix after verification."
+    echo ""
+    echo "    The update watcher runs in the background and notifies you"
+    echo "    if the fix needs to be re-applied."
+    echo ""
+
+    if $FORCE; then
+        return 0  # Don't auto-install in force mode
+    fi
+
+    read -p "Install the Steam update watcher? [y/N] " -n 1 -r
+    echo ""
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        chmod +x "$watcher_script"
+        if "$watcher_script" --install 2>/dev/null; then
+            print_success "Steam update watcher installed!"
+            echo "    You'll be notified if the fix needs to be re-applied."
+        else
+            print_warning "Could not install watcher (game will still work fine)"
+        fi
+    fi
+}
+
+# ============================================================
 # Cleanup and Error Handling
 # ============================================================
 
@@ -217,22 +440,49 @@ trap cleanup EXIT
 # ============================================================
 
 validate_game_app() {
+    # If GAME_APP wasn't explicitly set, try auto-detection
+    if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]] && [[ ! -d "$GAME_APP" ]]; then
+        print_step "Looking for Worms W.M.D..."
+        local detected_game
+        detected_game=$(auto_detect_game)
+
+        if [[ -n "$detected_game" ]]; then
+            GAME_APP="$detected_game"
+            print_substep "Found: $GAME_APP"
+        fi
+    fi
+
     if [[ -z "${GAME_APP:-}" ]]; then
-        print_error "GAME_APP is empty"
+        print_error "Could not find Worms W.M.D"
+        echo ""
+        echo "The game was not found in any of the usual locations."
+        echo ""
+        echo "Please make sure the game is installed, then either:"
+        echo "  1. Drag the game app onto this Terminal window and press Enter"
+        echo "  2. Set the path manually:"
+        echo "     GAME_APP=\"/path/to/Worms W.M.D.app\" ./fix_worms_wmd.sh"
         exit 1
     fi
 
     if [[ ! -d "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]]; then
         print_error "Game not found at: $GAME_APP"
+        echo ""
+        echo "This location doesn't contain Worms W.M.D."
+        echo ""
+        echo "Please check that the game is installed, then try again."
+        echo "You can also set the path manually:"
+        echo "  GAME_APP=\"/path/to/Worms W.M.D.app\" ./fix_worms_wmd.sh"
         exit 1
     fi
 
     local game_exec="$GAME_APP/Contents/MacOS/Worms W.M.D"
     if [[ ! -f "$game_exec" ]]; then
-        print_error "Invalid app bundle (missing main executable): $game_exec"
+        print_error "This doesn't look like Worms W.M.D"
         echo ""
-        echo "Set GAME_APP if your game is in a different location:"
-        echo "  GAME_APP=\"/path/to/Worms W.M.D.app\" ./fix_worms_wmd.sh"
+        echo "The folder exists but doesn't contain the game executable."
+        echo "Location: $GAME_APP"
+        echo ""
+        echo "Try reinstalling the game through Steam or GOG, then run this fix again."
         exit 1
     fi
 }
@@ -335,15 +585,11 @@ ${BOLD}EXAMPLES:${NC}
     # Restore from backup
     ./fix_worms_wmd.sh --restore
 
-${BOLD}REQUIREMENTS:${NC}
-    1. Intel Homebrew: /usr/local/bin/brew
-       Install: arch -x86_64 /bin/bash -c "\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-    2. Qt 5 (x86_64):
-       Install: arch -x86_64 /usr/local/bin/brew install qt@5
-
-    3. Rosetta 2 (Apple Silicon only):
-       Install: softwareupdate --install-rosetta
+${BOLD}AUTOMATIC FEATURES:${NC}
+    • Rosetta 2 is auto-installed if missing (Apple Silicon)
+    • Xcode Command Line Tools are auto-installed if missing
+    • Game location is auto-detected (Steam, GOG, custom paths)
+    • Qt frameworks are downloaded automatically (no Homebrew needed)
 
 ${BOLD}MORE INFO:${NC}
     Repository: https://github.com/cboyd0319/WormsWMD-macOS-Fix
@@ -573,10 +819,7 @@ do_fix() {
     # ============================================================
     print_step "Running pre-flight checks..."
 
-    validate_game_app
-    print_substep "Game found: $GAME_APP"
-
-    # Check macOS version
+    # Check macOS version first
     local macos_version major_version
     macos_version=$(sw_vers -productVersion)
     major_version=$(echo "$macos_version" | cut -d. -f1)
@@ -597,23 +840,23 @@ do_fix() {
         fi
     fi
 
-    # Check architecture
+    # Check architecture and auto-install Rosetta if needed
     local arch_name
     arch_name=$(uname -m)
     print_substep "Architecture: $arch_name"
 
     if [[ "$arch_name" == "arm64" ]]; then
-        # Check Rosetta
-        if ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
-            echo ""
-            print_error "Rosetta 2 is required but not installed."
-            echo ""
-            echo "Rosetta 2 is required to run x86_64 applications on Apple Silicon."
-            echo "Install with: softwareupdate --install-rosetta"
-            exit 1
-        fi
+        ensure_rosetta
         print_substep "Rosetta 2: available"
     fi
+
+    # Check for Xcode CLT and auto-install if needed
+    ensure_xcode_clt
+    print_substep "Build tools: available"
+
+    # Find the game (with auto-detection)
+    validate_game_app
+    print_substep "Game found: $GAME_APP"
 
     # Check Qt source: prefer pre-built, fall back to Homebrew
     QT_SOURCE=""
@@ -850,6 +1093,11 @@ do_fix() {
     fi
 
     # ============================================================
+    # Offer optional extras
+    # ============================================================
+    offer_steam_watcher
+
+    # ============================================================
     # Done
     # ============================================================
     echo ""
@@ -857,10 +1105,12 @@ do_fix() {
     echo -e "${GREEN}║${NC}                    ${GREEN}FIX COMPLETE!${NC}                            ${GREEN}║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo "The fix has been applied. Launch Worms W.M.D from Steam to test."
+    echo "The fix has been applied successfully!"
+    echo ""
+    echo "You can now launch Worms W.M.D from Steam or your Applications folder."
     echo ""
     echo -e "${DIM}Backup location: $BACKUP_DIR${NC}"
-    echo -e "${DIM}To restore:      ./fix_worms_wmd.sh --restore${NC}"
+    echo -e "${DIM}To undo the fix: ./fix_worms_wmd.sh --restore${NC}"
     echo ""
 }
 

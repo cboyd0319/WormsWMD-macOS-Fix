@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2025-12-26
+
+### Added
+- **Double-click installer**: `Install Fix.command` - download and double-click, that's it!
+- **Auto-install Rosetta 2**: Automatically installs Rosetta on Apple Silicon if missing
+- **Auto-install Xcode CLT**: Automatically prompts to install Xcode Command Line Tools if needed
+- **Auto-detect game location**: Searches Steam, GOG, and custom Steam library paths
+- **Steam watcher prompt**: Offers to install the update watcher after successful fix
+- **Multiple installation support**: If multiple game copies found, lets user choose which to fix
+
+### Changed
+- Completely redesigned for zero technical knowledge users
+- All error messages rewritten to be human-friendly with clear next steps
+- Fix now requires zero manual setup - everything is automatic
+- Help text updated to reflect automatic features
+
 ## [1.4.0] - 2025-12-25
 
 ### Added
@@ -157,6 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundles dependency libraries from Homebrew
 - Fixes all library paths to use `@executable_path`
 
+[1.5.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.4...v1.2.5
