@@ -12,6 +12,19 @@ set -e
 
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 INFO_PLIST="$GAME_APP/Contents/Info.plist"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
+
+source "$SCRIPT_DIR/logging.sh"
+worms_log_init "06_fix_info_plist"
+worms_debug_init
+
+if [[ -z "$LOGGING_PRESET" ]]; then
+    echo "Log file: $LOG_FILE"
+    if worms_bool_true "${WORMSWMD_DEBUG:-}"; then
+        echo "Trace log: $TRACE_FILE"
+    fi
+fi
 
 echo "=== Fixing Info.plist ==="
 

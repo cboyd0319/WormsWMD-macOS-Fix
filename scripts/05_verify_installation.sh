@@ -289,6 +289,54 @@ for plugin in "$GAME_PLUGINS/platforms/"*.dylib "$GAME_PLUGINS/imageformats/"*.d
 done
 echo "OK: Plugins checked"
 
+# Check Info.plist and config URLs
+echo ""
+echo "--- Checking Info.plist and config URLs ---"
+warnings_before=$warnings
+info_plist="$GAME_APP/Contents/Info.plist"
+if [ -f "$info_plist" ]; then
+    bundle_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$info_plist" 2>/dev/null || echo "")
+    hidpi=$(/usr/libexec/PlistBuddy -c "Print :NSHighResolutionCapable" "$info_plist" 2>/dev/null || echo "")
+    min_version=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$info_plist" 2>/dev/null || echo "")
+
+    if [ -z "$bundle_id" ]; then
+        echo "WARNING: CFBundleIdentifier is missing in Info.plist"
+        ((warnings++))
+    fi
+    if [ "$hidpi" != "true" ]; then
+        echo "WARNING: NSHighResolutionCapable is not enabled in Info.plist"
+        ((warnings++))
+    fi
+    if [ "$min_version" = "10.8" ]; then
+        echo "WARNING: LSMinimumSystemVersion is still 10.8 (legacy)"
+        ((warnings++))
+    fi
+else
+    echo "WARNING: Info.plist not found for verification"
+    ((warnings++))
+fi
+
+data_dir="$GAME_APP/Contents/Resources/DataOSX"
+if [ -d "$data_dir" ]; then
+    for config_file in SteamConfig.txt SteamConfigDemo.txt GOGConfig.txt; do
+        config_path="$data_dir/$config_file"
+        if [ -f "$config_path" ]; then
+            if grep -q "http://www\\.team17\\.com" "$config_path"; then
+                echo "WARNING: $config_file contains HTTP Team17 URLs"
+                ((warnings++))
+            fi
+            if grep -q "^[[:space:]]*URL_Internal.*xom\\.team17\\.com" "$config_path"; then
+                echo "WARNING: $config_file contains an internal staging URL"
+                ((warnings++))
+            fi
+        fi
+    done
+fi
+
+if [ "$warnings" -eq "$warnings_before" ]; then
+    echo "OK: Info.plist and config checks complete"
+fi
+
 # Summary
 echo ""
 echo "=== Verification Summary ==="

@@ -17,6 +17,7 @@ A comprehensive fix for Worms W.M.D black screen issues on macOS 26 (Tahoe) and 
 - [Restoring Original Files](#restoring-original-files)
 - [Troubleshooting](#troubleshooting)
 - [Technical Details](#technical-details)
+- [Security](#security)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -108,6 +109,9 @@ cd WormsWMD-macOS-Fix
 
 # Run the fix
 ./fix_worms_wmd.sh
+
+# Optional: Verify only
+./fix_worms_wmd.sh --verify
 ```
 
 The script will automatically:
@@ -115,6 +119,7 @@ The script will automatically:
 - Create a backup of original game files
 - Apply all necessary fixes
 - Verify the installation was successful
+- Apply optional Info.plist and config URL enhancements (if scripts are present)
 
 ## Detailed Installation
 
@@ -148,6 +153,12 @@ cd WormsWMD-macOS-Fix
 
 # Step 5: Verify the installation
 ./scripts/05_verify_installation.sh
+
+# Step 6 (optional): Fix Info.plist metadata
+./scripts/06_fix_info_plist.sh
+
+# Step 7 (optional): Secure config URLs
+./scripts/07_fix_config_urls.sh
 ```
 
 ### Custom Game Location
@@ -168,7 +179,8 @@ To check the current state without making changes:
 
 ## Restoring Original Files
 
-The fix script automatically creates a timestamped backup before making changes.
+The fix script automatically creates a timestamped backup before making changes
+(Frameworks, PlugIns, Info.plist, and key DataOSX config files).
 
 ### Automatic Restore
 
@@ -192,6 +204,16 @@ rm -rf "$GAME_APP/Contents/Frameworks"
 rm -rf "$GAME_APP/Contents/PlugIns"
 cp -R "$BACKUP_DIR/Frameworks" "$GAME_APP/Contents/"
 cp -R "$BACKUP_DIR/PlugIns" "$GAME_APP/Contents/"
+
+# Restore Info.plist (if backed up)
+if [[ -f "$BACKUP_DIR/Info.plist" ]]; then
+  cp "$BACKUP_DIR/Info.plist" "$GAME_APP/Contents/Info.plist"
+fi
+
+# Restore config files (if backed up)
+if [[ -d "$BACKUP_DIR/DataOSX" ]]; then
+  cp "$BACKUP_DIR/DataOSX/"* "$GAME_APP/Contents/Resources/DataOSX/" 2>/dev/null || true
+fi
 ```
 
 ## Troubleshooting
@@ -273,22 +295,7 @@ Ensure Rosetta is installed and working:
 softwareupdate --install-rosetta --agree-to-license
 ```
 
-### Using the Diagnostic Launcher
-
-For advanced troubleshooting, use the diagnostic launcher:
-
-```bash
-# Launch with logging
-./tools/launch_worms.sh --log
-
-# Safe mode (for graphics issues)
-./tools/launch_worms.sh --safe-mode --log
-
-# Full debug mode
-./tools/launch_worms.sh --qt-debug --opengl-debug --log --verbose
-```
-
-Logs are saved to `~/Library/Logs/WormsWMD/`.
+If you still see issues, attach the log file when reporting.
 
 ## Technical Details
 
@@ -303,6 +310,8 @@ QtWidgets, QtOpenGL, QtPrintSupport).
 | AGL.framework | System (removed) | Stub library |
 | QtDBus.framework | Not present (if missing) | Added (required by plugins) |
 | QtSvg.framework | Not present (if missing) | Added (required by SVG plugin) |
+| Info.plist | Missing identifiers / HiDPI flags | Adds CFBundleIdentifier, HiDPI flags, graphics switching, updates minimum version |
+| DataOSX configs | HTTP/internal URLs | HTTPS + internal URLs commented out (with .backup) |
 
 ### Libraries Added
 
@@ -334,6 +343,27 @@ The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL fun
 - It maintains binary compatibility with Qt 5.3 APIs the game uses
 - Available via Homebrew for easy installation
 
+## Security
+
+This fix is designed to be transparent, safe, and reversible. Key security features:
+
+- **Open source**: All code is auditable
+- **No network access**: Scripts never connect to the internet
+- **No elevated privileges**: Never requires `sudo`
+- **Reversible**: Full backup created before any changes
+- **Minimal scope**: Only modifies files inside the game bundle
+
+For detailed security information, see [SECURITY.md](SECURITY.md).
+
+To verify before running:
+```bash
+# Preview all changes without applying
+./fix_worms_wmd.sh --dry-run
+
+# Run ShellCheck on all scripts
+shellcheck fix_worms_wmd.sh scripts/*.sh
+```
+
 ## Contributing
 
 Contributions are welcome! If you find issues or have improvements:
@@ -348,7 +378,12 @@ Please report issues on the [GitHub Issues](https://github.com/cboyd0319/WormsWM
 
 ## Version History
 
-- **1.2.0** (2025-12-25): Info.plist fixes (HiDPI, bundle ID), config URL security fixes, diagnostic game launcher, dynamic framework scanning, improved logging/debugging
+- **1.2.5** (2025-12-25): Dry-run output now reflects Info.plist/config enhancements
+- **1.2.4** (2025-12-25): Verification output clarity for Info.plist/config checks
+- **1.2.3** (2025-12-25): Verification now checks Info.plist/config URLs; logging coverage for new scripts
+- **1.2.2** (2025-12-25): Option parsing fixes, backup/restore expanded to Info.plist + config files, docs accuracy pass
+- **1.2.1** (2025-12-25): Team17 report expansion and documentation clarity updates
+- **1.2.0** (2025-12-25): Dynamic framework scanning, logging/debugging, QtSvg bundling, Info.plist/config enhancements, and Team17 report
 - **1.1.0** (2025-12-25): Added dry-run mode, force mode, already-applied detection, automatic rollback, progress spinners, one-liner installer, and CI/CD pipeline
 - **1.0.0** (2025-12-25): Initial release for macOS 26 (Tahoe)
 

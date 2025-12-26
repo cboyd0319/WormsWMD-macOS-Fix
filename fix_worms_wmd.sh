@@ -24,7 +24,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.2.0"
+VERSION="1.2.5"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -187,6 +187,14 @@ rollback() {
         if [[ -d "$BACKUP_DIR/PlugIns" ]]; then
             rm -rf "$GAME_APP/Contents/PlugIns" 2>/dev/null || true
             cp -R "$BACKUP_DIR/PlugIns" "$GAME_APP/Contents/" 2>/dev/null || true
+        fi
+
+        if [[ -f "$BACKUP_DIR/Info.plist" ]]; then
+            cp "$BACKUP_DIR/Info.plist" "$GAME_APP/Contents/Info.plist" 2>/dev/null || true
+        fi
+
+        if [[ -d "$BACKUP_DIR/DataOSX" ]] && [[ -d "$GAME_APP/Contents/Resources/DataOSX" ]]; then
+            cp "$BACKUP_DIR/DataOSX/"* "$GAME_APP/Contents/Resources/DataOSX/" 2>/dev/null || true
         fi
 
         print_success "Rolled back to original state."
@@ -390,6 +398,16 @@ do_restore() {
     rm -rf "$GAME_APP/Contents/PlugIns"
     cp -R "$latest/PlugIns" "$GAME_APP/Contents/"
 
+    if [[ -f "$latest/Info.plist" ]]; then
+        print_step "Restoring Info.plist..."
+        cp "$latest/Info.plist" "$GAME_APP/Contents/Info.plist"
+    fi
+
+    if [[ -d "$latest/DataOSX" ]] && [[ -d "$GAME_APP/Contents/Resources/DataOSX" ]]; then
+        print_step "Restoring config files..."
+        cp "$latest/DataOSX/"* "$GAME_APP/Contents/Resources/DataOSX/" 2>/dev/null || true
+    fi
+
     echo ""
     print_success "Game restored to original state."
     echo ""
@@ -496,6 +514,8 @@ do_dry_run() {
     print_dry_run "Update library paths to use @executable_path"
     print_dry_run "Replace platform plugin: libqcocoa.dylib"
     print_dry_run "Update image format plugins"
+    print_dry_run "Update Info.plist metadata (bundle ID, HiDPI, min version)"
+    print_dry_run "Secure config URLs (HTTP→HTTPS, disable internal URLs)"
     echo ""
 
     print_success "Dry run complete. No changes were made."
@@ -647,6 +667,20 @@ do_fix() {
     cp -R "$GAME_APP/Contents/PlugIns" "$BACKUP_DIR/"
     stop_spinner
 
+    if [[ -f "$GAME_APP/Contents/Info.plist" ]]; then
+        cp "$GAME_APP/Contents/Info.plist" "$BACKUP_DIR/Info.plist"
+    fi
+
+    local data_dir="$GAME_APP/Contents/Resources/DataOSX"
+    if [[ -d "$data_dir" ]]; then
+        mkdir -p "$BACKUP_DIR/DataOSX"
+        for config_file in SteamConfig.txt SteamConfigDemo.txt GOGConfig.txt; do
+            if [[ -f "$data_dir/$config_file" ]]; then
+                cp "$data_dir/$config_file" "$BACKUP_DIR/DataOSX/$config_file"
+            fi
+        done
+    fi
+
     print_substep "Backup created: $BACKUP_DIR"
     CLEANUP_NEEDED=true
 
@@ -707,13 +741,15 @@ do_fix() {
     print_step "Applying enhancements..."
 
     # Fix Info.plist
-    if [[ -x "$SCRIPTS_DIR/06_fix_info_plist.sh" ]]; then
+    if [[ -f "$SCRIPTS_DIR/06_fix_info_plist.sh" ]]; then
+        chmod +x "$SCRIPTS_DIR/06_fix_info_plist.sh"
         "$SCRIPTS_DIR/06_fix_info_plist.sh" > /dev/null 2>&1 || true
-        print_substep "Info.plist updated (HiDPI, bundle ID)"
+        print_substep "Info.plist updated (bundle ID, HiDPI, min version)"
     fi
 
     # Fix config URLs
-    if [[ -x "$SCRIPTS_DIR/07_fix_config_urls.sh" ]]; then
+    if [[ -f "$SCRIPTS_DIR/07_fix_config_urls.sh" ]]; then
+        chmod +x "$SCRIPTS_DIR/07_fix_config_urls.sh"
         "$SCRIPTS_DIR/07_fix_config_urls.sh" > /dev/null 2>&1 || true
         print_substep "Config URLs secured (HTTP→HTTPS)"
     fi
@@ -766,6 +802,18 @@ do_fix() {
 # ============================================================
 
 FORCE=false
+ACTION="fix"
+
+set_action() {
+    local next_action="$1"
+
+    if [[ "$ACTION" != "fix" ]]; then
+        print_error "Only one mode can be selected (currently: $ACTION)"
+        exit 1
+    fi
+
+    ACTION="$next_action"
+}
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -774,12 +822,15 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         --restore|-r)
-            do_restore
+            set_action "restore"
+            shift
             ;;
         --verify|-v)
-            do_verify
+            set_action "verify"
+            shift
             ;;
         --dry-run|-n)
+            set_action "dry-run"
             DRY_RUN=true
             shift
             ;;
@@ -814,8 +865,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Run the appropriate action
-if $DRY_RUN; then
-    do_dry_run
-else
-    do_fix
-fi
+case "$ACTION" in
+    restore)
+        do_restore
+        ;;
+    verify)
+        do_verify
+        ;;
+    dry-run)
+        do_dry_run
+        ;;
+    fix)
+        do_fix
+        ;;
+esac

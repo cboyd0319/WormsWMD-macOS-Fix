@@ -1,6 +1,6 @@
 # Worms W.M.D - macOS Compatibility Report for Team17
 
-**Document Version:** 2.1
+**Document Version:** 2.2
 **Date:** December 25, 2025
 **Prepared for:** Team17 Digital Ltd.
 **Platform:** macOS 26 (Tahoe) and later
@@ -19,14 +19,14 @@ Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a bla
 
 ### Issue Summary
 
-| Category | Issues Found | Severity |
-|----------|--------------|----------|
-| Framework Dependencies | 4 | Critical |
-| Audio Libraries | 2 | High |
-| Build Configuration | 5 | Medium |
-| Security & Compliance | 5 | Medium |
-| Platform/Performance | 4 | Medium |
-| Diagnostics/Observability | 2 | Medium |
+| Category | Severity | Key Issues |
+|----------|----------|------------|
+| Framework Dependencies | Critical | AGL removal, Qt 5.3.2, missing QtDBus/QtSvg |
+| Audio Libraries | High | FMOD + Steamworks linked to removed libstdc++/libgcc |
+| Build Configuration | Medium | Ancient SDK/Xcode, missing CFBundleIdentifier |
+| Security & Compliance | Medium | Unsigned app, no hardened runtime, HTTP endpoints |
+| Platform/Performance | Medium | OpenGL-only, no Apple Silicon native binary |
+| Diagnostics/Observability | Medium | No structured logging or crash reporting |
 
 ---
 

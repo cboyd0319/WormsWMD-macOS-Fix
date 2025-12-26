@@ -5,19 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2025-12-25
+
+### Changed
+- Dry-run output now lists Info.plist/config enhancements for completeness
+
+## [1.2.4] - 2025-12-25
+
+### Changed
+- Verification output now reports a clean Info.plist/config check when no issues are found
+
+## [1.2.3] - 2025-12-25
+
+### Changed
+- Verification now checks Info.plist metadata and config URL hygiene
+- Logging now covers Info.plist and config URL scripts for consistent diagnostics
+
+## [1.2.2] - 2025-12-25
+
+### Changed
+- Option parsing now allows combining `--verify`/`--restore` with `--verbose`/`--debug` in any order
+- Backups include `Info.plist` and DataOSX config files for full restore coverage
+- Documentation aligned with current scripts and enhancements
+
+### Fixed
+- Restore/rollback now reverts Info.plist and config file changes when present
+
+## [1.2.1] - 2025-12-25
+
+### Changed
+- Documentation accuracy pass (removed references to non-existent tools, clarified logging/verification)
+- Team17 developer report expanded with scope, security/malware assessment, and updated recommendations
+
+### Fixed
+- Corrected version history entries to match shipped features
+
 ## [1.2.0] - 2025-12-25
 
 ### Added
 - Comprehensive Team17 developer report (`TEAM17_DEVELOPER_REPORT.md`) for official fix guidance
-- **Info.plist enhancements**: Adds CFBundleIdentifier, NSHighResolutionCapable (Retina support), NSSupportsAutomaticGraphicsSwitching
-- **Config security fixes**: HTTP→HTTPS for Team17 URLs, internal staging URLs commented out
-- **Diagnostic game launcher** (`tools/launch_worms.sh`): Logging, safe-mode, Qt/OpenGL debugging
+- Info.plist enhancement script (CFBundleIdentifier, HiDPI flags, minimum system version update)
+- Config URL security script (HTTP→HTTPS and internal URL disablement)
 - Verification now reports missing `@executable_path`/`@loader_path` dependencies
 - Per-run log files in `~/Library/Logs/WormsWMD-Fix` with `--log-file` override
 - Debug tracing (`--debug`) and verbose verification output (`--verbose`)
 - QtSvg.framework is bundled when missing (required by SVG image plugin)
 - Verification now checks binary architectures for x86_64 compatibility
-- Team17 report expanded with security/malware assessment and additional improvements
 
 ### Changed
 - Qt framework replacement now targets the frameworks present in the game bundle and adjusts install names based on their layout
@@ -75,6 +108,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundles dependency libraries from Homebrew
 - Fixes all library paths to use `@executable_path`
 
+[1.2.5]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.4...v1.2.5
+[1.2.4]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.3...v1.2.4
+[1.2.3]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.2...v1.2.3
+[1.2.2]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/tag/v1.0.0
