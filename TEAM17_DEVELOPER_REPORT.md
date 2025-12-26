@@ -1,38 +1,36 @@
-# Worms W.M.D - macOS Compatibility Report for Team17
+# Worms W.M.D macOS compatibility report for Team17
 
-**Document Version:** 2.5
-**Date:** December 26, 2025
-**Prepared for:** Team17 Digital Ltd.
-**Platform:** macOS 26 (Tahoe) and later
+Document version: 2.5
+Date: 2025-12-26
+Prepared for: Team17 Digital Ltd.
+Platform: macOS 26 (Tahoe) and later
 
----
+## Executive summary
 
-## Executive Summary
+Worms W.M.D does not launch on macOS 26 (Tahoe) and later. It shows a black screen. This report summarizes the issues, required fixes, and recommendations.
 
-Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a black screen. This report provides a comprehensive technical analysis of **all known issues** affecting the game, required fixes, recommended improvements, and suggestions for long-term maintainability.
+Severity: critical (game does not launch)
+Affected users: macOS 26+ players
+Root causes: deprecated framework dependencies, outdated libraries, legacy build settings, and missing platform compliance updates (signing, notarization, diagnostics)
 
-**Severity:** Critical (Game Unplayable)
-**Affected Users:** All macOS 26+ users
-**Root Causes:** Multiple deprecated framework dependencies, outdated libraries, legacy build configuration, and missing platform compliance updates (signing, notarization, diagnostics)
+Verified on this machine: macOS 26.2 (Apple Silicon M4 Max via Rosetta 2) with community fix v1.5.0 applied and verification passing
 
-**Verified on this machine:** macOS 26.2 (Apple Silicon M4 Max via Rosetta 2) with the community fix v1.5.0 applied and full verification passing.
+Community fix status: v1.5.0 provides a zero-setup experience with auto install for Rosetta 2 and Xcode CLT, plus game detection
 
-**Community Fix Status:** v1.5.0 provides a zero-setup experience—users can double-click to install, with automatic Rosetta 2/Xcode installation and game detection.
+### Issue summary
 
-### Issue Summary
-
-| Category | Severity | Key Issues |
+| Category | Severity | Key issues |
 |----------|----------|------------|
-| Framework Dependencies | Critical | AGL removal, Qt 5.3.2, missing QtDBus/QtSvg |
-| Audio Libraries | High | FMOD + Steamworks linked to removed libstdc++/libgcc |
-| Build Configuration | Medium | Ancient SDK/Xcode, missing CFBundleIdentifier |
-| Security & Compliance | Medium | Unsigned app, no hardened runtime, HTTP endpoints |
-| Platform/Performance | Medium | OpenGL-only, no Apple Silicon native binary |
-| Diagnostics/Observability | Medium | No structured logging or crash reporting |
+| Framework dependencies | Critical | AGL removal, Qt 5.3.2, missing QtDBus/QtSvg |
+| Audio libraries | High | FMOD and Steamworks linked to removed libstdc++/libgcc |
+| Build configuration | Medium | Ancient SDK/Xcode, missing CFBundleIdentifier |
+| Security and compliance | Medium | Unsigned app, no hardened runtime, HTTP endpoints |
+| Platform and performance | Medium | OpenGL-only, no Apple Silicon native binary |
+| Diagnostics and observability | Medium | No structured logging or crash reporting |
 
 ---
 
-## Scope and Evidence
+## Scope and evidence
 
 - Static analysis of the shipped macOS app bundle (Steam build) on macOS 26.2
 - Dynamic dependency inspection (`otool -L`, `lipo`, `codesign`)
@@ -41,41 +39,41 @@ Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a bla
 
 ---
 
-## Table of Contents
+## Table of contents
 
-1. [Critical Issues](#1-critical-issues)
-2. [High Priority Issues](#2-high-priority-issues)
-3. [Medium Priority Issues](#3-medium-priority-issues)
-4. [Technical Analysis](#4-technical-analysis)
-5. [Required Fixes](#5-required-fixes)
-6. [Recommended Improvements](#6-recommended-improvements)
-7. [Long-Term Recommendations](#7-long-term-recommendations)
-8. [Security and Malware Assessment](#8-security-and-malware-assessment)
-9. [Testing Verification](#9-testing-verification)
-10. [Performance Expectations](#10-performance-expectations)
-11. [Appendix: Technical Details](#11-appendix-technical-details)
+1. [Critical issues](#1-critical-issues)
+2. [High priority issues](#2-high-priority-issues)
+3. [Medium priority issues](#3-medium-priority-issues)
+4. [Technical analysis](#4-technical-analysis)
+5. [Required fixes](#5-required-fixes)
+6. [Recommended improvements](#6-recommended-improvements)
+7. [Long-term recommendations](#7-long-term-recommendations)
+8. [Security and malware assessment](#8-security-and-malware-assessment)
+9. [Testing verification](#9-testing-verification)
+10. [Performance expectations](#10-performance-expectations)
+11. [Appendix: technical details](#11-appendix-technical-details)
 
 ---
 
-## 1. Critical Issues
+## 1. Critical issues
 
-### 1.1 AGL Framework Removal (CRITICAL)
+### 1.1 AGL framework removal (critical)
 
-**Issue:** Apple removed the AGL (Apple OpenGL) framework in macOS 26 (Tahoe). The game's executable has a dynamic dependency on AGL.
+Issue: Apple removed the AGL (Apple OpenGL) framework in macOS 26 (Tahoe). The game's executable has a dynamic dependency on AGL.
 
-**Impact:** The game cannot launch at all - the dynamic linker fails to load the executable.
+Impact: The game cannot launch at all - the dynamic linker fails to load the executable.
 
-**Fix Required:** Either:
+Fix required: Do one of these options:
 - Remove all AGL dependencies from the codebase and rebuild, OR
 - Bundle a stub AGL.framework that provides no-op implementations of the 41 AGL functions
 
-### 1.2 Outdated Qt 5.3.2 Frameworks (CRITICAL)
+### 1.2 Outdated Qt 5.3.2 frameworks (critical)
 
-**Issue:** The game ships with Qt 5.3.2 (released 2014), which uses deprecated `NSOpenGLContext` APIs that no longer function correctly on modern macOS.
+Issue: The game ships with Qt 5.3.2 (released 2014), which uses deprecated `NSOpenGLContext` APIs that no longer function correctly on modern macOS.
 
-**Impact:** Even if AGL is resolved, the game displays only a black screen due to OpenGL context creation failures.
+Impact: Even if AGL is resolved, the game displays only a black screen due to OpenGL context creation failures.
 
-**Current State:**
+Current state:
 
 | Framework | Shipped Version | Required Version |
 |-----------|-----------------|------------------|
@@ -85,64 +83,64 @@ Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a bla
 | QtOpenGL  | 5.3.2           | 5.15.x or 6.x    |
 | QtPrintSupport | 5.3.2      | 5.15.x or 6.x    |
 
-**Fix Required:** Update Qt frameworks to 5.15.x (LTS) or Qt 6.x
+Fix required: Update Qt frameworks to 5.15.x (LTS) or Qt 6.x
 
-### 1.3 Missing Qt Frameworks (CRITICAL)
+### 1.3 Missing Qt frameworks (critical)
 
-**Issue:** The game bundle is missing required Qt frameworks that modern Qt plugins depend on.
+Issue: The game bundle is missing required Qt frameworks that modern Qt plugins depend on.
 
-**Missing Frameworks:**
+Missing frameworks:
 - `QtDBus.framework` - Required by libqcocoa.dylib platform plugin
 - `QtSvg.framework` - Required by libqsvg.dylib image format plugin
 
-**Fix Required:** Bundle these frameworks with the game.
+Fix required: Bundle these frameworks with the game.
 
 ---
 
-## 2. High Priority Issues
+## 2. High priority issues
 
-### 2.1 FMOD Audio Libraries Use Deprecated Runtime (HIGH)
+### 2.1 FMOD audio libraries use deprecated runtime (high)
 
-**Issue:** The bundled FMOD audio libraries (`libfmodevent.dylib`, `libfmodex.dylib`) link against deprecated GNU C++ runtime libraries that are **no longer present** on macOS 26.
+Issue: The bundled FMOD audio libraries (`libfmodevent.dylib`, `libfmodex.dylib`) link against deprecated GNU C++ runtime libraries that are no longer present on macOS 26.
 
-**Dependencies (MISSING on macOS 26):**
+Dependencies (missing on macOS 26):
 ```
-/usr/lib/libstdc++.6.dylib    ← REMOVED from macOS
-/usr/lib/libgcc_s.1.dylib     ← REMOVED from macOS
+/usr/lib/libstdc++.6.dylib    (removed from macOS)
+/usr/lib/libgcc_s.1.dylib     (removed from macOS)
 ```
 
-**Verified:** Both libraries are absent on macOS 26.2 (`/usr/lib`).
+Verified: Both libraries are absent on macOS 26.2 (`/usr/lib`).
 
-**Current Workaround:** Rosetta 2 appears to provide compatibility shims for these libraries, but this is undocumented and unreliable.
+Current workaround: Rosetta 2 appears to provide compatibility shims for these libraries, but this is undocumented and unreliable.
 
-**Impact:** Potential audio failures or crashes, especially in future macOS versions.
+Impact: Potential audio failures or crashes, especially in future macOS versions.
 
-**Fix Required:** Update FMOD to a modern version that uses libc++ instead of libstdc++.
+Fix required: Update FMOD to a modern version that uses libc++ instead of libstdc++.
 
-**Current FMOD Analysis:**
+Current FMOD analysis:
 - Version: Very old (built against Mac OS X 10.6 era SDKs)
 - Architecture: Universal (i386 + x86_64) - 32-bit code is unnecessary
 - Carbon Framework dependency: Deprecated
 
-### 2.2 Steam API Library Outdated (HIGH)
+### 2.2 Steam API library outdated (high)
 
-**Issue:** The bundled `libsteam_api.dylib` uses the same deprecated runtime:
+Issue: The bundled `libsteam_api.dylib` uses the same deprecated runtime:
 ```
-/usr/lib/libstdc++.6.dylib    ← REMOVED from macOS
-/usr/lib/libgcc_s.1.dylib     ← REMOVED from macOS
+/usr/lib/libstdc++.6.dylib    (removed from macOS)
+/usr/lib/libgcc_s.1.dylib     (removed from macOS)
 ```
 
-**Fix Required:** Update to current Steamworks SDK, which uses modern libc++.
+Fix required: Update to current Steamworks SDK, which uses modern libc++.
 
 ---
 
-## 3. Medium Priority Issues
+## 3. Medium priority issues
 
-### 3.1 Ancient Build Configuration
+### 3.1 Ancient build configuration
 
-**Current Build Environment (from Info.plist):**
+Current build environment (from Info.plist):
 
-| Property | Current Value | Recommended |
+| Property | Current value | Recommended |
 |----------|--------------|-------------|
 | DTSDKName | macosx10.11 | macosx14.0+ |
 | DTXcode | 0731 (Xcode 7.3.1) | 15.0+ |
@@ -150,138 +148,138 @@ Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a bla
 | BuildMachineOSBuild | 16G1618 (macOS 10.12.6) | Current |
 | LSMinimumSystemVersion | 10.8 | 12.0+ |
 
-**Issues:**
+Issues:
 1. Built with 9-year-old SDK (macOS 10.11 El Capitan, 2015)
 2. Built with Xcode 7.3.1 (2016)
 3. Minimum system version set to macOS 10.8 (2012)
 4. No modern macOS APIs or optimizations available
 
-### 3.2 No Code Signing (SECURITY)
+### 3.2 No code signing (security)
 
-**Issue:** The game binary is completely unsigned.
+Issue: The game binary is completely unsigned.
 
 ```bash
 $ codesign -dv "Worms W.M.D.app"
 code object is not signed at all
 ```
 
-**Impact:**
+Impact:
 - Gatekeeper warnings on first launch
 - Cannot be notarized (current state)
 - Reduced user trust
 - May be blocked by enterprise security policies
 
-### 3.3 No Hardened Runtime (SECURITY)
+### 3.3 No hardened runtime (security)
 
-**Issue:** The game does not use Apple's Hardened Runtime, which is required for notarization.
+Issue: The game does not use Apple's Hardened Runtime, which is required for notarization.
 
-**Missing Entitlements:**
+Missing entitlements:
 - `com.apple.security.cs.allow-unsigned-executable-memory`
 - `com.apple.security.cs.disable-library-validation`
-- Other required entitlements for games
+- Other entitlements required for games
 
-### 3.4 Bundled libcurl May Have Vulnerabilities (SECURITY)
+### 3.4 Bundled libcurl may have vulnerabilities (security)
 
-**Issue:** The game bundles `libcurl.4.dylib` which may contain security vulnerabilities if not updated regularly.
+Issue: The game bundles `libcurl.4.dylib` which may contain security vulnerabilities if not updated regularly.
 
-**Current Version:** Unknown (no version string visible)
+Current version: Unknown (no version string visible)
 
-**Recommendation:** Either:
+Recommendation: Do one of these options:
 - Use system libcurl (`/usr/lib/libcurl.4.dylib`)
 - Bundle and regularly update libcurl
 - Document the specific version for security audits
 
-### 3.5 Carbon Framework Usage (DEPRECATED)
+### 3.5 Carbon framework usage (deprecated)
 
-**Issue:** Both the game and FMOD libraries link against the Carbon framework:
+Issue: Both the game and FMOD libraries link against the Carbon framework:
 
 ```
 /System/Library/Frameworks/Carbon.framework/Versions/A/Carbon
 ```
 
-**Status:** Carbon has been deprecated since macOS 10.8 (2012) and fully deprecated since macOS 10.14 (2018).
+Status: Carbon has been deprecated since macOS 10.8 (2012) and fully deprecated since macOS 10.14 (2018).
 
-**Impact:** May cause issues in future macOS versions as Apple continues removing legacy APIs.
+Impact: May cause issues in future macOS versions as Apple continues removing legacy APIs.
 
-### 3.6 32-bit Code in Universal Binaries (OBSOLETE)
+### 3.6 32-bit code in universal binaries (obsolete)
 
-**Issue:** FMOD and Steam API libraries contain 32-bit (i386) code:
+Issue: FMOD and Steam API libraries contain 32-bit (i386) code:
 
 ```bash
 $ file libfmodex.dylib
 Mach-O universal binary with 2 architectures: [i386:...] [x86_64:...]
 ```
 
-**Impact:**
+Impact:
 - Unnecessary file size increase
 - 32-bit support was removed in macOS 10.15 Catalina (2019)
 - No functional benefit
 
-### 3.7 No Apple Silicon Native Binary (PERFORMANCE)
+### 3.7 No apple silicon native binary (performance)
 
-**Issue:** The macOS build is x86_64 only and runs under Rosetta 2 on Apple Silicon.
+Issue: The macOS build is x86_64 only and runs under Rosetta 2 on Apple Silicon.
 
-**Impact:**
+Impact:
 - Performance and battery penalties (often 2x+ slower)
 - Increased risk of incompatibility if Rosetta is deprecated in a future macOS
 
-**Fix Required:** Provide universal binaries (x86_64 + arm64).
+Fix required: Provide universal binaries (x86_64 + arm64).
 
-### 3.8 OpenGL-Only Renderer (DEPRECATED)
+### 3.8 OpenGL-only renderer (deprecated)
 
-**Issue:** Rendering relies on OpenGL, which is deprecated on macOS and may be removed in a future release.
+Issue: Rendering relies on OpenGL, which is deprecated on macOS and may be removed in a future release.
 
-**Impact:**
+Impact:
 - Future compatibility risk
 - Performance limitations compared to Metal
 
-**Fix Required:** Provide a Metal backend (direct Metal or via Qt 6 RHI).
+Fix required: Provide a Metal backend (direct Metal or via Qt 6 RHI).
 
-### 3.9 Limited Diagnostic Logging (MEDIUM)
+### 3.9 Limited diagnostic logging (medium)
 
-**Issue:** There is no documented, user-accessible logging for startup failures or rendering issues.
+Issue: There is no documented, user-accessible logging for startup failures or rendering issues.
 
-**Impact:** Support and QA cannot reliably reproduce or diagnose failures, especially black-screen or crash-on-startup cases.
+Impact: Support and QA cannot reliably reproduce or diagnose failures, especially black-screen or crash-on-startup cases.
 
-**Fix Required:** Add structured logging with configurable verbosity and file output (see section 6.8).
+Fix required: Add structured logging with configurable verbosity and file output (see section 6.8).
 
-### 3.10 No Crash Reporting / Symbolication Pipeline (MEDIUM)
+### 3.10 No crash reporting / symbolication pipeline (medium)
 
-**Issue:** Crash logs are not symbolicated and there is no integrated crash reporting pipeline.
+Issue: Crash logs are not symbolicated and there is no integrated crash reporting pipeline.
 
-**Impact:** High MTTR (mean time to resolution) for regressions and platform-specific issues.
+Impact: High MTTR (mean time to resolution) for regressions and platform-specific issues.
 
-**Fix Required:** Ship dSYMs and integrate crash reporting (see section 7.6).
+Fix required: Ship dSYMs and integrate crash reporting (see section 7.6).
 
-### 3.11 Insecure HTTP Endpoints in Config (SECURITY)
+### 3.11 Insecure HTTP endpoints in config (security)
 
-**Issue:** Configuration files reference HTTP endpoints:
+Issue: Configuration files reference HTTP endpoints:
 - `http://www.team17.com/wormsrevolution/`
 - `http://xom.team17.com/revolutiontest/` (internal)
 
-**Impact:**
+Impact:
 - Mixed-content and MITM risk
 - Internal endpoints should not ship in public builds
 
-**Fix Required:** Update to HTTPS and remove internal/staging URLs from retail builds.
+Fix required: Update to HTTPS and remove internal/staging URLs from retail builds.
 
-### 3.12 Missing Bundle Identifier (COMPLIANCE)
+### 3.12 Missing bundle identifier (compliance)
 
-**Issue:** `CFBundleIdentifier` is missing in the Info.plist.
+Issue: `CFBundleIdentifier` is missing in the Info.plist.
 
-**Impact:**
+Impact:
 - App identity and preferences are not properly namespaced
 - Complicates notarization, signing, and crash symbolication
 
-**Fix Required:** Set a stable bundle identifier (e.g., `com.team17.wormswmd`).
+Fix required: Set a stable bundle identifier (e.g., `com.team17.wormswmd`).
 
 ---
 
-## 4. Technical Analysis
+## 4. Technical analysis
 
-### 4.1 Complete Dependency Analysis
+### 4.1 Complete dependency analysis
 
-**Main Executable Dependencies:**
+Main Executable Dependencies:
 ```
 @executable_path/../Frameworks/libfmodevent.dylib
 @executable_path/../Frameworks/libfmodex.dylib
@@ -300,9 +298,9 @@ Mach-O universal binary with 2 architectures: [i386:...] [x86_64:...]
 /System/Library/Frameworks/IOSurface.framework
 /System/Library/Frameworks/CoreMedia.framework
 /System/Library/Frameworks/CoreVideo.framework
-/System/Library/Frameworks/Carbon.framework          ← DEPRECATED
+/System/Library/Frameworks/Carbon.framework          (deprecated)
 /System/Library/Frameworks/Cocoa.framework
-/System/Library/Frameworks/OpenGL.framework          ← DEPRECATED
+/System/Library/Frameworks/OpenGL.framework          (deprecated)
 /System/Library/Frameworks/CoreGraphics.framework
 /System/Library/Frameworks/AppKit.framework
 /System/Library/Frameworks/CFNetwork.framework
@@ -315,102 +313,102 @@ Mach-O universal binary with 2 architectures: [i386:...] [x86_64:...]
 /usr/lib/libSystem.B.dylib
 ```
 
-### 4.2 FMOD Library Analysis
+### 4.2 FMOD library analysis
 
-**libfmodex.dylib Dependencies:**
+libfmodex.dylib Dependencies:
 ```
-/System/Library/Frameworks/Carbon.framework          ← DEPRECATED
+/System/Library/Frameworks/Carbon.framework          (deprecated)
 /System/Library/Frameworks/AudioUnit.framework
 /System/Library/Frameworks/CoreAudio.framework
-/usr/lib/libstdc++.6.dylib                           ← MISSING on macOS 26
-/usr/lib/libgcc_s.1.dylib                            ← MISSING on macOS 26
+/usr/lib/libstdc++.6.dylib                           (missing on macOS 26)
+/usr/lib/libgcc_s.1.dylib                            (missing on macOS 26)
 /usr/lib/libSystem.B.dylib
 /System/Library/Frameworks/CoreServices.framework
 /System/Library/Frameworks/CoreFoundation.framework
 ```
 
-**libfmodevent.dylib Dependencies:**
+libfmodevent.dylib Dependencies:
 ```
-/System/Library/Frameworks/Carbon.framework          ← DEPRECATED
+/System/Library/Frameworks/Carbon.framework          (deprecated)
 @executable_path/../Frameworks/libfmodex.dylib
 /System/Library/Frameworks/CoreAudio.framework
-/usr/lib/libstdc++.6.dylib                           ← MISSING on macOS 26
-/usr/lib/libgcc_s.1.dylib                            ← MISSING on macOS 26
+/usr/lib/libstdc++.6.dylib                           (missing on macOS 26)
+/usr/lib/libgcc_s.1.dylib                            (missing on macOS 26)
 /usr/lib/libSystem.B.dylib
 /System/Library/Frameworks/CoreFoundation.framework
 ```
 
-### 4.3 Qt Framework Analysis
+### 4.3 Qt framework analysis
 
 The shipped Qt 5.3.2 frameworks have several critical issues:
 
-1. **OpenGL Context Creation:** Uses deprecated `NSOpenGLContext` APIs that fail silently on macOS 26
-2. **Missing Frameworks:** `QtDBus.framework` is required by the Cocoa platform plugin but not bundled
-3. **Plugin Compatibility:** `libqcocoa.dylib` platform plugin expects newer Qt internal APIs
-4. **Dependency Resolution:** Absolute paths to `/usr/local` that don't exist on end-user systems
+1. OpenGL context creation: Uses deprecated `NSOpenGLContext` APIs that fail silently on macOS 26
+2. Missing frameworks: `QtDBus.framework` is required by the Cocoa platform plugin but not bundled
+3. Plugin compatibility: `libqcocoa.dylib` platform plugin expects newer Qt internal APIs
+4. Dependency resolution: Absolute paths to `/usr/local` that do not exist on end-user systems
 
-### 4.4 Game Data Locations
+### 4.4 Game data locations
 
-**Save Data:** `~/Library/Application Support/Team17/Save/`
-**Preferences:** Not using standard NSUserDefaults (no plist files found)
-**DLC Content:** `steamapps/common/WormsWMD/DLC/`
+Save Data: `~/Library/Application Support/Team17/Save/`
+Preferences: Not using standard NSUserDefaults (no plist files found)
+DLC Content: `steamapps/common/WormsWMD/DLC/`
 
 ---
 
-## 5. Required Fixes
+## 5. Required fixes
 
-### 5.1 Fix 1: AGL Framework (Choose One)
+### 5.1 Fix 1: AGL framework (choose one)
 
-#### Option A: Rebuild Without AGL (Recommended)
+#### Option a: rebuild without AGL (recommended)
 Remove AGL dependencies from the codebase entirely. Modern Qt 5.15+ uses CGL directly.
 
-**Steps:**
+Steps:
 1. Audit codebase for `#include <AGL/agl.h>` or AGL function calls
 2. Replace with CGL equivalents or remove if unused
 3. Rebuild against macOS 12+ SDK
 
-#### Option B: Bundle AGL Stub (Quick Fix)
+#### Option b: bundle AGL stub (quick fix)
 Provide a stub framework that satisfies the dynamic linker. See `src/agl_stub.c` in the community fix for a complete implementation.
 
-### 5.2 Fix 2: Update Qt Frameworks
+### 5.2 Fix 2: update Qt frameworks
 
-**Minimum Required:** Qt 5.15.x LTS
-**Recommended:** Qt 6.5+ LTS (for Metal support)
+Minimum required: Qt 5.15.x LTS
+Recommended: Qt 6.5+ LTS (for Metal support)
 
-**Frameworks to Update:**
-- QtCore.framework → 5.15.x+
-- QtGui.framework → 5.15.x+
-- QtWidgets.framework → 5.15.x+
-- QtOpenGL.framework → 5.15.x+
-- QtPrintSupport.framework → 5.15.x+
+Frameworks to update:
+- QtCore.framework to 5.15.x+
+- QtGui.framework to 5.15.x+
+- QtWidgets.framework to 5.15.x+
+- QtOpenGL.framework to 5.15.x+
+- QtPrintSupport.framework to 5.15.x+
 
-**Frameworks to Add:**
+Frameworks to add:
 - QtDBus.framework (required by libqcocoa.dylib)
 - QtSvg.framework (required by SVG image plugin)
 
-### 5.3 Fix 3: Update FMOD
+### 5.3 Fix 3: update FMOD
 
-**Current Version:** Unknown (very old, ~2010 era)
-**Required:** FMOD 2.x or FMOD Core
+Current version: Unknown (very old, ~2010 era)
+Required: FMOD 2.x or FMOD Core
 
-**Changes Needed:**
+Changes needed:
 - Replace libfmodevent.dylib and libfmodex.dylib
 - Update to libc++ runtime (not libstdc++)
 - Remove Carbon framework dependency
 - Build x86_64 only (or universal x86_64 + arm64)
 
-### 5.4 Fix 4: Update Steam SDK
+### 5.4 Fix 4: update Steam SDK
 
-**Current:** Very old version using libstdc++
-**Required:** Current Steamworks SDK
+Current version: Very old (uses libstdc++).
+Required: Current Steamworks SDK.
 
-### 5.5 Fix 5: Update Platform Plugins
+### 5.5 Fix 5: update platform plugins
 
 Replace bundled plugins with Qt 5.15.x versions:
 - `PlugIns/platforms/libqcocoa.dylib`
 - `PlugIns/imageformats/*.dylib`
 
-### 5.6 Fix 6: Update Library Paths
+### 5.6 Fix 6: update library paths
 
 All library references must use `@executable_path` relative paths:
 
@@ -420,12 +418,12 @@ install_name_tool -change "/old/path" "@executable_path/../Frameworks/lib.dylib"
 
 ---
 
-## 6. Recommended Improvements
+## 6. Recommended improvements
 
-### 6.1 Code Signing and Notarization
+### 6.1 Code signing and notarization
 
-**Current State:** No code signing
-**Recommendation:** Full code signing and notarization pipeline
+Current state: No code signing
+Recommendation: Implement a full code signing and notarization pipeline.
 
 ```bash
 # Sign all frameworks and the app
@@ -444,7 +442,7 @@ xcrun notarytool submit "Worms W.M.D.app" \
 xcrun stapler staple "Worms W.M.D.app"
 ```
 
-**Required Entitlements (entitlements.plist):**
+Required entitlements (entitlements.plist):
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "...">
@@ -462,13 +460,13 @@ xcrun stapler staple "Worms W.M.D.app"
 </plist>
 ```
 
-### 6.2 Universal Binary Support
+### 6.2 Universal binary support
 
-**Current State:** x86_64 only (runs via Rosetta 2 on Apple Silicon)
+Current state: x86_64 only (runs via Rosetta 2 on Apple Silicon)
 
-**Recommendation:** Build universal binary (x86_64 + arm64)
+Recommendation: Build a universal binary (x86_64 + arm64).
 
-**Benefits:**
+Benefits:
 - Native performance on Apple Silicon (2-3x faster)
 - Reduced battery consumption (up to 50% better)
 - Future-proofing against Rosetta deprecation
@@ -478,24 +476,24 @@ xcrun stapler staple "Worms W.M.D.app"
 clang -arch x86_64 -arch arm64 -mmacosx-version-min=12.0 ...
 ```
 
-### 6.3 Metal Rendering Backend
+### 6.3 Metal rendering backend
 
-**Current State:** OpenGL only (deprecated since macOS 10.14)
+Current state: OpenGL only (deprecated since macOS 10.14)
 
-**Recommendation:** Add Metal rendering backend
+Recommendation: Add a Metal rendering backend.
 
-**Benefits:**
+Benefits:
 - OpenGL is deprecated and may be removed
 - Metal provides 2-10x better performance
 - Better battery life on laptops
 - Qt 6 has built-in Metal support via RHI
 
-### 6.4 Update Minimum macOS Version
+### 6.4 Update minimum macOS version
 
-**Current:** 10.8 (Mountain Lion, 2012)
-**Recommended:** 12.0 (Monterey, 2021)
+Current minimum: 10.8 (Mountain Lion, 2012)
+Recommended minimum: 12.0 (Monterey, 2021)
 
-**Benefits:**
+Benefits:
 - Access to modern APIs
 - Better security features
 - Smaller test matrix
@@ -503,64 +501,64 @@ clang -arch x86_64 -arch arm64 -mmacosx-version-min=12.0 ...
 
 ### 6.5 Update libcurl
 
-**Current:** Unknown bundled version
-**Options:**
+Current: Unknown bundled version
+Options:
 1. Use system libcurl (recommended for security)
 2. Bundle current libcurl and update regularly
 3. Switch to NSURLSession for networking
 
-### 6.6 Retina/HiDPI Display Support
+### 6.6 Retina/HiDPI display support
 
-**Verify:** Ensure `NSHighResolutionCapable` is set in Info.plist:
+Verify: Ensure `NSHighResolutionCapable` is set in Info.plist:
 ```xml
 <key>NSHighResolutionCapable</key>
 <true/>
 ```
 
-### 6.7 Full Screen Support
+### 6.7 Full screen support
 
-**Verify:** Modern full screen support via:
+Verify: Use modern full-screen support with:
 ```xml
 <key>LSUIPresentationMode</key>
 <integer>3</integer>
 ```
 
-### 6.8 Diagnostic Logging and Supportability
+### 6.8 Diagnostic logging and supportability
 
-**Recommendation:** Add a configurable logging system with file output and log levels:
+Recommendation: Add a configurable logging system with file output and log levels:
 - Default log location: `~/Library/Logs/Team17/WormsWMD/`
-- Launch args: `-log-level`, `-log-file`, `-safe-mode`
+- Launch arguments: `-log-level`, `-log-file`, `-safe-mode`
 - Capture Qt plugin loading, OpenGL/Metal initialization, and Steamworks init status
 
-**Benefit:** Faster support triage and reproducible diagnostics.
+Benefit: Faster support triage and reproducible diagnostics.
 
-### 6.9 Crash Reporting and Symbolication
+### 6.9 Crash reporting and symbolication
 
-**Recommendation:** Ship dSYMs and integrate crash reporting:
+Recommendation: Ship dSYMs and integrate crash reporting:
 - Centralized symbol server for each release build
 - Automatic crash submission (opt-in) with privacy controls
 
-**Benefit:** Dramatically reduces time to diagnose macOS-specific regressions.
+Benefit: Reduces time to diagnose macOS-specific regressions.
 
-### 6.10 Secure Networking and ATS Compliance
+### 6.10 Secure networking and ATS compliance
 
-**Recommendation:**
+Recommendation:
 - Remove HTTP endpoints from retail builds
 - Enforce HTTPS and update ATS exceptions only if required
 - Audit network calls for TLS 1.2+ compatibility
 
-### 6.11 Safe-Mode / Fallback Rendering
+### 6.11 Safe mode and fallback rendering
 
-**Recommendation:** Add a safe-mode option that:
+Recommendation: Add a safe-mode option that:
 - Disables hardware acceleration
 - Forces a compatibility renderer
 - Resets graphics settings to defaults
 
-**Benefit:** Provides a recovery path for graphics initialization failures.
+Benefit: Provides a recovery path for graphics initialization failures.
 
 ---
 
-## 7. Long-Term Recommendations
+## 7. Long-term recommendations
 
 ### 7.1 Port to Qt 6
 
@@ -569,19 +567,19 @@ Qt 5.15 is end-of-life. Qt 6 provides:
 - Better Apple Silicon support
 - Modern C++17/20 codebase
 - Active security updates
-- Better High DPI support
+- Better HiDPI support
 
 ### 7.2 Replace OpenGL with Metal
 
-**Timeline:** Apple may remove OpenGL entirely in a future macOS version.
+Timeline: Apple may remove OpenGL entirely in a future macOS version.
 
-**Options:**
+Options:
 1. Qt 6 RHI (easiest - abstracts Metal/OpenGL/Vulkan)
 2. MoltenVK (Vulkan over Metal)
 3. Direct Metal port (best performance)
 4. SDL2/3 with Metal backend
 
-### 7.3 Regular macOS Testing
+### 7.3 Regular macOS testing
 
 Establish a testing process:
 - WWDC beta releases (June) - immediate testing
@@ -589,7 +587,7 @@ Establish a testing process:
 - Final releases (October) - validation
 - Point releases - quick verification
 
-### 7.4 Automated CI/CD Pipeline
+### 7.4 Automated CI/CD pipeline
 
 ```yaml
 # GitHub Actions example
@@ -617,7 +615,7 @@ jobs:
           path: build/Release/*.app
 ```
 
-### 7.5 Dependency Management
+### 7.5 Dependency management
 
 Implement automated dependency updates:
 - Qt version tracking
@@ -625,7 +623,7 @@ Implement automated dependency updates:
 - libcurl security updates
 - Steam SDK updates
 
-### 7.6 Crash Reporting
+### 7.6 Crash reporting
 
 Implement crash reporting to catch issues early:
 - Apple's built-in crash reporter
@@ -634,56 +632,56 @@ Implement crash reporting to catch issues early:
 
 ---
 
-## 8. Security and Malware Assessment
+## 8. Security and malware assessment
 
-**Scope:** Static inspection of the installed macOS app bundle and configuration files on macOS 26.2. No source code was available for review.
+Scope: Static inspection of the installed macOS app bundle and configuration files on macOS 26.2. No source code was available for review.
 
-**Findings (static):**
+Findings (static):
 - No LaunchAgents/Daemons or autostart entries found (only `Contents/Info.plist` exists).
 - No script files with valid shebangs were detected; occurrences of `#!` are within binary data files (false positives).
 - URL strings are limited to expected Team17 endpoints in `DataOSX/SteamConfig.txt` and `DataOSX/GOGConfig.txt` (HTTP, not HTTPS) plus icon metadata.
 - Binaries are unsigned (confirmed via `codesign`), which is a distribution/security concern but not evidence of malware.
 
-**Conclusion:** No obvious indicators of malicious payloads were found in the static scan performed on this machine. This does **not** rule out runtime-only behaviors.
+Conclusion: No obvious indicators of malicious payloads were found in the static scan performed on this machine. This does not rule out runtime-only behaviors.
 
-**Recommended additional checks (for Team17):**
+Recommended additional checks (for Team17):
 - Runtime network monitoring (e.g., `lsof -i`, Little Snitch) to validate outbound connections.
 - Binary scanning with internal security tooling and reproducible build verification.
 - Dependency SBOM and provenance checks for Qt, FMOD, Steamworks, and bundled third-party libraries.
 
 ---
 
-## 9. Testing Verification
+## 9. Testing verification
 
-### 9.1 Compatibility Matrix
+### 9.1 Compatibility matrix
 
-#### Fix Required
+#### Fix required
 
-| macOS Version | Code Name | Fix Required | Status | Notes |
+| macOS version | Code name | Fix required | Status | Notes |
 |--------------|-----------|--------------|--------|-------|
-| macOS 26.x | Tahoe | **Yes** | VERIFIED | AGL removed, Qt 5.3.2 broken |
-| macOS 15.x | Sequoia | Likely No | Untested | AGL still present |
+| macOS 26.x | Tahoe | Yes | Verified | AGL removed, Qt 5.3.2 broken |
+| macOS 15.x | Sequoia | Likely no | Untested | AGL still present |
 | macOS 14.x | Sonoma | No | Expected | Should work without fix |
 | macOS 13.x | Ventura | No | Expected | Should work without fix |
 | macOS 12.x | Monterey | No | Expected | Should work without fix |
 
-#### Hardware Compatibility
+#### Hardware compatibility
 
 | Hardware | Status | Notes |
 |----------|--------|-------|
-| Apple Silicon (M1/M2/M3/M4) | VERIFIED | Runs via Rosetta 2 |
-| Intel Mac (2016+) | Expected PASS | Native x86_64 |
+| Apple Silicon (M1/M2/M3/M4) | Verified | Runs via Rosetta 2 |
+| Intel Mac (2016+) | Expected | Native x86_64 |
 | Intel Mac (pre-2016) | Unknown | May lack required Metal support |
 
-#### Tested Configurations
+#### Tested configurations
 
 | System | macOS | Hardware | GPU | Status |
 |--------|-------|----------|-----|--------|
-| Mac (Apple Silicon) | 26.2 | M4 Max | Integrated | PASS |
+| Mac (Apple Silicon) | 26.2 | M4 Max | Integrated | Pass |
 
-*Note: Please report additional tested configurations via GitHub issues.*
+Note: Please report additional tested configurations via GitHub issues.
 
-### 9.2 Verification Commands
+### 9.2 Verification commands
 
 ```bash
 # Check executable architecture
@@ -718,23 +716,23 @@ codesign -d --entitlements - "Worms W.M.D.app"
 ls ~/Library/Logs/Team17/WormsWMD/ 2>/dev/null || true
 ```
 
-### 9.3 Runtime Testing
+### 9.3 Runtime testing
 
-1. **Launch test:** Game launches without black screen
-2. **Audio test:** Sound effects and music play correctly
-3. **Graphics test:** No rendering glitches
-4. **Input test:** Keyboard, mouse, controller all work
-5. **Network test:** Multiplayer connectivity works
-6. **Save test:** Game saves and loads correctly
-7. **Steam test:** Achievements, cloud saves work
-8. **Full screen test:** Resolution switching works
-9. **Performance test:** Acceptable frame rates
+1. Launch test: Game launches without black screen
+2. Audio test: Sound effects and music play correctly
+3. Graphics test: No rendering glitches
+4. Input test: Keyboard, mouse, controller all work
+5. Network test: Multiplayer connectivity works
+6. Save test: Game saves and loads correctly
+7. Steam test: Achievements, cloud saves work
+8. Full screen test: Resolution switching works
+9. Performance test: Acceptable frame rates
 
 ---
 
-## 10. Performance Expectations
+## 10. Performance expectations
 
-### 10.1 Expected Performance
+### 10.1 Expected performance
 
 With the community fix applied, users can expect:
 
@@ -746,7 +744,7 @@ With the community fix applied, users can expect:
 | Gameplay (4+ players) | 30-60 FPS | 45-60 FPS |
 | Complex explosions | May dip to 20-30 FPS | 30-45 FPS |
 
-### 10.2 Performance Overhead
+### 10.2 Performance overhead
 
 | Factor | Overhead | Notes |
 |--------|----------|-------|
@@ -755,27 +753,27 @@ With the community fix applied, users can expect:
 | Qt 5.15 (vs Qt 5.3) | Negligible | May actually improve |
 | AGL stub | None | Stub is never actually called |
 
-### 10.3 Known Performance Issues
+### 10.3 Known performance issues
 
-1. **First launch after fix:** May be slower as Rosetta 2 translates new binaries
-2. **Large maps with many objects:** May experience frame drops
-3. **Extended sessions:** Memory usage may increase over time
-4. **Background apps:** Close resource-intensive apps for best performance
+1. First launch after fix: May be slower as Rosetta 2 translates new binaries
+2. Large maps with many objects: May experience frame drops
+3. Extended sessions: Memory usage may increase over time
+4. Background apps: Close resource-intensive apps for best performance
 
-### 10.4 Optimization Recommendations for Team17
+### 10.4 Optimization recommendations for Team17
 
 If source code access is available, these would significantly improve performance:
 
-1. **Native Apple Silicon build:** Would eliminate ~25-30% Rosetta overhead
-2. **Metal renderer:** Would provide 2-10x rendering performance improvement
-3. **Modern Qt 6 with RHI:** Built-in Metal support with better GPU utilization
-4. **Memory optimization:** Profile and fix any memory leaks
+1. Native Apple Silicon build: Would eliminate ~25-30% Rosetta overhead
+2. Metal renderer: Would provide 2-10x rendering performance improvement
+3. Modern Qt 6 with RHI: Built-in Metal support with better GPU utilization
+4. Memory optimization: Profile and fix any memory leaks
 
 ---
 
-## 11. Appendix: Technical Details
+## 11. Appendix: technical details
 
-### 11.1 AGL Stub Implementation
+### 11.1 AGL stub implementation
 
 A complete AGL stub implementation is provided in `src/agl_stub.c`. This provides no-op implementations of all 41 AGL functions:
 
@@ -792,18 +790,18 @@ A complete AGL stub implementation is provided in `src/agl_stub.c`. This provide
 - Display functions (2)
 - PBuffer functions (6)
 
-The community fix now builds a **universal binary** (x86_64 + arm64) for future-proofing.
+The community fix now builds a universal binary (x86_64 + arm64) for future-proofing.
 
-### 11.2 Bundled Library Version Analysis
+### 11.2 Bundled library version analysis
 
-#### FMOD Audio Libraries
+#### FMOD audio libraries
 
 | Library | Architecture | Runtime | Estimated Version | Notes |
 |---------|--------------|---------|-------------------|-------|
 | libfmodex.dylib | i386 + x86_64 | libstdc++.6 | FMOD Ex 4.x (~2010-2012) | Deprecated runtime |
 | libfmodevent.dylib | i386 + x86_64 | libstdc++.6 | FMOD Event (~2010-2012) | Deprecated runtime |
 
-**Analysis Method:**
+Analysis Method:
 ```bash
 # Check architecture
 lipo -info libfmodex.dylib
@@ -814,21 +812,21 @@ otool -L libfmodex.dylib | grep -E "libstdc|libgcc"
 # Output: /usr/lib/libstdc++.6.dylib, /usr/lib/libgcc_s.1.dylib
 ```
 
-**Version Indicators:**
+Version Indicators:
 - Presence of both i386 and x86_64 suggests pre-2015 build (before Apple moved to 64-bit only)
 - Use of libstdc++.6 indicates pre-2013 toolchain (before libc++ became default)
 - FMOD Ex (not FMOD Studio) was the product name until ~2014
 - File sizes and export symbols match FMOD Ex 4.x series
 
-**Recommended Update:** FMOD Studio 2.02.x or later (uses libc++, supports arm64)
+Recommended update: FMOD Studio 2.02.x or later (uses libc++, supports arm64)
 
-#### libcurl
+#### Libcurl
 
 | Library | Architecture | Estimated Version | Notes |
 |---------|--------------|-------------------|-------|
 | libcurl.4.dylib | x86_64 | 7.x (unknown minor) | Bundled, version unverifiable |
 
-**Analysis Method:**
+Analysis method:
 ```bash
 # Check for version string
 strings libcurl.4.dylib | grep -i "libcurl\|curl/"
@@ -839,7 +837,7 @@ otool -L libcurl.4.dylib
 # Links against system libraries (libc++, libz, etc.)
 ```
 
-**Security Recommendation:**
+Security recommendation:
 - Current version is unknown; may contain unpatched CVEs
 - Option 1: Use system libcurl (`/usr/lib/libcurl.4.dylib`) - automatically updated by Apple
 - Option 2: Bundle latest libcurl 8.x and maintain update schedule
@@ -851,13 +849,13 @@ otool -L libcurl.4.dylib
 |---------|--------------|---------|-------------------|-------|
 | libsteam_api.dylib | i386 + x86_64 | libstdc++.6 | Steamworks SDK ~1.3x (2015-2016) | Deprecated runtime |
 
-**Recommended Update:** Steamworks SDK 1.57+ (uses libc++, supports notarization)
+Recommended update: Steamworks SDK 1.57+ (uses libc++, supports notarization)
 
-### 11.3 Qt Property Browser Library
+### 11.3 Qt property browser library
 
 The game bundles `libQtSolutions_PropertyBrowser-head.1.0.0.dylib`, a third-party Qt component for property editing UI. This is from the Qt Solutions archive and appears compatible with Qt 5.15.
 
-### 11.4 Complete Build Information
+### 11.4 Complete build information
 
 From the current game bundle:
 
@@ -875,13 +873,13 @@ DTSDKName: macosx10.11
 DTXcode: 0731
 DTXcodeBuild: 7D1014
 LSMinimumSystemVersion: 10.8
-NSHumanReadableCopyright: Copyright © 2016 Team17
+NSHumanReadableCopyright: Copyright (c) 2016 Team17
 NSMainNibFile: MainMenu
 NSPrincipalClass: NSApplication
 BuildMachineOSBuild: 16G1618
 ```
 
-### 11.5 Required Dependency Versions
+### 11.5 Required dependency versions
 
 For the community fix (pre-built package or Homebrew fallback):
 
@@ -898,31 +896,27 @@ zstd: 1.5.x
 xz: 5.4.x
 ```
 
-**Note:** As of community fix v1.5.0, pre-built Qt frameworks are automatically downloaded, Rosetta 2 and Xcode CLT are auto-installed, and the game is auto-detected—eliminating all manual setup for most users.
+Note: As of community fix v1.5.0, pre-built Qt frameworks are automatically downloaded, Rosetta 2 and Xcode CLT are auto-installed, and the game is auto-detected - eliminating all manual setup for most users.
 
-### 11.6 Original Game Bundle Contents
+### 11.6 Original game bundle contents
 
-```
-Frameworks/
-├── QtCore.framework (5.3.2)
-├── QtGui.framework (5.3.2)
-├── QtWidgets.framework (5.3.2)
-├── QtOpenGL.framework (5.3.2)
-├── QtPrintSupport.framework (5.3.2)
-├── libQtSolutions_PropertyBrowser-head.1.0.0.dylib
-├── libfmodevent.dylib (universal i386+x86_64, libstdc++)
-├── libfmodex.dylib (universal i386+x86_64, libstdc++)
-├── libcurl.4.dylib
-└── libsteam_api.dylib (universal i386+x86_64, libstdc++)
+Frameworks:
+- QtCore.framework (5.3.2)
+- QtGui.framework (5.3.2)
+- QtWidgets.framework (5.3.2)
+- QtOpenGL.framework (5.3.2)
+- QtPrintSupport.framework (5.3.2)
+- libQtSolutions_PropertyBrowser-head.1.0.0.dylib
+- libfmodevent.dylib (universal i386+x86_64, libstdc++)
+- libfmodex.dylib (universal i386+x86_64, libstdc++)
+- libcurl.4.dylib
+- libsteam_api.dylib (universal i386+x86_64, libstdc++)
 
-PlugIns/
-├── platforms/
-│   └── libqcocoa.dylib
-└── imageformats/
-    └── *.dylib
-```
+PlugIns:
+- platforms/libqcocoa.dylib
+- imageformats/*.dylib
 
-### 11.7 Deprecated APIs Summary
+### 11.7 Deprecated apis summary
 
 | API/Framework | Deprecated | Notes |
 |--------------|------------|-------|
@@ -940,8 +934,8 @@ PlugIns/
 
 For questions about this report or the community fix:
 
-**Repository:** https://github.com/cboyd0319/WormsWMD-macOS-Fix
-**Issues:** https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
+Repository: https://github.com/cboyd0319/WormsWMD-macOS-Fix
+Issues: https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
 
 ---
 
