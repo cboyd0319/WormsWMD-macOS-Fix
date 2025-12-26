@@ -1,6 +1,6 @@
 # Worms W.M.D - macOS Compatibility Report for Team17
 
-**Document Version:** 2.3
+**Document Version:** 2.4
 **Date:** December 25, 2025
 **Prepared for:** Team17 Digital Ltd.
 **Platform:** macOS 26 (Tahoe) and later
@@ -881,7 +881,7 @@ BuildMachineOSBuild: 16G1618
 
 ### 11.5 Required Dependency Versions
 
-For the community fix (Homebrew reference):
+For the community fix (pre-built package or Homebrew fallback):
 
 ```
 qt@5: 5.15.18
@@ -895,6 +895,8 @@ webp: 1.3.x
 zstd: 1.5.x
 xz: 5.4.x
 ```
+
+**Note:** As of community fix v1.4.0, pre-built Qt frameworks are automatically downloaded, eliminating the Homebrew requirement for most users.
 
 ### 11.6 Original Game Bundle Contents
 

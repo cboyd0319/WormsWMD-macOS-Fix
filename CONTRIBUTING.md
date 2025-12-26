@@ -62,9 +62,14 @@ Before creating an issue, please:
 ### Prerequisites
 
 - macOS (Intel or Apple Silicon with Rosetta 2)
+- ShellCheck (`brew install shellcheck`)
+- Xcode Command Line Tools (`xcode-select --install`)
+
+**Optional (for testing Homebrew fallback):**
 - Intel Homebrew (`/usr/local/bin/brew`)
 - Qt 5 (`arch -x86_64 /usr/local/bin/brew install qt@5`)
-- ShellCheck (`brew install shellcheck`)
+
+**Note:** The fix now downloads pre-built Qt frameworks automatically. Homebrew is only needed for development/testing of the fallback path or creating new Qt packages.
 
 ### Clone the repository
 
@@ -77,13 +82,17 @@ cd WormsWMD-macOS-Fix
 
 ```bash
 # Run shellcheck on all scripts
-shellcheck fix_worms_wmd.sh install.sh scripts/*.sh
+shellcheck -e SC2034,SC1091 fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
 
 # Test the help command
 ./fix_worms_wmd.sh --help
 
 # Test dry-run mode (doesn't modify the game)
 ./fix_worms_wmd.sh --dry-run
+
+# Test the tools
+./tools/check_updates.sh --help
+./tools/collect_diagnostics.sh --help
 ```
 
 ## Making Changes
@@ -114,13 +123,14 @@ Types: `fix`, `feat`, `docs`, `refactor`, `test`, `chore`
 
 1. **Run ShellCheck:**
    ```bash
-   shellcheck -e SC2034 -e SC1091 fix_worms_wmd.sh install.sh scripts/*.sh
+   shellcheck -e SC2034 -e SC1091 fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
    ```
 
 2. **Verify bash syntax:**
    ```bash
    bash -n fix_worms_wmd.sh
    bash -n scripts/*.sh
+   bash -n tools/*.sh
    ```
 
 3. **Test the AGL stub compiles:**

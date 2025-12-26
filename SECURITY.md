@@ -31,7 +31,11 @@ This fix is a community-developed solution to make Worms W.M.D playable on macOS
 | Location | Purpose |
 |----------|---------|
 | `~/Documents/WormsWMD-Backup-*/` | Timestamped backup of original files |
-| `~/Library/Logs/WormsWMD-Fix/` | Log files for debugging |
+| `~/Documents/WormsWMD-SaveBackups/` | Save game backups (if using backup tool) |
+| `~/Library/Logs/WormsWMD-Fix/` | Fix log files for debugging |
+| `~/Library/Logs/WormsWMD/` | Game launcher logs and crash reports |
+| `~/.cache/wormswmd-fix/` | Downloaded Qt frameworks cache |
+| `~/Library/LaunchAgents/com.wormswmd.fix.watcher.plist` | Optional update watcher (only if installed) |
 | `/tmp/agl_stub_build/` | Temporary build directory (deleted after use) |
 
 ---
@@ -39,12 +43,27 @@ This fix is a community-developed solution to make Worms W.M.D playable on macOS
 ## What This Fix Does NOT Do
 
 - **No system modifications**: Does not touch `/System`, `/Library`, or any system files
-- **No network access**: Scripts never connect to the internet (except the one-liner installer which downloads from GitHub)
 - **No elevated privileges**: Never requires `sudo` or admin password
-- **No background processes**: Does not install daemons, agents, or startup items
 - **No data collection**: Does not collect, transmit, or store any personal data
 - **No executables outside game**: Only modifies files inside the game bundle
 - **No persistent changes**: Can be fully reversed with `--restore`
+
+### Network Access (Minimal)
+
+The fix makes limited network connections:
+- **Qt framework download**: One-time download of pre-built Qt frameworks from GitHub Releases (~50MB)
+- **Update checker** (optional): Checks GitHub API for new versions
+- **One-liner installer**: Downloads from GitHub
+
+All connections are to GitHub only. No third-party servers, no telemetry, no user data transmitted.
+
+### Optional Background Process
+
+The `tools/watch_for_updates.sh --install` command can optionally install a LaunchAgent that monitors for Steam updates. This is:
+- **Opt-in only**: Not installed by default
+- **Easily removable**: `./tools/watch_for_updates.sh --uninstall`
+- **Transparent**: Only checks if the fix is still applied
+- **Local only**: No network access
 
 ---
 
@@ -55,13 +74,16 @@ This fix is a community-developed solution to make Worms W.M.D playable on macOS
 All scripts are open source and written in readable Bash. Key files:
 
 ```bash
-# Main fix script (~900 lines)
+# Main fix script
 less fix_worms_wmd.sh
 
 # Individual step scripts
 ls -la scripts/
 
-# AGL stub source (C code, ~200 lines)
+# Additional tools
+ls -la tools/
+
+# AGL stub source (C code)
 less src/agl_stub.c
 ```
 
@@ -161,14 +183,23 @@ This fix uses the following external components:
 
 | Component | Source | Purpose |
 |-----------|--------|---------|
-| Qt 5.15 | Homebrew (`qt@5`) | Replace outdated Qt 5.3.2 |
-| GLib, PCRE2, etc. | Homebrew (Qt dependencies) | Required by Qt 5.15 |
+| Qt 5.15 | Pre-built package from GitHub Releases, or Homebrew (`qt@5`) | Replace outdated Qt 5.3.2 |
+| GLib, PCRE2, etc. | Bundled with Qt package or from Homebrew | Required by Qt 5.15 |
 
 All components are obtained from:
-- **Homebrew**: Official macOS package manager (https://brew.sh)
-- **Intel Homebrew path**: `/usr/local/` (x86_64 libraries for Rosetta compatibility)
+- **GitHub Releases**: Pre-built Qt frameworks hosted on this repository's releases
+- **Homebrew** (fallback): Official macOS package manager (https://brew.sh)
 
-No binaries are downloaded from unknown sources. The AGL stub is compiled from source on your machine using Apple's Clang compiler.
+The AGL stub is compiled from source on your machine using Apple's Clang compiler.
+
+### Pre-built Qt Package Security
+
+The pre-built Qt package (`qt-frameworks-x86_64-*.tar.gz`) is:
+- Built from official Homebrew Qt 5.15
+- Packaged using `tools/package_qt_frameworks.sh` (you can inspect this script)
+- Hosted on GitHub Releases with SHA256 checksums
+- Downloaded over HTTPS only
+- Verified with checksum before extraction
 
 ---
 
@@ -245,9 +276,11 @@ For non-security bugs, please use [GitHub Issues](https://github.com/cboyd0319/W
 
 Yes. The fix only modifies files inside the game bundle and creates backups. It cannot harm your system, access your data, or persist outside the game directory.
 
-### Why does it need Intel Homebrew?
+### Why did it used to need Intel Homebrew?
 
-The game is x86_64 only (runs via Rosetta 2 on Apple Silicon). It needs x86_64 Qt libraries, which are installed via Intel Homebrew (`/usr/local/bin/brew`).
+The game is x86_64 only (runs via Rosetta 2 on Apple Silicon). It needs x86_64 Qt libraries. Previously, these were installed via Intel Homebrew (`/usr/local/bin/brew`).
+
+**As of v1.4.0, Homebrew is no longer required!** The fix now downloads pre-built Qt frameworks automatically. Homebrew is only used as a fallback if the download fails.
 
 ### Can I verify the code myself?
 
