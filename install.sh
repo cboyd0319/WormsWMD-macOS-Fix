@@ -91,7 +91,7 @@ else
         git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
     else
         mkdir -p "$INSTALL_DIR"
-        curl -fsSL "$REPO_URL/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
+        curl -fsSL --max-time 60 "$REPO_URL/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
     fi
 fi
 

@@ -74,7 +74,7 @@ get_current_version() {
 # Get latest version from GitHub
 get_latest_version() {
     local response
-    response=$(curl -sf "$RAW_FIX_URL" 2>/dev/null) || return 1
+    response=$(curl -sf --max-time 15 "$RAW_FIX_URL" 2>/dev/null) || return 1
 
     # Extract VERSION="x.y.z"
     local version
@@ -87,7 +87,7 @@ get_latest_version() {
 
 # Get download URL for latest version
 get_download_url() {
-    if curl -sfI "$ZIP_URL" >/dev/null 2>&1; then
+    if curl -sfI --max-time 10 "$ZIP_URL" >/dev/null 2>&1; then
         echo "$ZIP_URL"
     else
         return 1
@@ -215,7 +215,7 @@ else
         fi
 
         download_file="$HOME/Downloads/WormsWMD-Fix-${latest}.zip"
-        if curl -L -o "$download_file" "$download_url"; then
+        if curl -L --max-time 120 -o "$download_file" "$download_url"; then
             echo -e "${GREEN}Downloaded: $download_file${NC}"
             echo ""
             echo "To install:"

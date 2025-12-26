@@ -102,7 +102,7 @@ select_local_package() {
 
 select_remote_package() {
     local response
-    response=$(curl -sf "$GITHUB_API_URL" 2>/dev/null) || return 1
+    response=$(curl -sf --max-time 30 "$GITHUB_API_URL" 2>/dev/null) || return 1
 
     local urls
     urls=$(echo "$response" | grep -o '"download_url": *"[^"]*qt-frameworks-x86_64-[^"]*\.tar\.gz"' | cut -d'"' -f4)
@@ -171,7 +171,7 @@ if $CHECK_ONLY; then
         echo "available"
         exit 0
     fi
-    if select_remote_package && curl -sfI "$DOWNLOAD_URL" >/dev/null 2>&1; then
+    if select_remote_package && curl -sfI --max-time 10 "$DOWNLOAD_URL" >/dev/null 2>&1; then
         echo "available"
     else
         echo "unavailable"
@@ -221,14 +221,14 @@ else
         echo "Downloading from: $DOWNLOAD_URL"
 
         # Check if URL is accessible
-        if ! curl -sfI "$DOWNLOAD_URL" >/dev/null 2>&1; then
+        if ! curl -sfI --max-time 10 "$DOWNLOAD_URL" >/dev/null 2>&1; then
             echo -e "${YELLOW}Pre-built Qt frameworks not available.${NC}"
             echo "FALLBACK_TO_HOMEBREW"
             exit 1
         fi
 
         # Download with progress
-        if ! curl -L --progress-bar -o "$CACHED_PACKAGE" "$DOWNLOAD_URL"; then
+        if ! curl -L --max-time 300 --progress-bar -o "$CACHED_PACKAGE" "$DOWNLOAD_URL"; then
             echo -e "${RED}ERROR:${NC} Download failed"
             rm -f "$CACHED_PACKAGE"
             exit 1
@@ -255,7 +255,7 @@ if $USE_LOCAL; then
         echo -e "${YELLOW}Warning: Could not verify checksum (missing .sha256)${NC}"
     fi
 else
-    if curl -sf "$CHECKSUM_URL" -o "$CACHED_PACKAGE.sha256" 2>/dev/null; then
+    if curl -sf --max-time 10 "$CHECKSUM_URL" -o "$CACHED_PACKAGE.sha256" 2>/dev/null; then
         EXPECTED=$(cat "$CACHED_PACKAGE.sha256" | cut -d' ' -f1)
         ACTUAL=$(shasum -a 256 "$CACHED_PACKAGE" | cut -d' ' -f1)
 

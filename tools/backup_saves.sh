@@ -14,6 +14,15 @@
 
 set -e
 
+# Cleanup temp files on exit
+TEMP_DIR=""
+cleanup() {
+    if [[ -n "$TEMP_DIR" ]] && [[ -d "$TEMP_DIR" ]]; then
+        rm -rf "$TEMP_DIR"
+    fi
+}
+trap cleanup EXIT
+
 # Save locations
 STEAM_SAVES="$HOME/Library/Application Support/Steam/userdata"
 TEAM17_SAVES="$HOME/Library/Application Support/Team17"
@@ -99,16 +108,15 @@ do_backup() {
     local timestamp
     timestamp=$(date '+%Y%m%d-%H%M%S')
     local backup_file="$BACKUP_DIR/saves-$timestamp.tar.gz"
-    local temp_dir
-    temp_dir=$(mktemp -d)
+    TEMP_DIR=$(mktemp -d)
 
     local items_backed_up=0
 
     # Backup Team17 saves
     if [[ -d "$TEAM17_SAVES" ]]; then
         echo "Backing up Team17 saves..."
-        mkdir -p "$temp_dir/Team17"
-        cp -R "$TEAM17_SAVES"/* "$temp_dir/Team17/" 2>/dev/null || true
+        mkdir -p "$TEMP_DIR/Team17"
+        cp -R "$TEAM17_SAVES"/* "$TEMP_DIR/Team17/" 2>/dev/null || true
         ((items_backed_up++))
     fi
 
@@ -117,14 +125,14 @@ do_backup() {
     steam_save_dirs=$(find_steam_saves)
 
     if [[ -n "$steam_save_dirs" ]]; then
-        mkdir -p "$temp_dir/Steam"
+        mkdir -p "$TEMP_DIR/Steam"
         while IFS= read -r save_dir; do
             if [[ -d "$save_dir" ]]; then
                 local user_id
                 user_id=$(basename "$(dirname "$save_dir")")
                 echo "Backing up Steam saves for user $user_id..."
-                mkdir -p "$temp_dir/Steam/$user_id"
-                cp -R "$save_dir"/* "$temp_dir/Steam/$user_id/" 2>/dev/null || true
+                mkdir -p "$TEMP_DIR/Steam/$user_id"
+                cp -R "$save_dir"/* "$TEMP_DIR/Steam/$user_id/" 2>/dev/null || true
                 ((items_backed_up++))
             fi
         done <<< "$steam_save_dirs"
@@ -132,12 +140,11 @@ do_backup() {
 
     if [[ $items_backed_up -eq 0 ]]; then
         echo -e "${YELLOW}No save games found to backup.${NC}"
-        rm -rf "$temp_dir"
         exit 0
     fi
 
     # Create metadata
-    cat > "$temp_dir/BACKUP_INFO.txt" << EOF
+    cat > "$TEMP_DIR/BACKUP_INFO.txt" << EOF
 Worms W.M.D Save Game Backup
 Created: $(date)
 macOS: $(sw_vers -productVersion)
@@ -147,10 +154,7 @@ EOF
     # Create tarball
     echo ""
     echo "Creating archive..."
-    tar -czf "$backup_file" -C "$temp_dir" .
-
-    # Cleanup
-    rm -rf "$temp_dir"
+    tar -czf "$backup_file" -C "$TEMP_DIR" .
 
     local size
     size=$(du -h "$backup_file" | cut -f1)
@@ -197,22 +201,21 @@ do_restore() {
     echo ""
     echo -e "${BLUE}Restoring from: $(basename "$backup_file")${NC}"
 
-    local temp_dir
-    temp_dir=$(mktemp -d)
+    TEMP_DIR=$(mktemp -d)
 
     # Extract backup
-    tar -xzf "$backup_file" -C "$temp_dir"
+    tar -xzf "$backup_file" -C "$TEMP_DIR"
 
     # Restore Team17 saves
-    if [[ -d "$temp_dir/Team17" ]]; then
+    if [[ -d "$TEMP_DIR/Team17" ]]; then
         echo "Restoring Team17 saves..."
         mkdir -p "$TEAM17_SAVES"
-        cp -R "$temp_dir/Team17"/* "$TEAM17_SAVES/" 2>/dev/null || true
+        cp -R "$TEMP_DIR/Team17"/* "$TEAM17_SAVES/" 2>/dev/null || true
     fi
 
     # Restore Steam saves
-    if [[ -d "$temp_dir/Steam" ]]; then
-        for user_dir in "$temp_dir/Steam"/*; do
+    if [[ -d "$TEMP_DIR/Steam" ]]; then
+        for user_dir in "$TEMP_DIR/Steam"/*; do
             if [[ -d "$user_dir" ]]; then
                 local user_id
                 user_id=$(basename "$user_dir")
@@ -224,9 +227,6 @@ do_restore() {
             fi
         done
     fi
-
-    # Cleanup
-    rm -rf "$temp_dir"
 
     echo ""
     echo -e "${GREEN}Saves restored successfully!${NC}"
