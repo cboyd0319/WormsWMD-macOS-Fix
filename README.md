@@ -55,16 +55,16 @@ The script installs these if needed (you may see system prompts):
 
 ## Documentation
 
-- `docs/INSTALL.md`
-- `docs/TROUBLESHOOTING.md`
-- `docs/FAQ.md`
-- `docs/TECHNICAL.md`
-- `docs/TOOLS.md`
-- `SECURITY.md`
-- `CONTRIBUTING.md`
-- `TEAM17_DEVELOPER_REPORT.md`
-- `CHANGELOG.md`
-- `LICENSE`
+- [What this fix improves](docs/IMPROVEMENTS.md) - All fixes and enhancements explained
+- [Installation](docs/INSTALL.md) - Manual install and restore options
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Solutions for common problems
+- [FAQ](docs/FAQ.md) - Frequently asked questions
+- [Tools](docs/TOOLS.md) - Helper utilities reference
+- [Technical details](docs/TECHNICAL.md) - How the fix works
+- [Security](SECURITY.md) - Security information
+- [Contributing](CONTRIBUTING.md) - How to contribute
+- [Changelog](CHANGELOG.md) - Version history
+- [Team17 Developer Report](TEAM17_DEVELOPER_REPORT.md) - Technical report for Team17
 
 ## Support
 
