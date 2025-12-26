@@ -268,7 +268,7 @@ ensure_rosetta() {
     if $FORCE; then
         echo "Installing Rosetta 2..."
     else
-        read -p "Install Rosetta 2 now? [Y/n] " -n 1 -r
+        read -p "Install Rosetta 2 now? [Y/n] " -n 1 -r < /dev/tty
         echo ""
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             print_error "Rosetta 2 is required. Cannot continue without it."
@@ -315,7 +315,7 @@ ensure_xcode_clt() {
     if $FORCE; then
         echo "Installing Xcode Command Line Tools..."
     else
-        read -p "Install Xcode Command Line Tools now? [Y/n] " -n 1 -r
+        read -p "Install Xcode Command Line Tools now? [Y/n] " -n 1 -r < /dev/tty
         echo ""
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             print_error "Xcode Command Line Tools are required. Cannot continue without them."
@@ -380,7 +380,7 @@ offer_steam_watcher() {
         return 0  # Don't auto-install in force mode
     fi
 
-    read -p "Install the Steam update watcher? [y/N] " -n 1 -r
+    read -p "Install the Steam update watcher? [y/N] " -n 1 -r < /dev/tty
     echo ""
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -641,7 +641,7 @@ do_restore() {
     echo ""
 
     if ! $FORCE; then
-        read -p "Restore from this backup? [y/N] " -n 1 -r
+        read -p "Restore from this backup? [y/N] " -n 1 -r < /dev/tty
         echo ""
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             echo "Restore cancelled."
@@ -820,7 +820,7 @@ do_fix() {
         echo ""
 
         if ! $FORCE; then
-            read -p "Re-apply the fix anyway? [y/N] " -n 1 -r
+            read -p "Re-apply the fix anyway? [y/N] " -n 1 -r < /dev/tty
             echo ""
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 echo ""
@@ -851,7 +851,7 @@ do_fix() {
         echo "         Your version ($macos_version) may not need this fix."
         echo ""
         if ! $FORCE; then
-            read -p "Continue anyway? [y/N] " -n 1 -r
+            read -p "Continue anyway? [y/N] " -n 1 -r < /dev/tty
             echo ""
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 echo "Fix cancelled."
