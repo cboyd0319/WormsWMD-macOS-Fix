@@ -1,7 +1,7 @@
 # Worms W.M.D - macOS Compatibility Report for Team17
 
-**Document Version:** 2.4
-**Date:** December 25, 2025
+**Document Version:** 2.5
+**Date:** December 26, 2025
 **Prepared for:** Team17 Digital Ltd.
 **Platform:** macOS 26 (Tahoe) and later
 
@@ -15,7 +15,9 @@ Worms W.M.D fails to launch on macOS 26 (Tahoe) and later, displaying only a bla
 **Affected Users:** All macOS 26+ users
 **Root Causes:** Multiple deprecated framework dependencies, outdated libraries, legacy build configuration, and missing platform compliance updates (signing, notarization, diagnostics)
 
-**Verified on this machine:** macOS 26.2 (Apple Silicon via Rosetta) with the community fix applied and full verification passing.
+**Verified on this machine:** macOS 26.2 (Apple Silicon M4 Max via Rosetta 2) with the community fix v1.5.0 applied and full verification passing.
+
+**Community Fix Status:** v1.5.0 provides a zero-setup experience—users can double-click to install, with automatic Rosetta 2/Xcode installation and game detection.
 
 ### Issue Summary
 
@@ -677,7 +679,7 @@ Implement crash reporting to catch issues early:
 
 | System | macOS | Hardware | GPU | Status |
 |--------|-------|----------|-----|--------|
-| MacBook Pro 14" | 26.2 | M3 Pro | Integrated | PASS |
+| Mac (Apple Silicon) | 26.2 | M4 Max | Integrated | PASS |
 
 *Note: Please report additional tested configurations via GitHub issues.*
 
@@ -896,7 +898,7 @@ zstd: 1.5.x
 xz: 5.4.x
 ```
 
-**Note:** As of community fix v1.4.0, pre-built Qt frameworks are automatically downloaded, eliminating the Homebrew requirement for most users.
+**Note:** As of community fix v1.5.0, pre-built Qt frameworks are automatically downloaded, Rosetta 2 and Xcode CLT are auto-installed, and the game is auto-detected—eliminating all manual setup for most users.
 
 ### 11.6 Original Game Bundle Contents
 
@@ -943,4 +945,4 @@ For questions about this report or the community fix:
 
 ---
 
-*This report was prepared based on comprehensive analysis of Worms W.M.D version distributed via Steam as of December 2025, tested on macOS 26.2 (Tahoe) on Apple Silicon.*
+*This report was prepared based on comprehensive analysis of Worms W.M.D version distributed via Steam as of December 2025, tested on macOS 26.2 (Tahoe) on Apple Silicon (M4 Max). Community fix v1.5.0 verified.*
