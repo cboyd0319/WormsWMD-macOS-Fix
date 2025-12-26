@@ -389,7 +389,7 @@ A: The fix doesn't modify networking. If online features don't work, it's likely
 
 **Q: My controller doesn't work. Can the fix help?**
 
-A: The fix doesn't modify input handling. Controller support depends on the game's original implementation and macOS controller support. Try using a controller mapping tool like Joystick Doctor.
+A: The fix doesn't modify input handling, but we include a diagnostic tool. Run `./tools/controller_helper.sh` to check controller connectivity and get configuration tips for Xbox, PlayStation, and Switch Pro controllers.
 
 ## Known Limitations
 
@@ -469,7 +469,7 @@ The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL fun
 - Qt 5.15 is the last version of Qt 5 with long-term support
 - It uses modern OpenGL APIs compatible with macOS's OpenGL implementation
 - It maintains binary compatibility with Qt 5.3 APIs the game uses
-- Available via Homebrew for easy installation
+- Pre-built x86_64 frameworks available for easy distribution
 
 ## Security
 
