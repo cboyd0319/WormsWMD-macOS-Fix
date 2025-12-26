@@ -348,7 +348,7 @@ Please report issues on the [GitHub Issues](https://github.com/cboyd0319/WormsWM
 
 ## Version History
 
-- **Unreleased**: Info.plist fixes (HiDPI, bundle ID), config URL security fixes, diagnostic game launcher, dynamic framework scanning, improved logging/debugging
+- **1.2.0** (2025-12-25): Info.plist fixes (HiDPI, bundle ID), config URL security fixes, diagnostic game launcher, dynamic framework scanning, improved logging/debugging
 - **1.1.0** (2025-12-25): Added dry-run mode, force mode, already-applied detection, automatic rollback, progress spinners, one-liner installer, and CI/CD pipeline
 - **1.0.0** (2025-12-25): Initial release for macOS 26 (Tahoe)
 
