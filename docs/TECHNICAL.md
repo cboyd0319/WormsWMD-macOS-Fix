@@ -10,7 +10,7 @@ These limitations exist because the game is closed-source.
 |------------|--------|--------|
 | FMOD uses deprecated runtime | Audio may break in future macOS | FMOD libs link to removed libstdc++; Rosetta provides shims for now |
 | Steam API uses deprecated runtime | Networking may break in future macOS | Same as FMOD; needs Steamworks SDK update |
-| No native Apple Silicon | ~20-30% performance overhead | Requires a universal binary |
+| No native Apple Silicon | Performance overhead via Rosetta (varies by system) | Requires a universal binary |
 | OpenGL only (deprecated) | May break if Apple removes OpenGL | Needs a Metal renderer |
 | No code signing by Team17 | Gatekeeper warnings | Only Team17 can sign with their Developer ID |
 
@@ -45,8 +45,8 @@ The fix replaces Qt frameworks bundled with the game (commonly QtCore, QtGui, Qt
 | QtDBus.framework | Not present (if missing) | Added (required by plugins) |
 | QtSvg.framework | Not present (if missing) | Added (required by SVG plugin) |
 | Info.plist | Missing identifiers and HiDPI flags | Adds CFBundleIdentifier, HiDPI flags, graphics switching, updates minimum version |
-| DataOSX configs | HTTP/internal URLs | HTTPS; internal URLs commented out (with .backup) |
-| CommonData configs | HTTP URLs | HTTPS (analytics, HTTP config) |
+| DataOSX configs | HTTP/internal URLs | HTTPS for known URLs; internal URLs commented out (with .backup) |
+| CommonData configs | HTTP URLs | HTTPS in AnalyticsConfig.txt and HttpConfig.txt |
 
 ## Libraries added
 
@@ -68,7 +68,7 @@ The exact list varies by Qt version and plugin set.
 
 ## How the AGL stub works
 
-The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL functions. Qt 5.15 doesn't use AGL (it uses Core OpenGL directly), so the stub only needs to exist to satisfy the dynamic linker.
+The AGL stub (`src/agl_stub.c`) provides empty implementations of all 40 AGL functions. Qt 5.15 doesn't use AGL (it uses Core OpenGL directly), so the stub only needs to exist to satisfy the dynamic linker.
 
 ## Why Qt 5.15
 

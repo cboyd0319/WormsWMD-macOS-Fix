@@ -60,7 +60,7 @@ The game window may appear very small after applying the fix. This happens becau
 
 ## Game still shows a black screen
 
-1. Verify game files in Steam:
+1. Verify game files in Steam (note: this does not remove extra files from prior fixes):
    - Right-click **Worms W.M.D** → **Properties** → **Local Files** → **Verify integrity of game files**
    - Re-run the fix script after verification
 2. Check that the fix was applied:
@@ -72,7 +72,8 @@ The game window may appear very small after applying the fix. This happens becau
    - Look for entries related to "Worms" in **Crash Reports**
 4. Try a clean install:
    - Restore original files: `./fix_worms_wmd.sh --restore`
-   - Verify game files in Steam
+   - Uninstall the game in Steam
+   - Reinstall the game
    - Re-run the fix
 
 ## "Library not loaded" errors on launch
@@ -116,7 +117,7 @@ Logs are saved to `~/Library/Logs/WormsWMD/`.
 
 If you experience input lag, stuttering, or slow performance:
 
-1. Disable V-Sync (most effective):
+1. Disable V-Sync (often helps):
    - In-game: **Help & Options** → **Settings** → disable **Vertical Sync**
 2. Use windowed mode:
    - In-game: **Help & Options** → **Settings** → **Display**

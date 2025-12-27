@@ -4,11 +4,11 @@
 
 **Q: Does this fix work on macOS 15 (Sequoia) or earlier?**
 
-You probably don't need it. This fix targets macOS 26 (Tahoe) where Apple removed AGL.
+This fix targets macOS 26 (Tahoe) where Apple removed AGL. Earlier macOS versions typically don't need it unless you're seeing the same black-screen symptoms.
 
 **Q: Does this fix work for the GOG version?**
 
-Yes. The fix modifies the app bundle, which is the same for Steam and GOG. Set `GAME_APP` to your GOG installation path.
+The fix operates on the macOS app bundle. If your GOG install uses the same app bundle layout, it should work. Set `GAME_APP` to your GOG installation path.
 
 **Q: Is this fix safe?**
 
@@ -16,7 +16,7 @@ Yes. The fix only modifies files inside the game's app bundle, creates a backup 
 
 **Q: Can I undo this fix?**
 
-Yes. Run `./fix_worms_wmd.sh --restore` or verify game files in Steam to restore the original files.
+Yes. Run `./fix_worms_wmd.sh --restore` or uninstall/reinstall the game. Steam "Verify integrity" does not remove extra files from prior fixes.
 
 ## Technical
 
@@ -40,7 +40,7 @@ Not without source code. Team17 would need to ship a universal binary.
 
 **Q: Is performance worse on Apple Silicon compared to Intel?**
 
-Rosetta adds overhead, but most systems still run the game smoothly.
+Rosetta adds overhead; actual performance varies by system.
 
 **Q: The game runs slowly on first launch after the fix. Is this normal?**
 
@@ -48,7 +48,7 @@ Yes. Rosetta translates x86_64 code on first run and caches it. Subsequent launc
 
 **Q: Are there any graphics settings I should change?**
 
-Defaults should work. If you see issues, lower the resolution or disable effects. The diagnostic launcher supports `--safe-mode`.
+Defaults often work. If you see issues, lower the resolution or disable effects. The diagnostic launcher supports `--safe-mode`.
 
 ## Troubleshooting
 

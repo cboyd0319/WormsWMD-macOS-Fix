@@ -297,7 +297,7 @@ Pre-built Qt packages:
 
 4. **Backup restore is not validated**: `backup_saves.sh` does not validate tar archive contents before extraction. Only restore backups you created yourself.
 
-5. **Game config secrets**: The original game ships with API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
+5. **Game config secrets**: The original game ships with confirmed API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
 
 ## Reporting security issues
 

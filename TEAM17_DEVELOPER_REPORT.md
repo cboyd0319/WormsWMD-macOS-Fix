@@ -7,7 +7,7 @@ Platform: macOS 26 (Tahoe) and later
 
 ## Executive summary
 
-Worms W.M.D does not launch on macOS 26 (Tahoe) and later. The game displays a black screen and fails to initialize due to deprecated framework dependencies. This report is based on a **fresh, clean Steam installation** verified on 2025-12-26, with no residual fix artifacts.
+Worms W.M.D does not launch on macOS 26 (Tahoe) and later. The game displays a black screen and fails to initialize due to deprecated framework dependencies. This report is based on direct inspection of a Steam bundle captured on 2025-12-26. If a community fix has ever been applied, a full uninstall/reinstall is required to validate a pristine stock state (Steam integrity verification does not remove extra files).
 
 **Severity**: Critical (game does not launch on macOS 26+)
 
@@ -18,10 +18,10 @@ Worms W.M.D does not launch on macOS 26 (Tahoe) and later. The game displays a b
 
 **Security findings**: Multiple exposed API secrets discovered in shipped configuration files (see Section 8).
 
-**Verified environment**:
-- Fresh Steam install at `~/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app`
+**Verified environment (at time of analysis)**:
+- Steam bundle at `~/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app`
 - macOS 26.2 (Tahoe) on Apple Silicon (M4 Max)
-- No community fix applied - pure stock Steam build
+- Stock state assumed; re-verify with a clean reinstall if prior fixes were applied
 
 ---
 
@@ -91,7 +91,7 @@ Worms W.M.D does not launch on macOS 26 (Tahoe) and later. The game displays a b
 
 **Impact**: Even with AGL resolved, the game displays a black screen.
 
-**Shipped Qt versions** (confirmed):
+**Shipped Qt versions** (observed in inspected bundle):
 
 | Framework | Version | Release date |
 |-----------|---------|--------------|
@@ -199,7 +199,7 @@ Both the main executable and FMOD link to Carbon:
 ### 3.5 No Apple Silicon native binary
 
 **Current**: x86_64 only (34 MB executable)
-**Impact**: Runs via Rosetta 2 with ~20-30% performance overhead
+**Impact**: Runs via Rosetta 2 with performance overhead that varies by system and workload
 
 ### 3.6 OpenGL-only renderer
 
@@ -336,7 +336,7 @@ Additional frameworks to bundle:
 
 ### 5.3 Fix 3: Update FMOD
 
-**Current**: FMOD Ex 4.x (~2010)
+**Estimated current**: FMOD Ex 4.x (~2010)
 **Required**: FMOD Studio 2.02+ or FMOD Core
 
 Requirements:
@@ -346,7 +346,7 @@ Requirements:
 
 ### 5.4 Fix 4: Update Steamworks SDK
 
-**Current**: ~1.3x (2015-2016)
+**Estimated current**: ~1.3x (2015-2016)
 **Required**: 1.57+
 
 Requirements:
@@ -507,9 +507,9 @@ jobs:
 
 ### 8.1 Exposed API credentials (HIGH SEVERITY)
 
-**CRITICAL**: The shipped game contains exposed API secrets in plaintext configuration files.
+**CRITICAL**: The shipped game contains confirmed API secrets in plaintext configuration files.
 
-*Note: Actual secret values have been redacted from this public report. The secrets are visible to anyone who inspects the game bundle.*
+*Note: Actual secret values are redacted from this public report. Presence was confirmed by direct inspection of the game bundle.*
 
 #### GOGConfig.txt
 ```
@@ -609,10 +609,10 @@ The game bundle is completely unsigned, which:
 | macOS version | Code name | Fix required | Notes |
 |--------------|-----------|--------------|-------|
 | macOS 26.x | Tahoe | Yes | AGL removed, Qt 5.3.2 broken |
-| macOS 15.x | Sequoia | Possibly | AGL still present, may work |
-| macOS 14.x | Sonoma | No | Expected to work |
-| macOS 13.x | Ventura | No | Expected to work |
-| macOS 12.x | Monterey | No | Expected to work |
+| macOS 15.x | Sequoia | Unknown | Not verified; AGL still present |
+| macOS 14.x | Sonoma | Unknown | Not verified |
+| macOS 13.x | Ventura | Unknown | Not verified |
+| macOS 12.x | Monterey | Unknown | Not verified |
 
 ### 9.2 Hardware compatibility
 
@@ -650,24 +650,16 @@ otool -L "Contents/Frameworks/libfmodex.dylib" | grep -E "libstdc|libgcc"
 
 ## 10. Performance expectations
 
-### 10.1 Expected performance (with fix)
+### 10.1 Performance (not benchmarked in this analysis)
 
-| Metric | Apple Silicon (Rosetta 2) | Intel Mac |
-|--------|---------------------------|-----------|
-| Launch Time | 3-8 seconds | 2-5 seconds |
-| Menu Navigation | Smooth | Smooth |
-| Gameplay (1v1) | 60 FPS | 60 FPS |
-| Gameplay (4+ players) | 30-60 FPS | 45-60 FPS |
-| Complex explosions | 20-30 FPS | 30-45 FPS |
+No quantitative benchmarks were collected during this analysis. Measure performance on target hardware with repeatable in-game scenarios if precise numbers are required.
 
-### 10.2 Performance overhead
+### 10.2 Performance factors (qualitative)
 
-| Factor | Overhead | Notes |
-|--------|----------|-------|
-| Rosetta 2 translation | ~20-30% | Cached after first run |
-| OpenGL (vs Metal) | ~10-20% | macOS OpenGL is wrapped |
-| Qt 5.15 (vs 5.3) | Negligible | May improve |
-| AGL stub | None | Never actually called |
+Factors that can influence performance:
+- Rosetta 2 translation on Apple Silicon
+- OpenGL renderer vs a native Metal backend
+- Qt version and plugin compatibility
 
 ### 10.3 Optimization recommendations
 
@@ -754,7 +746,7 @@ For native performance improvements:
 | OpenGL.framework | macOS 10.14 | Still present | Medium risk |
 | 32-bit (i386) | macOS 10.14 | macOS 10.15 | Unnecessary |
 
-### 11.3 Bundle size analysis
+### 11.3 Bundle size analysis (approximate)
 
 | Component | Size |
 |-----------|------|
@@ -766,6 +758,8 @@ For native performance improvements:
 | Resources/Audio | ~600 MB |
 | Other resources | ~1.2 GB |
 | **Total** | **~4.9 GB** |
+
+*Note: Sizes were estimated from the inspected bundle on 2025-12-26 and will vary by build and platform.*
 
 ### 11.4 Configuration files analyzed
 
@@ -809,4 +803,4 @@ Issues: https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
 
 ---
 
-*This report was prepared from a fresh Steam installation on macOS 26.2 (Tahoe) on Apple Silicon (M4 Max), verified on 2025-12-26. No community fix was applied during analysis to ensure accurate stock state documentation.*
+*This report was prepared from a Steam bundle inspected on macOS 26.2 (Tahoe) on Apple Silicon (M4 Max), captured on 2025-12-26. If the bundle had ever been modified by a fix, reinstall to confirm a pristine stock state before re-validating these findings.*

@@ -21,7 +21,7 @@ Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibilit
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
 ```
 
-Requires `git` (Xcode Command Line Tools installs it if missing).
+Requires `git` (install Xcode Command Line Tools if missing).
 
 ### Option 3: Manual / advanced
 
@@ -29,12 +29,12 @@ See `docs/INSTALL.md` for manual install, dry-run, and restore steps.
 
 ## Requirements
 
-- macOS 26 (Tahoe) or later
+- Target: macOS 26 (Tahoe) or later (earlier macOS versions typically don't need the fix)
 - Worms W.M.D installed via Steam or GOG
 - Internet connection
 - git (installed by Xcode Command Line Tools)
 
-The script installs these if needed (you may see system prompts):
+The script can prompt to install these if needed (you may see system prompts):
 - Rosetta 2 (Apple Silicon)
 - Xcode Command Line Tools
 - Qt frameworks (downloaded from GitHub; Homebrew fallback)
@@ -45,8 +45,8 @@ The script installs these if needed (you may see system prompts):
 - Replaces Qt 5.3.2 with Qt 5.15.
 - Bundles required dependencies and fixes install names.
 - Updates Info.plist (bundle ID, HiDPI support, minimum version).
-- Fixes HTTP URLs to HTTPS in config files.
-- Comments out internal/staging URLs that shouldn't be in retail builds.
+- Fixes known HTTP URLs in DataOSX/CommonData config files.
+- Comments out internal/staging URLs in DataOSX config files.
 - Clears quarantine flags and applies ad-hoc signing.
 - Resets incompatible Qt window geometry to fix small window issues.
 
@@ -63,7 +63,7 @@ This checks:
 - Rosetta 2 status (Apple Silicon)
 - Game installation and fix status
 - Runtime dependencies
-- Network connectivity to Team17 services
+- Network connectivity to Team17 and Steam endpoints
 
 Use `--quick` to skip network checks, or `--verbose` for detailed output.
 

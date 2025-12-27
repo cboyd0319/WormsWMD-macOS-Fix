@@ -87,7 +87,7 @@ Some issues can't be fixed without access to the game's source code:
 
 | Limitation | Impact | Why it can't be fixed |
 |------------|--------|----------------------|
-| No native Apple Silicon | ~20-30% performance overhead via Rosetta | Requires rebuilding the game binary |
+| No native Apple Silicon | Performance overhead via Rosetta (varies by system) | Requires rebuilding the game binary |
 | FMOD uses deprecated runtime | Audio may break in future macOS | FMOD libs need updating by Team17 |
 | Steam API uses deprecated runtime | Networking may break in future macOS | Steamworks SDK needs updating |
 | OpenGL only | May break if Apple removes OpenGL | Requires a Metal renderer |

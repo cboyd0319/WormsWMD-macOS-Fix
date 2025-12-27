@@ -17,7 +17,7 @@ This checks:
 - Rosetta 2 status (Apple Silicon)
 - Game installation and fix status
 - Runtime dependencies (FMOD, Steam API, libcurl)
-- Network connectivity to Team17 services (skip with `--quick`)
+- Network connectivity to Team17 and Steam endpoints (skip with `--quick`)
 
 Note: Network checks require `curl`. Use `--quick` to skip them.
 
