@@ -2,6 +2,16 @@
 
 Notable changes are listed here. This project follows Keep a Changelog and Semantic Versioning.
 
+## 1.6.1 (2025-12-27)
+
+### Fixed
+- Fixed "dependencies not found" errors when using pre-built Qt frameworks on Apple Silicon Macs without Intel Homebrew (Issue #2).
+- Pre-built Qt package now properly copies bundled x86_64 dependency libraries (libpcre2, libzstd, libglib, libintl, libpng, libfreetype, etc.).
+- Dependency copy script now skips Homebrew scanning when using pre-built package (dependencies already included).
+
+### Changed
+- Added chmod instructions to README and troubleshooting for "Insufficient Privileges" errors (Issue #1).
+
 ## 1.6.0 (2025-12-26)
 
 ### Added

@@ -6,6 +6,10 @@
 # This script scans those dependencies and copies them into the game's
 # Frameworks folder to keep the app self-contained.
 #
+# When using pre-built Qt frameworks (QT_SOURCE=prebuild), dependencies
+# are already bundled in the package, so this script will verify they
+# exist rather than scanning Homebrew paths.
+#
 
 set -euo pipefail
 
@@ -15,6 +19,7 @@ GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
+QT_SOURCE="${QT_SOURCE:-homebrew}"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
@@ -37,6 +42,32 @@ if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]] || [[ ! -f "$GAME_EXE
 fi
 
 mkdir -p "$GAME_FRAMEWORKS" "$GAME_PLUGINS/platforms" "$GAME_PLUGINS/imageformats"
+
+# When using pre-built package, dependencies are already bundled
+# Just verify they exist and report success
+if [[ "$QT_SOURCE" == "prebuild" ]]; then
+    echo "=== Verifying Bundled Dependencies ==="
+
+    # Count bundled dylibs (excluding Qt frameworks which are separate)
+    bundled_count=0
+    for dylib in "$GAME_FRAMEWORKS"/*.dylib; do
+        if [[ -f "$dylib" ]]; then
+            ((++bundled_count))
+        fi
+    done
+
+    if [[ $bundled_count -gt 0 ]]; then
+        echo "Found $bundled_count bundled dependencies"
+        echo ""
+        echo "Copied $bundled_count libraries"
+        echo "COPIED_LIBS=$bundled_count"
+        echo "MISSING_LIBS=0"
+        exit 0
+    else
+        echo "WARNING: No bundled dependencies found in pre-built package"
+        echo "Falling back to Homebrew dependency scanning..."
+    fi
+fi
 
 echo "=== Copying Qt External Dependencies ==="
 

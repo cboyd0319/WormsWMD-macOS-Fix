@@ -130,6 +130,31 @@ for fw in "${FRAMEWORKS[@]}"; do
 done
 
 echo ""
+
+# Copy bundled dependencies from pre-built package
+# These are x86_64 libraries that Qt depends on (pcre2, glib, zstd, etc.)
+# Plugins (libq*.dylib) are handled separately in the plugins section below
+if [[ "$QT_SOURCE" == "prebuild" ]]; then
+    echo "=== Copying Bundled Dependencies ==="
+    dep_count=0
+    for dylib in "$NEW_QT"/*.dylib; do
+        if [[ -f "$dylib" ]]; then
+            name=$(basename "$dylib")
+            # Skip plugins (they start with libq and are copied from PlugIns/)
+            if [[ "$name" == libq*.dylib ]]; then
+                continue
+            fi
+            echo "Copying $name..."
+            cp "$dylib" "$GAME_FRAMEWORKS/"
+            chmod 755 "$GAME_FRAMEWORKS/$name"
+            install_name_tool -id "@executable_path/../Frameworks/$name" "$GAME_FRAMEWORKS/$name" 2>/dev/null || true
+            ((++dep_count))
+        fi
+    done
+    echo "Copied $dep_count dependency libraries"
+    echo ""
+fi
+
 echo "=== Replacing Qt Plugins ==="
 
 # Replace platform plugin

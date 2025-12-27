@@ -23,18 +23,24 @@ Gatekeeper blocks `.command` files downloaded from the internet. Try these optio
 1. **Right-click method:**
    - Right-click `Install Fix.command` → select **Open** → select **Open** again in the dialog
 
-2. **Remove quarantine flag:**
+2. **"Insufficient Privileges" or permission denied:**
+   ```bash
+   chmod +x ~/Downloads/Install\ Fix.command
+   ```
+   Then double-click the file again.
+
+3. **Remove quarantine flag:**
    ```bash
    xattr -d com.apple.quarantine ~/Downloads/Install\ Fix.command
    ```
    Then double-click the file.
 
-3. **Run from Terminal:**
+4. **Run from Terminal:**
    ```bash
    bash ~/Downloads/Install\ Fix.command
    ```
 
-4. **Use the one-liner instead:**
+5. **Use the one-liner instead:**
    ```bash
    curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
    ```
