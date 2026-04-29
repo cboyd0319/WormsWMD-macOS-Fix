@@ -781,7 +781,7 @@ For native performance improvements:
 
 ### 11.5 Community fix components
 
-The community fix (v1.6.3) addresses the critical issues by:
+The community fix (v1.6.4) addresses the critical issues by:
 
 1. **AGL stub**: Provides `AGL.framework` with no-op implementations
 2. **Qt 5.15**: Replaces all Qt frameworks and plugins

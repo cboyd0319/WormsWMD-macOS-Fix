@@ -13,7 +13,7 @@ bundle, and gives you a preview and restore path.
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.3.zip.sha256
+   shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.4.zip.sha256
    ```
 
 4. Unzip it and run `Worms W.M.D Fix.command`.
@@ -26,7 +26,7 @@ workflow publishes artifact attestations so you can verify that a release asset
 came from this repository's build process:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.6.3.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.6.4.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 The checksum proves the downloaded zip matches the release asset. The

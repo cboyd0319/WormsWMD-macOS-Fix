@@ -94,24 +94,24 @@ The `check_updates.sh --download` option downloads a ZIP snapshot from GitHub wi
 ## Download verification
 
 Release bundles publish both a zip and a matching SHA-256 checksum file. For
-the `v1.6.3` release:
+the `v1.6.4` release:
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.3.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.4.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.6.3.zip: OK
+WormsWMD-macOS-Fix-v1.6.4.zip: OK
 ```
 
 Release bundles also receive GitHub artifact attestations from the release
 workflow:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.6.3.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.6.4.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 The checksum verifies the file content. The attestation verifies that GitHub

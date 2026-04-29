@@ -131,7 +131,10 @@ make_zip() {
         exit 1
     fi
 
-    shasum -a 256 "$zip_path" > "$zip_path.sha256"
+    (
+        cd "$OUTPUT_DIR"
+        shasum -a 256 "$bundle_name.zip" > "$bundle_name.zip.sha256"
+    )
     worms_print_success "Release zip: $zip_path"
     worms_print_success "Checksum: $zip_path.sha256"
 }

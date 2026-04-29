@@ -6,6 +6,12 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No changes yet.
 
+## 1.6.4 (2026-04-29)
+
+### Fixed
+- Fixed release checksum files so `shasum -a 256 -c` works after downloading
+  the zip and `.sha256` file from GitHub Releases.
+
 ## 1.6.3 (2026-04-29)
 
 ### Added

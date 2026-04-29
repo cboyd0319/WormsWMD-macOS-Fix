@@ -3,10 +3,10 @@
 # install.sh - One-liner installer for Worms W.M.D macOS Fix
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.3/install.sh | INSTALL_REF=v1.6.3 bash
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | INSTALL_REF=v1.6.4 bash
 #
 # Or with options:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.3/install.sh | INSTALL_REF=v1.6.3 bash -s -- --dry-run
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | INSTALL_REF=v1.6.4 bash -s -- --dry-run
 #
 
 set -euo pipefail

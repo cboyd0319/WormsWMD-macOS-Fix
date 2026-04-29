@@ -13,14 +13,14 @@ What to do
 Want to verify the zip first?
 -----------------------------
 
-If you downloaded "WormsWMD-macOS-Fix-v1.6.3.zip.sha256" next to this zip,
+If you downloaded "WormsWMD-macOS-Fix-v1.6.4.zip.sha256" next to this zip,
 open Terminal in your Downloads folder and run:
 
-    shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.3.zip.sha256
+    shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.4.zip.sha256
 
 It should print:
 
-    WormsWMD-macOS-Fix-v1.6.3.zip: OK
+    WormsWMD-macOS-Fix-v1.6.4.zip: OK
 
 If macOS blocks the file
 ------------------------
