@@ -1,5 +1,12 @@
 # Worms W.M.D macOS Fix
 
+[![CI](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml/badge.svg)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![macOS 26.0+](https://img.shields.io/badge/macOS-26.0%2B-blue.svg)](https://www.apple.com/macos/)
+[![Latest release](https://img.shields.io/github/v/release/cboyd0319/WormsWMD-macOS-Fix?label=release)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest)
+[![Security documented](https://img.shields.io/badge/security-documented-brightgreen.svg)](SECURITY.md)
+[![Unofficial community fix](https://img.shields.io/badge/Team17-unofficial%20community%20fix-lightgrey.svg)](ATTRIBUTIONS.md)
+
 ## Run This First
 
 1. Download the [latest release zip](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest).
@@ -18,80 +25,24 @@ then choose **Open** again. If the fix fails, run the same file again and press
 <img src="assets/geocities-chaos-banner.svg" alt="Worms W.M.D macOS Fix black screen repair zone" width="100%" />
 
 <marquee behavior="alternate" scrollamount="12">
-<b>!!! PRESS 1 TO FIX !!! NO SUDO !!! BACKUPS FIRST !!! QT 5.15 TIME MACHINE !!! UNDER CONSTRUCTION FOREVER !!!</b>
+<b>!!! PRESS 1 TO FIX !!! NO SUDO !!! BACKUPS FIRST !!! QT 5.15 !!! UNOFFICIAL COMMUNITY FIX !!!</b>
 </marquee>
-
-<br />
-
-<a href="https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml/badge.svg" /></a>
-<a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a>
-<a href="https://www.apple.com/macos/"><img alt="macOS 26.0+" src="https://img.shields.io/badge/macOS-26.0%2B-blue.svg" /></a>
-<a href="https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest"><img alt="Press 1 to fix" src="https://img.shields.io/badge/PRESS-1%20TO%20FIX-ff00ff?style=for-the-badge" /></a>
-<a href="SECURITY.md"><img alt="No sudo" src="https://img.shields.io/badge/SUDO-NOT%20INVITED-00ff66?style=for-the-badge" /></a>
-<a href="ATTRIBUTIONS.md"><img alt="Unofficial community fix" src="https://img.shields.io/badge/TEAM17-UNOFFICIAL%20COMMUNITY%20FIX-ffff00?style=for-the-badge" /></a>
-<a href="#worms-wmd-macos-fix"><img alt="Best viewed in Netscape 4.7" src="https://img.shields.io/badge/BEST%20VIEWED-NETSCAPE%204.7-ff6600?style=for-the-badge" /></a>
-
-<br />
-
-<img src="assets/visitor-counter.svg" alt="Fake 1998 visitor counter" width="58%" />
-
-<br />
-
-<img src="assets/under-construction-strip.svg" alt="Under construction forever strip" width="100%" />
 
 </div>
 
 ---
 
-## Friendly Fix, Loud Website
+## About
 
-Your game launches. The screen goes black. Everybody stares at it. The computer
-acts like this is normal. This repo shows up wearing seven badges, a fake
-visitor counter, and exactly one serious purpose: make the four-step answer
-above hard to miss.
+Worms W.M.D can open to a black screen on newer macOS because the game expects
+older graphics and Qt runtime behavior. This community project applies the
+current workaround and keeps restore, verification, and support tools in the
+same launcher.
 
-That is the whole normal-person path. Everything else on this page is either a
-safety explanation, a support escape hatch, or decorative old-web noise taped to
-the outside for morale.
+This is an unofficial community fix. It does not include Worms W.M.D game files
+or official Team17/Worms artwork.
 
-No `sudo`. No system-wide surgery. No game files included. No official
-Team17/Worms art bundled. Just a community fix, a backup, and a menu that tries
-very hard not to make you learn Terminal.
-
-## Why This Is Reasonable To Trust
-
-The website is intentionally loud. The installer is intentionally boring.
-
-- You can read every script in this repository before running it.
-- The release zip contains this project's scripts, docs, tools, and original
-  visuals. It does not contain Worms W.M.D game files.
-- The launcher does not ask for an administrator password and does not use
-  `sudo`.
-- The fix creates restorable backups with manifests before changing game-bundle
-  files.
-- Option `4` restores from backup. Option `5` creates a sanitized support
-  bundle for bug reports.
-- [SECURITY.md](SECURITY.md) documents the file access, network access,
-  verification checks, and things the project will not do.
-
-## Friendly Control Room
-
-<div align="center">
-
-<img src="assets/webring-control-room.svg" alt="Retro web ring control room with fix, panic, and undo buttons" width="100%" />
-
-</div>
-
-This is the whole control panel in less dramatic words:
-
-- Want the fix? Press `1`.
-- Want to see what would happen first? Press `2`.
-- Want proof it worked? Press `3`.
-- Want to undo it? Press `4`.
-- Want help without explaining computers? Press `5`.
-- Want the little help page? Press `6`.
-
-## Giant Flashing Button Map
+## Launcher Options
 
 The launcher is just a menu. Option `1` is the main path. The other buttons are
 there when you want to preview, check, restore, or ask for help.
@@ -99,11 +50,11 @@ there when you want to preview, check, restore, or ask for help.
 <table>
 <tr>
 <th>Button</th>
-<th>What It Does In Human Words</th>
+<th>What It Does</th>
 </tr>
 <tr>
 <td><code>1</code></td>
-<td>Applies the recommended fix. This is the big friendly button.</td>
+<td>Applies the recommended fix.</td>
 </tr>
 <tr>
 <td><code>2</code></td>
@@ -127,93 +78,18 @@ there when you want to preview, check, restore, or ask for help.
 </tr>
 </table>
 
-## Steam Forum Speedrun
-
-```text
-BLACK SCREEN?        yes
-DOWNLOADED ZIP?      yes
-DOUBLE-CLICKED FILE? Worms W.M.D Fix.command
-PRESSED BUTTON?      1
-SUDO?                no
-BACKUP?              automatic
-PANIC LEVEL?         optional
-```
-
-If anything fails, run `Worms W.M.D Fix.command` again and choose option `5`.
-That puts a support bundle on your Desktop so you can open an issue without
-writing a detective novel about your Mac.
-
-## Plain-English Safety Promises
-
-Sign here with your eyes only:
-
-```text
-[x] I will not be asked for an admin password.
-[x] The fix backs up game-bundle files before changing them.
-[x] The repo does not ship official Worms art, game binaries, or save files.
-[x] The support button tries to sanitize useful diagnostics for bug reports.
-[x] The fun parts are silly. The installer parts are meant to be boring.
-```
-
-## Choose Your Path Through The Neon Portal
-
-| I Am... | Click This Portal |
-| --- | --- |
-| A normal player who wants the game to work | Download the [latest release zip](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest), unzip it, double-click `Worms W.M.D Fix.command`, press `1`. |
-| A normal player who downloaded only one file | Download [`Install Fix.command`](https://github.com/cboyd0319/WormsWMD-macOS-Fix/raw/main/Install%20Fix.command), double-click it, then press `1` in the launcher it opens. |
-| Blocked by macOS | Right-click the `.command` file, choose **Open**, then choose **Open** again. If needed, see [Troubleshooting](docs/TROUBLESHOOTING.md#install-fixcommand-wont-run). |
-| A Terminal person who wants a shortcut | Run the command in the next section. |
-| A maintainer, investigator, or technical reader | Start with [docs/INSTALL.md](docs/INSTALL.md), [docs/TECHNICAL.md](docs/TECHNICAL.md), and [docs/TOOLS.md](docs/TOOLS.md). |
-
-## Optional Terminal Shortcut
+## Terminal Install Option
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
 ```
 
 Requires `git` (install Xcode Command Line Tools if missing). With no command
-line flags and an interactive Terminal, it opens the same friendly launcher
-menu. The menu is the main event; the command is only a faster doorway.
+line flags and an interactive Terminal, it opens the same launcher menu.
 
 If `curl | bash` makes you uncomfortable, that is reasonable. Use the release
 zip at the top of this page, or open `install.sh` in your browser first and read
 it before running anything.
-
-## What This Actually Does
-
-No mystery required. It is a carefully labeled box of small repairs:
-
-- **The black-screen antidote:** adds an AGL stub framework so macOS 26+ can
-  launch the game.
-- **The Qt time machine:** replaces the very old bundled Qt 5.3.2 runtime with
-  Qt 5.15.
-- **The safety net:** creates restorable backups with manifests before changing
-  files.
-- **The package bouncer:** verifies Qt package checksums, metadata, manifests,
-  and x86_64 slices before using them.
-- **The window un-shrinker:** resets incompatible old Qt window geometry.
-- **The support button:** creates a sanitized support bundle so players do not
-  have to describe mysterious errors in a forum post.
-
-## Trust Signals, But Loud
-
-| Badge | Meaning |
-| --- | --- |
-| `MOST LIKELY TO SAY PRESS 1` | The README refuses to hide the useful answer. |
-| `NO SUDO ENERGY` | The fix stays inside user-writable project and game-bundle paths. |
-| `BACKUP GOBLET` | Restorable backups are part of the normal apply path. |
-| `SUPPORT BUNDLE FAX MACHINE` | Option `5` creates a report players can attach to an issue. |
-| `UNOFFICIAL BUT TRYING` | This is a community project, not a Team17 product. |
-
-## Plain-English Decoder Ring
-
-| Weird Thing | Translation |
-| --- | --- |
-| The screen is black | The old game is asking modern macOS for an old graphics API doorway called AGL. |
-| The fix adds an AGL stub | It gives the dynamic linker the missing symbols the old launch path expects. |
-| Qt gets refreshed | The bundled Qt 5.3.2 runtime is replaced with Qt 5.15-compatible pieces. |
-| Backups happen first | You can restore changed files from the launcher. |
-| No official art is here | The repo is unofficial and only ships original project visuals. |
 
 ## Requirements
 
@@ -246,6 +122,18 @@ The script can prompt to install these if needed (you may see system prompts):
 - Resets incompatible Qt window geometry to fix small window issues.
 - Creates restorable backups with manifests for integrity checks.
 
+## Security And Verification
+
+See [SECURITY.md](SECURITY.md) for the threat model, permissions, audit
+checklist, and source review commands. The short version:
+
+- The launcher does not require `sudo` or administrator privileges.
+- Pre-built Qt packages are checked with metadata, checksums, manifests, and
+  x86_64 slice validation before use.
+- Game-bundle backups include manifests and restore verification.
+- Support bundles are designed to collect diagnostics without game binaries,
+  save archives, or private account tokens.
+
 ## Pre-Flight Check
 
 Before launching, you can verify your system is ready:
@@ -264,10 +152,10 @@ This checks:
 
 Use `--quick` to skip network checks, or `--verbose` for detailed output.
 
-## Documentation Web Ring
+## Documentation
 
 - [Documentation index](docs/README.md) - Complete durable docs map
-- [Support](SUPPORT.md) - Normal-person issue reporting and support bundles
+- [Support](SUPPORT.md) - Issue reporting and support bundles
 - [Attributions](ATTRIBUTIONS.md) - Asset and unofficial-project policy
 - [Steam post template](STEAM_POST.md) - Copy/paste community support text
 - [What this fix improves](docs/IMPROVEMENTS.md) - All fixes and enhancements explained
