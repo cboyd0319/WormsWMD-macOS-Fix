@@ -1,93 +1,152 @@
 # Worms W.M.D macOS Fix
 
-## The unofficial "my game opens to a haunted black rectangle" repair kit
+## Run This First
 
-[![CI](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml/badge.svg)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![macOS](https://img.shields.io/badge/macOS-26.0%2B-blue.svg)](https://www.apple.com/macos/)
-
-![Worms W.M.D macOS Fix community badge](assets/worms-fix-badge.svg)
-
-Your game launches. The screen goes black. Everybody stares at it. The computer
-pretends this is fine.
-
-This project is the small, unofficial, community-made contraption that gets
-Worms W.M.D moving again on modern macOS. It adds the missing AGL compatibility
-piece, refreshes the old Qt runtime, makes backups before touching the game, and
-gives normal humans a double-click menu instead of a Terminal treasure hunt.
-
-No `sudo`. No system-wide surgery. No game files included. No official
-Team17/Worms art bundled. Just a fix, a backup, and a big friendly button.
-
-## The Tiny Story
-
-Modern macOS removed an old graphics doorway called AGL. Worms W.M.D still
-knocks on that doorway. The doorway is gone. The game stands there, holding its
-little suitcase, staring into the void.
-
-This repo builds a polite fake doorway, refreshes the creaky Qt bits, checks
-its own shoelaces, and sends the game back through the launch tube.
-
-## Steam Forum Speedrun
-
-If you are here because somebody dropped this link into a Steam thread:
-
-1. Download the latest release zip.
+1. Download the [latest release zip](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest).
 2. Unzip it.
 3. Double-click `Worms W.M.D Fix.command`.
 4. Press `1`.
-5. Go back to launching tiny arguments with physics.
 
-If anything feels cursed, press `5` in the launcher and it will put a support
-bundle on your Desktop.
+If macOS blocks it, right-click `Worms W.M.D Fix.command`, choose **Open**,
+then choose **Open** again. If the fix fails, run the same file again and press
+`5` to create a support bundle on your Desktop.
 
-## Start Here
+---
 
-### I want the big friendly button
+<div align="center">
 
-1. Download the latest release zip: https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest
-2. Unzip it.
-3. Open `README_FIRST.txt`.
-4. Double-click `Worms W.M.D Fix.command`.
-5. Choose option 1: **Apply the recommended fix**.
+<pre>
+ __        __                  __        __   __  __   ____
+ \ \      / /__  _ __ _ __ ___ \ \      / /  |  \/  | |  _ \
+  \ \ /\ / / _ \| '__| '_ ` _ \ \ \ /\ / /   | |\/| | | | | |
+   \ V  V / (_) | |  | | | | | | \ V  V /    | |  | |_| |_| |
+    \_/\_/ \___/|_|  |_| |_| |_|  \_/\_/     |_|  |_(_)____/
 
-If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
-**Open**, then choose **Open** again.
+                 macOS BLACK SCREEN REPAIR ZONE
+</pre>
 
-The launcher menu is intentionally boring in the best possible way:
+<img src="assets/geocities-chaos-banner.svg" alt="Worms W.M.D macOS Fix black screen repair zone" width="100%" />
 
-| Button | What it does |
+<marquee behavior="alternate" scrollamount="12">
+<b>!!! PRESS 1 TO FIX !!! NO SUDO !!! BACKUPS FIRST !!! QT 5.15 TIME MACHINE !!! UNDER CONSTRUCTION FOREVER !!!</b>
+</marquee>
+
+<br />
+
+<a href="https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml/badge.svg" /></a>
+<a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a>
+<a href="https://www.apple.com/macos/"><img alt="macOS 26.0+" src="https://img.shields.io/badge/macOS-26.0%2B-blue.svg" /></a>
+<a href="https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest"><img alt="Press 1 to fix" src="https://img.shields.io/badge/PRESS-1%20TO%20FIX-ff00ff?style=for-the-badge" /></a>
+<a href="SECURITY.md"><img alt="No sudo" src="https://img.shields.io/badge/SUDO-NOT%20INVITED-00ff66?style=for-the-badge" /></a>
+<a href="ATTRIBUTIONS.md"><img alt="Unofficial community fix" src="https://img.shields.io/badge/TEAM17-UNOFFICIAL%20COMMUNITY%20FIX-ffff00?style=for-the-badge" /></a>
+<a href="#worms-wmd-macos-fix"><img alt="Best viewed in Netscape 4.7" src="https://img.shields.io/badge/BEST%20VIEWED-NETSCAPE%204.7-ff6600?style=for-the-badge" /></a>
+
+<br />
+
+<img src="assets/visitor-counter.svg" alt="Fake 1998 visitor counter" width="58%" />
+
+<br />
+
+<img src="assets/worms-fix-badge.svg" alt="Worms W.M.D macOS Fix community badge" width="64%" />
+
+<br />
+
+<img src="assets/button-wall.svg" alt="Retro button wall showing press 1, no sudo, backups, Qt 5.15, diagnostics, restore, and play again" width="100%" />
+
+<br />
+
+<img src="assets/under-construction-strip.svg" alt="Under construction forever strip" width="100%" />
+
+</div>
+
+---
+
+## Welcome To The Questionable Website For A Very Useful Button
+
+Your game launches. The screen goes black. Everybody stares at it. The computer
+acts like this is normal. This repo shows up wearing seven badges, a fake
+visitor counter, and exactly one serious purpose: make the four-step answer
+above hard to miss.
+
+That is the whole normal-person path. Everything else on this page is either a
+safety explanation, a support escape hatch, or decorative old-web noise taped to
+the outside for morale.
+
+No `sudo`. No system-wide surgery. No game files included. No official
+Team17/Worms art bundled. Just a community fix, a backup, and a menu that tries
+very hard not to make you learn Terminal.
+
+## Giant Flashing Button Map
+
+The launcher is just a menu. Option `1` is the main path. The other buttons are
+there when you want to preview, check, restore, or ask for help.
+
+<table>
+<tr>
+<th>Button</th>
+<th>What It Does In Human Words</th>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>Applies the recommended fix. This is the big friendly button.</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>Shows what would change before changing anything.</td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td>Checks whether the fix is already installed.</td>
+</tr>
+<tr>
+<td><code>4</code></td>
+<td>Restores original files from a backup.</td>
+</tr>
+<tr>
+<td><code>5</code></td>
+<td>Creates a sanitized support bundle on your Desktop.</td>
+</tr>
+<tr>
+<td><code>6</code></td>
+<td>Opens the simple help file.</td>
+</tr>
+</table>
+
+## Steam Forum Speedrun
+
+```text
+BLACK SCREEN?        yes
+DOWNLOADED ZIP?      yes
+DOUBLE-CLICKED FILE? Worms W.M.D Fix.command
+PRESSED BUTTON?      1
+SUDO?                no
+BACKUP?              automatic
+PANIC LEVEL?         optional
+```
+
+If anything fails, run `Worms W.M.D Fix.command` again and choose option `5`.
+That puts a support bundle on your Desktop so you can open an issue without
+writing a detective novel about your Mac.
+
+## Choose Your 1998 Web Portal
+
+| I Am... | Click This Portal |
 | --- | --- |
-| `1` | Applies the recommended fix |
-| `2` | Shows what would change before anything changes |
-| `3` | Checks whether the fix is installed |
-| `4` | Restores original files from a backup |
-| `5` | Creates a support bundle on your Desktop |
-| `6` | Opens the simple help file |
+| A normal player who wants the game to work | Download the [latest release zip](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest), unzip it, double-click `Worms W.M.D Fix.command`, press `1`. |
+| A normal player who downloaded only one file | Download [`Install Fix.command`](https://github.com/cboyd0319/WormsWMD-macOS-Fix/raw/main/Install%20Fix.command), double-click it, then press `1` in the launcher it opens. |
+| Blocked by macOS | Right-click the `.command` file, choose **Open**, then choose **Open** again. If needed, see [Troubleshooting](docs/TROUBLESHOOTING.md#install-fixcommand-wont-run). |
+| A Terminal person who enjoys tiny incantations | Run the command in the next section. |
+| A maintainer, investigator, or brave lever-puller | Start with [docs/INSTALL.md](docs/INSTALL.md), [docs/TECHNICAL.md](docs/TECHNICAL.md), and [docs/TOOLS.md](docs/TOOLS.md). |
 
-### I only downloaded one file
-
-1. Download [`Install Fix.command`](https://github.com/cboyd0319/WormsWMD-macOS-Fix/raw/main/Install%20Fix.command).
-2. Double-click the file.
-3. If macOS blocks it, right-click → **Open** → **Open** again.
-4. If you see "Insufficient Privileges", run: `chmod +x ~/Downloads/Install\ Fix.command`
-5. If it still won't run, see [Troubleshooting](docs/TROUBLESHOOTING.md#install-fixcommand-wont-run).
-
-`Install Fix.command` downloads or updates the repo, then opens the same
-friendly launcher menu.
-
-### I am a Terminal person and I enjoy tiny incantations
+## Tiny Incantation Zone
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
 ```
 
 Requires `git` (install Xcode Command Line Tools if missing). With no command
-line flags and an interactive Terminal, it opens the friendly launcher menu.
-
-### I want the gears, levers, and emergency trapdoors
-
-See `docs/INSTALL.md` for manual install, dry-run, and restore steps.
+line flags and an interactive Terminal, it opens the same friendly launcher
+menu. The menu is the main event; the command is only a faster doorway.
 
 ## What Kind Of Magic Is This?
 
@@ -105,25 +164,40 @@ Not magic, sadly. Just a carefully labeled box of small repairs:
 - **The support button:** creates a sanitized support bundle so players do not
   have to describe mysterious computer smoke in a forum post.
 
+## Panic Decoder Ring
+
+| Weird Thing | Translation |
+| --- | --- |
+| The screen is black | The old game is asking modern macOS for an old graphics API doorway called AGL. |
+| The fix adds an AGL stub | It gives the dynamic linker the missing symbols the old launch path expects. |
+| Qt gets refreshed | The bundled Qt 5.3.2 runtime is replaced with Qt 5.15-compatible pieces. |
+| Backups happen first | You can restore changed files from the launcher. |
+| No official art is here | The repo is unofficial and only ships original project visuals. |
+
 ## Requirements
 
-- Target: macOS 26 (Tahoe) or later. Earlier macOS versions typically don't need the AGL fix, but macOS 15.x users with keyboard input buffering or lag may benefit from the Qt 5.15 refresh.
+- Target: macOS 26 (Tahoe) or later. Earlier macOS versions typically don't
+  need the AGL fix, but macOS 15.x users with keyboard input buffering or lag
+  may benefit from the Qt 5.15 refresh.
 - Worms W.M.D installed via Steam or GOG
 - Internet connection
 - git (installed by Xcode Command Line Tools)
 
 The script can prompt to install these if needed (you may see system prompts):
+
 - Rosetta 2 (Apple Silicon)
 - Xcode Command Line Tools
 - Qt frameworks (downloaded from GitHub; Homebrew fallback)
 
-## What the fix does
+## What The Fix Does
 
 - Adds an AGL stub framework so the game launches on macOS 26+.
 - Replaces Qt 5.3.2 with Qt 5.15.
-- Verifies pre-built Qt package checksums, metadata, manifests, and x86_64 slices before use.
+- Verifies pre-built Qt package checksums, metadata, manifests, and x86_64
+  slices before use.
 - Bundles required dependencies and fixes install names.
-- May resolve keyboard input buffering or lag caused by the original Qt 5.3.2 runtime.
+- May resolve keyboard input buffering or lag caused by the original Qt 5.3.2
+  runtime.
 - Updates Info.plist (bundle ID, HiDPI support, minimum version).
 - Fixes known HTTP URLs in DataOSX/CommonData config files.
 - Comments out internal/staging URLs in DataOSX config files.
@@ -131,7 +205,7 @@ The script can prompt to install these if needed (you may see system prompts):
 - Resets incompatible Qt window geometry to fix small window issues.
 - Creates restorable backups with manifests for integrity checks.
 
-## Pre-flight check
+## Pre-Flight Check
 
 Before launching, you can verify your system is ready:
 
@@ -140,6 +214,7 @@ Before launching, you can verify your system is ready:
 ```
 
 This checks:
+
 - macOS version and architecture
 - Rosetta 2 status (Apple Silicon)
 - Game installation and fix status
@@ -148,7 +223,7 @@ This checks:
 
 Use `--quick` to skip network checks, or `--verbose` for detailed output.
 
-## Documentation
+## Documentation Web Ring
 
 - [Documentation index](docs/README.md) - Complete durable docs map
 - [Support](SUPPORT.md) - Normal-person issue reporting and support bundles
@@ -170,7 +245,7 @@ Use `--quick` to skip network checks, or `--verbose` for detailed output.
 
 - Issues: https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
 - If a player is stuck, ask them to run `Worms W.M.D Fix.command` and choose
-  option 5 to create a sanitized support bundle on the Desktop.
+  option `5` to create a sanitized support bundle on the Desktop.
 
 ## Credits
 
@@ -178,7 +253,7 @@ Use `--quick` to skip network checks, or `--verbose` for detailed output.
 - Qt Project for Qt 5.15
 - Original project badge and release visuals are included under this repo's
   license; no official Team17/Worms art is bundled.
-- Fix developed with assistance from Claude
+- Fix developed with AI assistance
 
 ## Links
 
