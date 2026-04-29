@@ -15,17 +15,6 @@ then choose **Open** again. If the fix fails, run the same file again and press
 
 <div align="center">
 
-<pre>
- __        __                         __        __   __  __   ____
- \ \      / /__  _ __ _ __ ___  ___  \ \      / /  |  \/  | |  _ \
-  \ \ /\ / / _ \| '__| '_ ` _ \/ __|  \ \ /\ / /   | |\/| | | | | |
-   \ V  V / (_) | |  | | | | | \__ \   \ V  V /    | |  | |_| |_| |
-    \_/\_/ \___/|_|  |_| |_| |_|___/    \_/\_/     |_|  |_(_)____/
-
-                         Worms W.M.D
-                 macOS BLACK SCREEN REPAIR ZONE
-</pre>
-
 <img src="assets/geocities-chaos-banner.svg" alt="Worms W.M.D macOS Fix black screen repair zone" width="100%" />
 
 <marquee behavior="alternate" scrollamount="12">
@@ -48,25 +37,13 @@ then choose **Open** again. If the fix fails, run the same file again and press
 
 <br />
 
-<img src="assets/worms-fix-badge.svg" alt="Worms W.M.D macOS Fix community badge" width="64%" />
-
-<br />
-
-<img src="assets/quick-start-billboard.svg" alt="Retro quick start billboard showing download, unzip, double-click, and press 1" width="100%" />
-
-<br />
-
-<img src="assets/button-wall.svg" alt="Retro button wall showing press 1, no sudo, backups, Qt 5.15, diagnostics, restore, and play again" width="100%" />
-
-<br />
-
 <img src="assets/under-construction-strip.svg" alt="Under construction forever strip" width="100%" />
 
 </div>
 
 ---
 
-## Welcome To The Questionable Website For A Very Useful Button
+## Friendly Fix, Loud Website
 
 Your game launches. The screen goes black. Everybody stares at it. The computer
 acts like this is normal. This repo shows up wearing seven badges, a fake
@@ -81,7 +58,23 @@ No `sudo`. No system-wide surgery. No game files included. No official
 Team17/Worms art bundled. Just a community fix, a backup, and a menu that tries
 very hard not to make you learn Terminal.
 
-## Absolutely Unnecessary Emergency Control Room
+## Why This Is Reasonable To Trust
+
+The website is intentionally loud. The installer is intentionally boring.
+
+- You can read every script in this repository before running it.
+- The release zip contains this project's scripts, docs, tools, and original
+  visuals. It does not contain Worms W.M.D game files.
+- The launcher does not ask for an administrator password and does not use
+  `sudo`.
+- The fix creates restorable backups with manifests before changing game-bundle
+  files.
+- Option `4` restores from backup. Option `5` creates a sanitized support
+  bundle for bug reports.
+- [SECURITY.md](SECURITY.md) documents the file access, network access,
+  verification checks, and things the project will not do.
+
+## Friendly Control Room
 
 <div align="center">
 
@@ -150,7 +143,7 @@ If anything fails, run `Worms W.M.D Fix.command` again and choose option `5`.
 That puts a support bundle on your Desktop so you can open an issue without
 writing a detective novel about your Mac.
 
-## Guestbook Of Extremely Specific Promises
+## Plain-English Safety Promises
 
 Sign here with your eyes only:
 
@@ -162,17 +155,17 @@ Sign here with your eyes only:
 [x] The fun parts are silly. The installer parts are meant to be boring.
 ```
 
-## Choose Your 1998 Web Portal
+## Choose Your Path Through The Neon Portal
 
 | I Am... | Click This Portal |
 | --- | --- |
 | A normal player who wants the game to work | Download the [latest release zip](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest), unzip it, double-click `Worms W.M.D Fix.command`, press `1`. |
 | A normal player who downloaded only one file | Download [`Install Fix.command`](https://github.com/cboyd0319/WormsWMD-macOS-Fix/raw/main/Install%20Fix.command), double-click it, then press `1` in the launcher it opens. |
 | Blocked by macOS | Right-click the `.command` file, choose **Open**, then choose **Open** again. If needed, see [Troubleshooting](docs/TROUBLESHOOTING.md#install-fixcommand-wont-run). |
-| A Terminal person who enjoys tiny incantations | Run the command in the next section. |
-| A maintainer, investigator, or brave lever-puller | Start with [docs/INSTALL.md](docs/INSTALL.md), [docs/TECHNICAL.md](docs/TECHNICAL.md), and [docs/TOOLS.md](docs/TOOLS.md). |
+| A Terminal person who wants a shortcut | Run the command in the next section. |
+| A maintainer, investigator, or technical reader | Start with [docs/INSTALL.md](docs/INSTALL.md), [docs/TECHNICAL.md](docs/TECHNICAL.md), and [docs/TOOLS.md](docs/TOOLS.md). |
 
-## Tiny Incantation Zone
+## Optional Terminal Shortcut
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
@@ -182,9 +175,13 @@ Requires `git` (install Xcode Command Line Tools if missing). With no command
 line flags and an interactive Terminal, it opens the same friendly launcher
 menu. The menu is the main event; the command is only a faster doorway.
 
-## What Kind Of Magic Is This?
+If `curl | bash` makes you uncomfortable, that is reasonable. Use the release
+zip at the top of this page, or open `install.sh` in your browser first and read
+it before running anything.
 
-Not magic, sadly. Just a carefully labeled box of small repairs:
+## What This Actually Does
+
+No mystery required. It is a carefully labeled box of small repairs:
 
 - **The black-screen antidote:** adds an AGL stub framework so macOS 26+ can
   launch the game.
@@ -196,9 +193,9 @@ Not magic, sadly. Just a carefully labeled box of small repairs:
   and x86_64 slices before using them.
 - **The window un-shrinker:** resets incompatible old Qt window geometry.
 - **The support button:** creates a sanitized support bundle so players do not
-  have to describe mysterious computer smoke in a forum post.
+  have to describe mysterious errors in a forum post.
 
-## Fake Awards Shelf
+## Trust Signals, But Loud
 
 | Badge | Meaning |
 | --- | --- |
@@ -208,7 +205,7 @@ Not magic, sadly. Just a carefully labeled box of small repairs:
 | `SUPPORT BUNDLE FAX MACHINE` | Option `5` creates a report players can attach to an issue. |
 | `UNOFFICIAL BUT TRYING` | This is a community project, not a Team17 product. |
 
-## Panic Decoder Ring
+## Plain-English Decoder Ring
 
 | Weird Thing | Translation |
 | --- | --- |
@@ -295,8 +292,8 @@ Use `--quick` to skip network checks, or `--verbose` for detailed output.
 
 - Steam community for reporting the issue
 - Qt Project for Qt 5.15
-- Original project badge and release visuals are included under this repo's
-  license; no official Team17/Worms art is bundled.
+- Original project visuals are included under this repo's license; no official
+  Team17/Worms art is bundled.
 - Fix developed with AI assistance
 
 ## Links
