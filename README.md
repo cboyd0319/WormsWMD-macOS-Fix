@@ -1,4 +1,6 @@
-# Worms W.M.D - macOS Tahoe (26.x) Fix
+# Worms W.M.D macOS Fix
+
+## The unofficial "my game opens to a haunted black rectangle" repair kit
 
 [![CI](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml/badge.svg)](https://github.com/cboyd0319/WormsWMD-macOS-Fix/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -6,11 +8,42 @@
 
 ![Worms W.M.D macOS Fix community badge](assets/worms-fix-badge.svg)
 
-Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibility and replacing the bundled Qt frameworks. The Qt refresh can also help older macOS installs that show keyboard input buffering or lag. The repo also includes tools for diagnostics, backups, and updates.
+Your game launches. The screen goes black. Everybody stares at it. The computer
+pretends this is fine.
 
-## Quick start
+This project is the small, unofficial, community-made contraption that gets
+Worms W.M.D moving again on modern macOS. It adds the missing AGL compatibility
+piece, refreshes the old Qt runtime, makes backups before touching the game, and
+gives normal humans a double-click menu instead of a Terminal treasure hunt.
 
-### Option 1: Release zip for most players
+No `sudo`. No system-wide surgery. No game files included. No official
+Team17/Worms art bundled. Just a fix, a backup, and a big friendly button.
+
+## The Tiny Story
+
+Modern macOS removed an old graphics doorway called AGL. Worms W.M.D still
+knocks on that doorway. The doorway is gone. The game stands there, holding its
+little suitcase, staring into the void.
+
+This repo builds a polite fake doorway, refreshes the creaky Qt bits, checks
+its own shoelaces, and sends the game back through the launch tube.
+
+## Steam Forum Speedrun
+
+If you are here because somebody dropped this link into a Steam thread:
+
+1. Download the latest release zip.
+2. Unzip it.
+3. Double-click `Worms W.M.D Fix.command`.
+4. Press `1`.
+5. Go back to launching tiny arguments with physics.
+
+If anything feels cursed, press `5` in the launcher and it will put a support
+bundle on your Desktop.
+
+## Start Here
+
+### I want the big friendly button
 
 1. Download the latest release zip: https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest
 2. Unzip it.
@@ -21,7 +54,18 @@ Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibilit
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
 
-### Option 2: Tiny bootstrap download
+The launcher menu is intentionally boring in the best possible way:
+
+| Button | What it does |
+| --- | --- |
+| `1` | Applies the recommended fix |
+| `2` | Shows what would change before anything changes |
+| `3` | Checks whether the fix is installed |
+| `4` | Restores original files from a backup |
+| `5` | Creates a support bundle on your Desktop |
+| `6` | Opens the simple help file |
+
+### I only downloaded one file
 
 1. Download [`Install Fix.command`](https://github.com/cboyd0319/WormsWMD-macOS-Fix/raw/main/Install%20Fix.command).
 2. Double-click the file.
@@ -32,7 +76,7 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 `Install Fix.command` downloads or updates the repo, then opens the same
 friendly launcher menu.
 
-### Option 3: One-liner (Terminal)
+### I am a Terminal person and I enjoy tiny incantations
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
@@ -41,9 +85,25 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/i
 Requires `git` (install Xcode Command Line Tools if missing). With no command
 line flags and an interactive Terminal, it opens the friendly launcher menu.
 
-### Option 4: Manual / advanced
+### I want the gears, levers, and emergency trapdoors
 
 See `docs/INSTALL.md` for manual install, dry-run, and restore steps.
+
+## What Kind Of Magic Is This?
+
+Not magic, sadly. Just a carefully labeled box of small repairs:
+
+- **The black-screen antidote:** adds an AGL stub framework so macOS 26+ can
+  launch the game.
+- **The Qt time machine:** replaces the very old bundled Qt 5.3.2 runtime with
+  Qt 5.15.
+- **The safety net:** creates restorable backups with manifests before changing
+  files.
+- **The package bouncer:** verifies Qt package checksums, metadata, manifests,
+  and x86_64 slices before using them.
+- **The window un-shrinker:** resets incompatible old Qt window geometry.
+- **The support button:** creates a sanitized support bundle so players do not
+  have to describe mysterious computer smoke in a forum post.
 
 ## Requirements
 
