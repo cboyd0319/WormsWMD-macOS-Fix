@@ -12,6 +12,7 @@
 #   --output FILE   Write to specific file (default: stdout)
 #   --full          Include extended diagnostics (larger output)
 #   --copy          Copy output to clipboard (macOS)
+#   --bundle        Create a sanitized support bundle for GitHub issues
 #   --help          Show this help
 #
 
@@ -28,10 +29,20 @@ GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/W
 OUTPUT_FILE=""
 FULL_MODE=false
 COPY_TO_CLIPBOARD=false
+SUPPORT_BUNDLE=false
+BUNDLE_OUTPUT_DIR="${BUNDLE_OUTPUT_DIR:-$HOME/Desktop}"
+BUNDLE_TEMP_DIR=""
+
+cleanup() {
+    if [[ -n "$BUNDLE_TEMP_DIR" ]] && [[ -d "$BUNDLE_TEMP_DIR" ]]; then
+        rm -rf "$BUNDLE_TEMP_DIR"
+    fi
+}
+trap cleanup EXIT
 
 # Colors (disabled for file output)
 setup_colors() {
-    if [[ -t 1 ]] && [[ -z "$OUTPUT_FILE" ]]; then
+    if [[ -t 1 ]] && [[ -z "$OUTPUT_FILE" ]] && ! $SUPPORT_BUNDLE; then
         worms_color_init always
     else
         worms_color_init never
@@ -51,6 +62,9 @@ OPTIONS:
     --output FILE   Write diagnostics to a file
     --full          Include extended diagnostics (library details, etc.)
     --copy          Copy output to clipboard (macOS pbcopy)
+    --bundle        Create a sanitized .tar.gz support bundle
+    --bundle-output DIR
+                   Write support bundle to DIR (default: ~/Desktop)
     --help, -h      Show this help message
 
 EXAMPLES:
@@ -65,6 +79,9 @@ EXAMPLES:
 
     # Full diagnostics to file
     ./collect_diagnostics.sh --full --output ~/Desktop/worms-full-diagnostics.txt
+
+    # Create a bundle to attach to a GitHub issue
+    ./collect_diagnostics.sh --bundle
 
 EOF
 }
@@ -115,6 +132,18 @@ while [[ $# -gt 0 ]]; do
         --copy)
             COPY_TO_CLIPBOARD=true
             shift
+            ;;
+        --bundle|--support-bundle)
+            SUPPORT_BUNDLE=true
+            shift
+            ;;
+        --bundle-output)
+            if [[ -z "${2:-}" ]] || [[ "$2" == -* ]]; then
+                echo "ERROR: --bundle-output requires a directory"
+                exit 1
+            fi
+            BUNDLE_OUTPUT_DIR="$2"
+            shift 2
             ;;
         --help|-h)
             print_help
@@ -292,11 +321,15 @@ collect_diagnostics() {
         info "The installer can use Intel Homebrew Qt as a fallback."
     fi
 
-    local_qt_package=$(worms_latest_path_by_mtime "$REPO_DIR/dist" "qt-frameworks-x86_64-*.tar.gz" "f")
+    local_qt_package=$(worms_latest_qt_package_by_version "$REPO_DIR/dist" true || true)
     if [[ -n "$local_qt_package" ]]; then
         info "Local package: $(basename "$local_qt_package")"
         if [[ -f "${local_qt_package}.sha256" ]]; then
-            ok "Local package checksum file present"
+            if shasum -a 256 -c "${local_qt_package}.sha256" >/dev/null 2>&1; then
+                ok "Local package checksum verified"
+            else
+                fail "Local package checksum mismatch"
+            fi
         else
             warn "Local package checksum file missing"
         fi
@@ -491,8 +524,112 @@ collect_diagnostics() {
     echo "Issues: https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues"
 }
 
+sanitize_report() {
+    local input="$1"
+    local output="$2"
+
+    awk -v home="$HOME" '
+        {
+            gsub(home, "~")
+            gsub(/[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}/, "[redacted-email]")
+            print
+        }
+    ' "$input" > "$output"
+}
+
+write_qt_package_bundle_info() {
+    local bundle_dir="$1"
+    local info_file="$bundle_dir/qt-package.txt"
+    local local_qt_package=""
+
+    {
+        echo "Qt package status"
+        echo "================="
+        echo ""
+
+        if [[ -f "$REPO_DIR/scripts/download_qt_frameworks.sh" ]]; then
+            echo "Availability: $("$REPO_DIR/scripts/download_qt_frameworks.sh" --check 2>/dev/null || echo unavailable)"
+        else
+            echo "Availability: unavailable (download script missing)"
+        fi
+
+        local_qt_package=$(worms_latest_qt_package_by_version "$REPO_DIR/dist" true || true)
+        if [[ -n "$local_qt_package" ]]; then
+            echo "Local package: $(basename "$local_qt_package")"
+            if shasum -a 256 -c "${local_qt_package}.sha256" >/dev/null 2>&1; then
+                echo "Checksum: verified"
+            else
+                echo "Checksum: mismatch"
+            fi
+            echo ""
+            echo "Metadata:"
+            tar -xOf "$local_qt_package" METADATA.txt 2>/dev/null || echo "(metadata unavailable)"
+        else
+            echo "Local package: none"
+        fi
+    } > "$info_file"
+}
+
+copy_backup_manifests() {
+    local bundle_dir="$1"
+    local manifests_dir="$bundle_dir/backup-manifests"
+    local copied=0
+    local backup manifest target_name
+
+    mkdir -p "$manifests_dir"
+    if [[ -d "$HOME/Documents" ]]; then
+        while IFS= read -r -d '' backup; do
+            manifest="$backup/BACKUP_MANIFEST.tsv"
+            if [[ -f "$manifest" ]]; then
+                target_name="$(basename "$backup").tsv"
+                cp "$manifest" "$manifests_dir/$target_name"
+                copied=$((copied + 1))
+            fi
+        done < <(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null)
+    fi
+
+    if [[ "$copied" -eq 0 ]]; then
+        echo "No fix backup manifests were found." > "$manifests_dir/README.txt"
+    fi
+}
+
+collect_support_bundle() {
+    local output_dir="$BUNDLE_OUTPUT_DIR"
+    local timestamp bundle_path raw_report was_full
+
+    mkdir -p "$output_dir" 2>/dev/null || output_dir="$PWD"
+    timestamp=$(date '+%Y%m%d-%H%M%S')
+    bundle_path="$output_dir/wormswmd-support-$timestamp.tar.gz"
+    BUNDLE_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-support.XXXXXX")
+
+    {
+        echo "Worms W.M.D macOS Fix support bundle"
+        echo "Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+        echo "Repository: https://github.com/cboyd0319/WormsWMD-macOS-Fix"
+        echo ""
+        echo "This bundle contains sanitized diagnostics, Qt package status, and backup manifests."
+        echo "It does not include save files, game binaries, or raw crash logs."
+    } > "$BUNDLE_TEMP_DIR/README.txt"
+
+    raw_report="$BUNDLE_TEMP_DIR/diagnostics.raw.txt"
+    was_full=$FULL_MODE
+    FULL_MODE=true
+    collect_diagnostics > "$raw_report"
+    FULL_MODE=$was_full
+    sanitize_report "$raw_report" "$BUNDLE_TEMP_DIR/diagnostics.txt"
+    rm -f "$raw_report"
+
+    write_qt_package_bundle_info "$BUNDLE_TEMP_DIR"
+    copy_backup_manifests "$BUNDLE_TEMP_DIR"
+
+    COPYFILE_DISABLE=1 tar -czf "$bundle_path" -C "$BUNDLE_TEMP_DIR" .
+    echo "Support bundle created: $bundle_path"
+}
+
 # Run diagnostics
-if [[ -n "$OUTPUT_FILE" ]]; then
+if $SUPPORT_BUNDLE; then
+    collect_support_bundle
+elif [[ -n "$OUTPUT_FILE" ]]; then
     collect_diagnostics > "$OUTPUT_FILE"
     echo "Diagnostics saved to: $OUTPUT_FILE"
 elif $COPY_TO_CLIPBOARD; then

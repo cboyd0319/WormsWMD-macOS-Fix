@@ -7,10 +7,10 @@
 # This eliminates the need for users to install Homebrew.
 #
 # Usage:
-#   ./package_qt_frameworks.sh [--output DIR]
+#   ./package_qt_frameworks.sh [--output DIR] [--qt-prefix DIR] [--version VERSION]
 #
 # Requirements:
-#   - Intel Homebrew with Qt 5 installed
+#   - Intel Homebrew with Qt 5 installed, or an explicit x86_64 Qt prefix
 #   - Run on macOS with x86_64 support
 #
 
@@ -19,7 +19,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/../dist}"
-QT_PREFIX="/usr/local/opt/qt@5"
+QT_PREFIX="${QT_PREFIX:-/usr/local/opt/qt@5}"
+QT_PACKAGE_VERSION="${QT_PACKAGE_VERSION:-}"
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1704067200}"
 PACKAGE_NAME="qt-frameworks-x86_64"
 
 # shellcheck disable=SC1091
@@ -28,25 +30,66 @@ source "$REPO_DIR/scripts/common.sh"
 source "$REPO_DIR/scripts/ui.sh"
 worms_color_init
 
-for cmd in otool tar shasum mktemp; do
+for cmd in date find gzip lipo mktemp otool shasum tar; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         worms_print_error "Missing required command: $cmd"
         exit 1
     fi
 done
 
+print_help() {
+    cat << EOF
+Usage: $0 [--output DIR] [--qt-prefix DIR] [--version VERSION]
+
+Packages Qt 5.15 x86_64 frameworks for distribution.
+
+Options:
+  --output DIR      Write archive and checksum to DIR (default: dist/)
+  --qt-prefix DIR   Use this Qt installation prefix (default: $QT_PREFIX)
+  --version VERSION Override package version used in metadata and file name
+  --help, -h        Show this help message
+
+Environment:
+  QT_PREFIX           Default Qt installation prefix
+  QT_PACKAGE_VERSION  Same as --version
+  SOURCE_DATE_EPOCH   Reproducible timestamp seed (default: $SOURCE_DATE_EPOCH)
+
+Examples:
+  $0 --output dist
+  $0 --qt-prefix /usr/local/opt/qt@5 --version 5.15.18
+  $0 --qt-prefix /path/to/qt-5.15.19 --version 5.15.19
+EOF
+}
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --output)
+            if [[ -z "${2:-}" ]] || [[ "$2" == -* ]]; then
+                worms_print_error "--output requires a directory"
+                exit 1
+            fi
             OUTPUT_DIR="$2"
             shift 2
             ;;
+        --qt-prefix)
+            if [[ -z "${2:-}" ]] || [[ "$2" == -* ]]; then
+                worms_print_error "--qt-prefix requires a directory"
+                exit 1
+            fi
+            QT_PREFIX="$2"
+            shift 2
+            ;;
+        --version)
+            if [[ -z "${2:-}" ]] || [[ "$2" == -* ]]; then
+                worms_print_error "--version requires a version string"
+                exit 1
+            fi
+            QT_PACKAGE_VERSION="$2"
+            shift 2
+            ;;
         --help|-h)
-            echo "Usage: $0 [--output DIR]"
-            echo ""
-            echo "Packages Qt 5.15 x86_64 frameworks for distribution."
-            echo "Requires Intel Homebrew with qt@5 installed."
+            print_help
             exit 0
             ;;
         *)
@@ -56,28 +99,127 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+format_epoch_utc() {
+    local epoch="$1"
+
+    date -u -r "$epoch" +"%Y-%m-%d %H:%M:%S UTC" 2>/dev/null \
+        || date -u -d "@$epoch" +"%Y-%m-%d %H:%M:%S UTC" 2>/dev/null
+}
+
+format_epoch_touch() {
+    local epoch="$1"
+
+    date -u -r "$epoch" +"%Y%m%d%H%M.%S" 2>/dev/null \
+        || date -u -d "@$epoch" +"%Y%m%d%H%M.%S" 2>/dev/null
+}
+
+determine_qt_version() {
+    local qmake="$QT_PREFIX/bin/qmake"
+    local header="$QT_PREFIX/lib/QtCore.framework/Headers/qglobal.h"
+    local qt_version_path
+
+    if [[ -n "$QT_PACKAGE_VERSION" ]]; then
+        echo "$QT_PACKAGE_VERSION"
+        return 0
+    fi
+
+    if [[ -x "$qmake" ]]; then
+        "$qmake" -query QT_VERSION 2>/dev/null && return 0
+    fi
+
+    if [[ -f "$header" ]]; then
+        awk '/QT_VERSION_STR/ {gsub(/"/, "", $3); print $3; exit}' "$header" 2>/dev/null && return 0
+    fi
+
+    if [[ "$QT_PREFIX" == "/usr/local/opt/qt@5" ]]; then
+        qt_version_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d" || true)
+        if [[ -n "$qt_version_path" ]]; then
+            basename "$qt_version_path"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+qt_source_label() {
+    if [[ "$QT_PREFIX" == "/usr/local/opt/qt@5" ]]; then
+        echo "Intel Homebrew ($QT_PREFIX)"
+    else
+        echo "Qt prefix ($QT_PREFIX)"
+    fi
+}
+
+validate_packaged_binary() {
+    local binary="$1"
+    local archs
+
+    archs=$(lipo -archs "$binary" 2>/dev/null || true)
+    if [[ -z "$archs" ]]; then
+        worms_print_error "Could not inspect architecture: $binary"
+        return 1
+    fi
+    if ! echo "$archs" | tr ' ' '\n' | grep -qx "x86_64"; then
+        worms_print_error "Packaged binary is missing x86_64 slice: $binary ($archs)"
+        return 1
+    fi
+}
+
+normalize_archive_inputs() {
+    local touch_time="$1"
+
+    find "$WORK_DIR" -exec touch -h -t "$touch_time" {} + 2>/dev/null || true
+}
+
+create_reproducible_archive() {
+    local archive_path="$1"
+    local tar_list="$WORK_DIR/.tar-list"
+
+    (
+        cd "$WORK_DIR" || exit 1
+        {
+            find Frameworks PlugIns -print
+            printf '%s\n' METADATA.txt MANIFEST.txt
+        } | LC_ALL=C sort > "$tar_list"
+
+        COPYFILE_DISABLE=1 tar \
+            --format ustar \
+            --uid 0 \
+            --gid 0 \
+            --uname root \
+            --gname wheel \
+            -cf - \
+            -T "$tar_list" \
+            | gzip -n > "$archive_path"
+    )
+}
+
 # Verify Qt installation
 if [[ ! -d "$QT_PREFIX" ]]; then
     worms_print_error "Qt 5 not found at $QT_PREFIX"
     echo "Install with: arch -x86_64 /usr/local/bin/brew install qt@5"
+    echo "Or pass --qt-prefix /path/to/qt --version 5.15.x"
     exit 1
 fi
 
-QT_VERSION_PATH=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
-if [[ -n "$QT_VERSION_PATH" ]]; then
-    QT_VERSION=$(basename "$QT_VERSION_PATH")
-else
-    QT_VERSION=""
-fi
-if [[ -z "$QT_VERSION" ]]; then
+QT_VERSION=$(determine_qt_version || true)
+if [[ -z "$QT_VERSION" ]] || [[ ! "$QT_VERSION" =~ ^[0-9]+([.][0-9]+)*$ ]]; then
     worms_print_error "Could not determine Qt version"
+    echo "Pass --version 5.15.x when packaging from a custom Qt prefix."
     exit 1
 fi
+CREATED_AT=$(format_epoch_utc "$SOURCE_DATE_EPOCH")
+TOUCH_TIME=$(format_epoch_touch "$SOURCE_DATE_EPOCH")
+SOURCE_LABEL=$(qt_source_label)
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_DIR=$(cd "$OUTPUT_DIR" && pwd)
 
 echo ""
 echo -e "${BLUE}Qt Framework Packager${NC}"
 echo "Qt Version: $QT_VERSION"
+echo "Qt Prefix: $QT_PREFIX"
 echo "Output: $OUTPUT_DIR"
+echo "Source Date Epoch: $SOURCE_DATE_EPOCH"
 echo ""
 
 # Create working directory
@@ -106,9 +248,16 @@ FRAMEWORKS=(
 for fw in "${FRAMEWORKS[@]}"; do
     if [[ -d "$QT_PREFIX/lib/${fw}.framework" ]]; then
         cp -R "$QT_PREFIX/lib/${fw}.framework" "$FRAMEWORKS_DIR/"
+        binary=$(worms_framework_binary "$FRAMEWORKS_DIR/${fw}.framework" "$fw" || true)
+        if [[ -z "$binary" ]]; then
+            worms_print_error "${fw}.framework copied but framework binary was not found"
+            exit 1
+        fi
+        validate_packaged_binary "$binary"
         echo "  Copied ${fw}.framework"
     else
-        worms_print_warning "${fw}.framework not found, skipping"
+        worms_print_error "${fw}.framework not found at $QT_PREFIX/lib"
+        exit 1
     fi
 done
 
@@ -117,7 +266,11 @@ worms_print_step "Copying platform plugins..."
 mkdir -p "$PLUGINS_DIR/platforms"
 if [[ -f "$QT_PREFIX/plugins/platforms/libqcocoa.dylib" ]]; then
     cp "$QT_PREFIX/plugins/platforms/libqcocoa.dylib" "$PLUGINS_DIR/platforms/"
+    validate_packaged_binary "$PLUGINS_DIR/platforms/libqcocoa.dylib"
     echo "  Copied libqcocoa.dylib"
+else
+    worms_print_error "Required platform plugin not found: $QT_PREFIX/plugins/platforms/libqcocoa.dylib"
+    exit 1
 fi
 
 # Copy image format plugins
@@ -126,6 +279,7 @@ mkdir -p "$PLUGINS_DIR/imageformats"
 for plugin in "$QT_PREFIX/plugins/imageformats/"*.dylib; do
     if [[ -f "$plugin" ]]; then
         cp "$plugin" "$PLUGINS_DIR/imageformats/"
+        validate_packaged_binary "$PLUGINS_DIR/imageformats/$(basename "$plugin")"
         echo "  Copied $(basename "$plugin")"
     fi
 done
@@ -142,8 +296,9 @@ copy_deps() {
     local binary="$1"
 
     while IFS= read -r dep; do
-        # Only process /usr/local dependencies
-        if [[ "$dep" == /usr/local/* ]]; then
+        # Only package external dylib dependencies that can travel with the app.
+        if [[ "$dep" == /usr/local/* ]] || [[ "$dep" == "$QT_PREFIX"/* ]]; then
+            [[ "$dep" == *.dylib ]] || continue
             local dep_name
             dep_name=$(basename "$dep")
 
@@ -154,6 +309,7 @@ copy_deps() {
 
             if [[ -f "$dep" ]]; then
                 cp "$dep" "$DEPS_DIR/"
+                validate_packaged_binary "$DEPS_DIR/$dep_name"
                 echo "$dep_name" >> "$COPIED_DEPS_FILE"
                 echo "  Copied $dep_name"
 
@@ -161,19 +317,25 @@ copy_deps() {
                 copy_deps "$dep"
             fi
         fi
-    done < <(otool -L "$binary" 2>/dev/null | awk 'NR>1 {print $1}' | grep "^/usr/local" || true)
+    done < <(
+        otool -L "$binary" 2>/dev/null \
+            | awk 'NR>1 {print $1}' \
+            | while IFS= read -r candidate; do
+                if [[ "$candidate" == /usr/local/* ]] || [[ "$candidate" == "$QT_PREFIX"/* ]]; then
+                    printf '%s\n' "$candidate"
+                fi
+            done
+    )
 }
 
 # Scan all frameworks
 for fw_dir in "$FRAMEWORKS_DIR"/*.framework; do
     if [[ -d "$fw_dir" ]]; then
         fw_name=$(basename "$fw_dir" .framework)
-        for binary in "$fw_dir/Versions/5/$fw_name" "$fw_dir/Versions/A/$fw_name" "$fw_dir/$fw_name"; do
-            if [[ -f "$binary" ]]; then
-                copy_deps "$binary"
-                break
-            fi
-        done
+        binary=$(worms_framework_binary "$fw_dir" "$fw_name" || true)
+        if [[ -n "$binary" ]]; then
+            copy_deps "$binary"
+        fi
     fi
 done
 
@@ -205,8 +367,9 @@ Qt Frameworks Package for Worms W.M.D macOS Fix
 
 Qt Version: $QT_VERSION
 Architecture: x86_64
-Created: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-Source: Intel Homebrew (/usr/local/opt/qt@5)
+Created: $CREATED_AT
+Source: $SOURCE_LABEL
+Source Date Epoch: $SOURCE_DATE_EPOCH
 
 Contents:
 - Frameworks: $fw_count
@@ -217,14 +380,20 @@ This package is part of the WormsWMD-macOS-Fix project.
 https://github.com/cboyd0319/WormsWMD-macOS-Fix
 EOF
 
+# Create package manifest before archiving
+worms_print_step "Creating manifest..."
+worms_write_manifest "$WORK_DIR" "$WORK_DIR/MANIFEST.txt" Frameworks PlugIns METADATA.txt
+worms_verify_manifest "$WORK_DIR" "$WORK_DIR/MANIFEST.txt"
+
+# Normalize timestamps for reproducible archives.
+normalize_archive_inputs "$TOUCH_TIME"
+
 # Create the tarball
 worms_print_step "Creating archive..."
-mkdir -p "$OUTPUT_DIR"
 ARCHIVE_NAME="${PACKAGE_NAME}-${QT_VERSION}.tar.gz"
 ARCHIVE_PATH="$OUTPUT_DIR/$ARCHIVE_NAME"
 
-cd "$WORK_DIR"
-tar -czf "$ARCHIVE_PATH" Frameworks PlugIns METADATA.txt
+create_reproducible_archive "$ARCHIVE_PATH"
 
 # Calculate checksum
 CHECKSUM=$(shasum -a 256 "$ARCHIVE_PATH" | cut -d' ' -f1)

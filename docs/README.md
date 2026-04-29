@@ -42,6 +42,9 @@ current when adding, moving, renaming, or deleting Markdown files.
   - shipped plan for applying the harness methodology to this repo.
 - [Installer diagnostics audit plan](exec-plans/2026-04-29-installer-diagnostics-audit.md)
   - audit trail for installer, diagnostics, and documentation fixes.
+- [Community hardening plan](exec-plans/2026-04-28-community-hardening.md)
+  - audit trail for Qt package verification, reproducible packaging,
+    diagnostics bundles, and backup manifest validation.
 
 ## Maintenance
 

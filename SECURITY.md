@@ -24,7 +24,7 @@ This fix is designed to be safe against:
 | Insecure game URLs | HTTP URLs upgraded to HTTPS, staging URLs disabled |
 | Privilege escalation | No `sudo`, no SUID, runs entirely as current user |
 | Symlink attacks | Temp files use `mktemp`, cleanup traps prevent dangling files |
-| Supply chain attacks | Pre-built packages require SHA256 verification |
+| Supply chain attacks | Pre-built packages require SHA256, metadata, manifest, and architecture verification |
 
 ## What the fix modifies
 
@@ -96,12 +96,20 @@ Pre-built Qt framework packages undergo multiple verification steps:
 
 1. **Source verification**: Downloaded only from the repository's `dist/` directory
 2. **Checksum validation**: SHA256 hash must match the `.sha256` file
-3. **Archive layout validation**: Only whitelisted paths are allowed:
+3. **Version and metadata validation**: Package names and `METADATA.txt` must
+   agree on a numeric Qt 5.15.x version and x86_64 architecture
+4. **Archive layout validation**: Only whitelisted paths are allowed:
    - `Frameworks/` and contents
    - `PlugIns/` and contents
    - `METADATA.txt`
-4. **Path traversal protection**: Archives containing `../`, `/..`, or absolute paths are rejected
-5. **Post-extraction verification**: Confirms expected directories exist
+   - `MANIFEST.txt`
+5. **Path traversal protection**: Archives containing `../`, `/..`, or absolute paths are rejected
+6. **Required content validation**: Required Qt frameworks, the Cocoa platform
+   plugin, metadata, and plugin directories must be present after extraction
+7. **Architecture validation**: Framework and plugin binaries must contain an
+   `x86_64` Mach-O slice
+8. **Package manifest validation**: `MANIFEST.txt` is verified when present
+9. **Post-extraction verification**: Confirms expected directories exist before use
 
 If any verification fails, the script falls back to Homebrew only when a valid Intel Homebrew Qt install is present; otherwise it exits before replacing game frameworks.
 
@@ -181,16 +189,17 @@ Last audit: 2026-04-29
 | Category | Status | Notes |
 |----------|--------|-------|
 | Command injection | Pass | No `eval` on user input, no unsafe shell expansion |
-| Path traversal | Pass | Archive validation, no unvalidated path concatenation |
+| Path traversal | Pass | Qt and save-backup archive validation, no unvalidated path concatenation |
 | Network security | Pass | HTTPS-only, TLS 1.2+, checksums required |
 | Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
 | Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory and cleanup traps |
 | Race conditions | Pass | Atomic operations where possible |
 | Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
-| Dependency security | Pass | Checksums for downloads, Homebrew fallback |
+| Dependency security | Pass | Checksums, metadata, manifests, and x86_64 slice checks for pre-built Qt |
 | Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
+| Backup restore | Pass | Game backups and save archives validate manifests when present; legacy backups are flagged |
 
 ## Verifying the fix
 
@@ -267,6 +276,7 @@ The fix automatically creates a backup before making changes:
 - `PlugIns/` - Original Qt plugins
 - `Info.plist` - Original app metadata
 - `DataOSX/` - Original configuration files
+- `BACKUP_MANIFEST.tsv` - SHA256 and size manifest for backup verification
 
 **Restore command**:
 
@@ -278,7 +288,7 @@ The fix automatically creates a backup before making changes:
 
 | Component | Source | Verification |
 |-----------|--------|--------------|
-| Qt 5.15 | Pre-built in repo `dist/`, or Homebrew | SHA256 checksum |
+| Qt 5.15 | Pre-built in repo `dist/`, or Homebrew | SHA256 checksum, metadata, package manifest, x86_64 slices |
 | GLib, PCRE2, etc. | Bundled with Qt or from Homebrew | Transitive from Qt |
 
 Pre-built Qt packages:
@@ -289,13 +299,13 @@ Pre-built Qt packages:
 
 ## Known limitations
 
-1. **Pre-built packages are not signed**: The Qt framework tarball uses SHA256 checksums but not cryptographic signatures. The checksum file is in the same repository.
+1. **Pre-built packages are not signed**: The Qt framework tarball uses SHA256 checksums, metadata, and manifests but not cryptographic signatures. The checksum file is in the same repository.
 
 2. **Update downloads lack signatures**: `check_updates.sh --download` retrieves code without signature verification. Use `git pull` for authenticated updates.
 
 3. **Ad-hoc code signature**: The app is signed with an ad-hoc signature, not a Developer ID. This may trigger Gatekeeper warnings on some systems.
 
-4. **Backup restore is not validated**: `backup_saves.sh` does not validate tar archive contents before extraction. Only restore backups you created yourself.
+4. **Legacy backups cannot be fully verified**: Backups created before manifest support can still be restored, but the scripts warn that they lack checksum manifests.
 
 5. **Game config secrets**: The original game ships with confirmed API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
 

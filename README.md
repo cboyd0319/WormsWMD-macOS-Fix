@@ -44,6 +44,7 @@ The script can prompt to install these if needed (you may see system prompts):
 
 - Adds an AGL stub framework so the game launches on macOS 26+.
 - Replaces Qt 5.3.2 with Qt 5.15.
+- Verifies pre-built Qt package checksums, metadata, manifests, and x86_64 slices before use.
 - Bundles required dependencies and fixes install names.
 - May resolve keyboard input buffering or lag caused by the original Qt 5.3.2 runtime.
 - Updates Info.plist (bundle ID, HiDPI support, minimum version).
@@ -51,6 +52,7 @@ The script can prompt to install these if needed (you may see system prompts):
 - Comments out internal/staging URLs in DataOSX config files.
 - Clears quarantine flags and applies ad-hoc signing.
 - Resets incompatible Qt window geometry to fix small window issues.
+- Creates restorable backups with manifests for integrity checks.
 
 ## Pre-flight check
 

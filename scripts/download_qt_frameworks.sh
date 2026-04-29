@@ -29,6 +29,8 @@ TEMP_EXTRACT=""
 CHECKSUM_TMP=""
 
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/common.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/ui.sh"
 worms_color_init
 
@@ -82,7 +84,7 @@ verify_checksum() {
 
 validate_tar_layout() {
     local archive="$1"
-    local entry
+    local raw_entry entry
     local listing
 
     if ! listing=$(tar -tzf "$archive" 2>/dev/null); then
@@ -90,7 +92,12 @@ validate_tar_layout() {
         return 1
     fi
 
-    while IFS= read -r entry; do
+    while IFS= read -r raw_entry; do
+        [[ -z "$raw_entry" ]] && continue
+        entry="${raw_entry#./}"
+        while [[ "$entry" == */ ]]; do
+            entry="${entry%/}"
+        done
         [[ -z "$entry" ]] && continue
 
         if [[ "$entry" == /* ]] || [[ "$entry" == *"../"* ]] || [[ "$entry" == *"/.."* ]]; then
@@ -99,7 +106,7 @@ validate_tar_layout() {
         fi
 
         case "$entry" in
-            Frameworks|Frameworks/*|PlugIns|PlugIns/*|METADATA.txt)
+            Frameworks|Frameworks/*|PlugIns|PlugIns/*|METADATA.txt|MANIFEST.txt)
                 ;;
             *)
                 echo -e "${RED}ERROR:${NC} Unexpected entry in archive: $entry"
@@ -109,38 +116,132 @@ validate_tar_layout() {
     done <<< "$listing"
 }
 
-version_compare() {
-    local v1="$1"
-    local v2="$2"
+validate_archive_metadata() {
+    local archive="$1"
+    local expected_version="${2:-}"
+    local metadata version arch
 
-    local v1_parts v2_parts
-    IFS='.' read -ra v1_parts <<< "$v1"
-    IFS='.' read -ra v2_parts <<< "$v2"
-
-    local max_parts=${#v1_parts[@]}
-    if [[ ${#v2_parts[@]} -gt $max_parts ]]; then
-        max_parts=${#v2_parts[@]}
+    if ! metadata=$(tar -xOf "$archive" METADATA.txt 2>/dev/null); then
+        echo -e "${RED}ERROR:${NC} Archive is missing METADATA.txt."
+        return 1
     fi
 
-    for ((i=0; i<max_parts; i++)); do
-        local p1="${v1_parts[$i]:-0}"
-        local p2="${v2_parts[$i]:-0}"
+    version=$(awk -F': ' '/^Qt Version:/ {print $2; exit}' <<< "$metadata")
+    arch=$(awk -F': ' '/^Architecture:/ {print $2; exit}' <<< "$metadata")
 
-        if [[ ! "$p1" =~ ^[0-9]+$ ]]; then
-            p1=0
-        fi
-        if [[ ! "$p2" =~ ^[0-9]+$ ]]; then
-            p2=0
-        fi
+    if [[ -z "$version" ]]; then
+        echo -e "${RED}ERROR:${NC} Archive metadata is missing Qt Version."
+        return 1
+    fi
+    if [[ -n "$expected_version" ]] && [[ "$version" != "$expected_version" ]]; then
+        echo -e "${RED}ERROR:${NC} Archive version mismatch: expected $expected_version, found $version."
+        return 1
+    fi
+    if [[ "$arch" != "x86_64" ]]; then
+        echo -e "${RED}ERROR:${NC} Archive architecture must be x86_64; found ${arch:-unknown}."
+        return 1
+    fi
+}
 
-        if [[ "$p1" -gt "$p2" ]]; then
-            return 0
-        elif [[ "$p1" -lt "$p2" ]]; then
+validate_macho_x86_64() {
+    local binary="$1"
+    local archs
+
+    command -v lipo >/dev/null 2>&1 || return 0
+    archs=$(lipo -archs "$binary" 2>/dev/null || true)
+    [[ -n "$archs" ]] || return 0
+
+    if ! echo "$archs" | tr ' ' '\n' | grep -qx "x86_64"; then
+        echo -e "${RED}ERROR:${NC} Missing x86_64 slice: $binary ($archs)"
+        return 1
+    fi
+}
+
+validate_extracted_package() {
+    local extract_dir="$1"
+    local expected_version="${2:-}"
+    local required_fw binary plugin dylib
+    local required_frameworks=(
+        QtCore
+        QtGui
+        QtWidgets
+        QtOpenGL
+        QtPrintSupport
+        QtDBus
+        QtSvg
+    )
+
+    if [[ ! -d "$extract_dir/Frameworks" ]] || [[ ! -d "$extract_dir/PlugIns" ]]; then
+        echo -e "${RED}ERROR:${NC} Package is missing Frameworks or PlugIns."
+        return 1
+    fi
+
+    if [[ ! -f "$extract_dir/METADATA.txt" ]]; then
+        echo -e "${RED}ERROR:${NC} Package is missing METADATA.txt."
+        return 1
+    fi
+    if [[ -n "$expected_version" ]] && ! grep -qx "Qt Version: $expected_version" "$extract_dir/METADATA.txt"; then
+        echo -e "${RED}ERROR:${NC} Extracted package metadata does not match $expected_version."
+        return 1
+    fi
+    if ! grep -qx "Architecture: x86_64" "$extract_dir/METADATA.txt"; then
+        echo -e "${RED}ERROR:${NC} Extracted package metadata does not declare x86_64."
+        return 1
+    fi
+
+    for required_fw in "${required_frameworks[@]}"; do
+        if [[ ! -d "$extract_dir/Frameworks/${required_fw}.framework" ]]; then
+            echo -e "${RED}ERROR:${NC} Package is missing ${required_fw}.framework."
             return 1
         fi
+        binary=$(worms_framework_binary "$extract_dir/Frameworks/${required_fw}.framework" "$required_fw" || true)
+        if [[ -z "$binary" ]]; then
+            echo -e "${RED}ERROR:${NC} Package is missing ${required_fw} framework binary."
+            return 1
+        fi
+        validate_macho_x86_64 "$binary" || return 1
     done
 
-    return 0
+    if [[ ! -f "$extract_dir/PlugIns/platforms/libqcocoa.dylib" ]]; then
+        echo -e "${RED}ERROR:${NC} Package is missing PlugIns/platforms/libqcocoa.dylib."
+        return 1
+    fi
+
+    while IFS= read -r -d '' plugin; do
+        validate_macho_x86_64 "$plugin" || return 1
+    done < <(find "$extract_dir/PlugIns" -type f -name "*.dylib" -print0 2>/dev/null)
+
+    while IFS= read -r -d '' dylib; do
+        validate_macho_x86_64 "$dylib" || return 1
+    done < <(find "$extract_dir/Frameworks" -maxdepth 1 -type f -name "*.dylib" -print0 2>/dev/null)
+
+    if [[ -f "$extract_dir/MANIFEST.txt" ]]; then
+        worms_verify_manifest "$extract_dir" "$extract_dir/MANIFEST.txt" || {
+            echo -e "${RED}ERROR:${NC} Package manifest verification failed."
+            return 1
+        }
+    fi
+}
+
+verify_local_package() {
+    local package="$1"
+    local version verify_dir status=0
+
+    version=$(worms_qt_package_version "$package") || return 1
+    [[ -f "${package}.sha256" ]] || return 1
+    read_checksum "${package}.sha256" >/dev/null || return 1
+    verify_checksum "$package" "${package}.sha256" || return 1
+    validate_tar_layout "$package" || return 1
+    validate_archive_metadata "$package" "$version" || return 1
+
+    verify_dir=$(mktemp -d)
+    if ! tar -xzf "$package" -C "$verify_dir" 2>/dev/null; then
+        rm -rf "$verify_dir"
+        return 1
+    fi
+    validate_extracted_package "$verify_dir" "$version" || status=1
+    rm -rf "$verify_dir"
+    return "$status"
 }
 
 select_local_package() {
@@ -152,18 +253,12 @@ select_local_package() {
     fi
 
     while IFS= read -r -d '' package; do
-        local name version
-        if [[ ! -f "${package}.sha256" ]]; then
-            continue
-        fi
-        if ! read_checksum "${package}.sha256" >/dev/null; then
-            continue
-        fi
-        name=$(basename "$package")
-        version=${name#qt-frameworks-x86_64-}
-        version=${version%.tar.gz}
+        local version
+        version=$(worms_qt_package_version "$package" || true)
+        [[ -n "$version" ]] || continue
+        verify_local_package "$package" || continue
 
-        if [[ -z "$best_version" ]] || version_compare "$version" "$best_version"; then
+        if [[ -z "$best_version" ]] || worms_version_ge "$version" "$best_version"; then
             best_version="$version"
             best_path="$package"
         fi
@@ -198,10 +293,10 @@ select_remote_package() {
         [[ -n "$url" ]] || continue
         local name version
         name=$(basename "$url")
-        version=${name#qt-frameworks-x86_64-}
-        version=${version%.tar.gz}
+        version=$(worms_qt_package_version "$name" || true)
+        [[ -n "$version" ]] || continue
 
-        if [[ -z "$best_version" ]] || version_compare "$version" "$best_version"; then
+        if [[ -z "$best_version" ]] || worms_version_ge "$version" "$best_version"; then
             best_version="$version"
             best_url="$url"
             best_name="$name"
@@ -249,10 +344,8 @@ done
 
 if $CHECK_ONLY; then
     if select_local_package; then
-        if [[ -f "${CACHED_PACKAGE}.sha256" ]] && read_checksum "${CACHED_PACKAGE}.sha256" >/dev/null; then
-            echo "available"
-            exit 0
-        fi
+        echo "available"
+        exit 0
     fi
     CHECKSUM_TMP=$(mktemp -t wormswmd-checksum.XXXXXX)
     if select_remote_package \
@@ -288,9 +381,13 @@ fi
 
 # Check if already cached and extracted
 if [[ -d "$EXTRACT_DIR/Frameworks" ]] && [[ -d "$EXTRACT_DIR/PlugIns" ]] && ! $FORCE; then
-    echo -e "${GREEN}Using cached Qt frameworks${NC}"
-    echo "$EXTRACT_DIR"
-    exit 0
+    if validate_extracted_package "$EXTRACT_DIR" "$QT_VERSION"; then
+        echo -e "${GREEN}Using cached Qt frameworks${NC}"
+        echo "$EXTRACT_DIR"
+        exit 0
+    fi
+    echo -e "${YELLOW}Cached Qt frameworks failed validation; refreshing cache.${NC}"
+    rm -rf "$EXTRACT_DIR"
 fi
 
 if $USE_LOCAL; then
@@ -324,9 +421,9 @@ else
 fi
 
 if $USE_LOCAL; then
-    local_checksum="${CACHED_PACKAGE}.sha256"
-    if [[ ! -f "$local_checksum" ]]; then
-        echo -e "${RED}ERROR:${NC} Missing checksum for local package: $local_checksum"
+    checksum_path="${CACHED_PACKAGE}.sha256"
+    if [[ ! -f "$checksum_path" ]]; then
+        echo -e "${RED}ERROR:${NC} Missing checksum for local package: $checksum_path"
         echo "FALLBACK_TO_HOMEBREW"
         exit 1
     fi
@@ -342,7 +439,7 @@ fi
 echo "Verifying download..."
 if ! verify_checksum "$CACHED_PACKAGE" "$CACHED_PACKAGE.sha256"; then
     echo -e "${RED}ERROR:${NC} Checksum verification failed!"
-    rm -f "$CACHED_PACKAGE"
+    $USE_LOCAL || rm -f "$CACHED_PACKAGE"
     echo "FALLBACK_TO_HOMEBREW"
     exit 1
 fi
@@ -351,7 +448,13 @@ echo -e "${GREEN}Checksum verified${NC}"
 # Verify archive layout before extraction
 if ! validate_tar_layout "$CACHED_PACKAGE"; then
     echo -e "${RED}ERROR:${NC} Archive validation failed."
-    rm -f "$CACHED_PACKAGE"
+    $USE_LOCAL || rm -f "$CACHED_PACKAGE"
+    echo "FALLBACK_TO_HOMEBREW"
+    exit 1
+fi
+if ! validate_archive_metadata "$CACHED_PACKAGE" "$QT_VERSION"; then
+    echo -e "${RED}ERROR:${NC} Archive metadata validation failed."
+    $USE_LOCAL || rm -f "$CACHED_PACKAGE"
     echo "FALLBACK_TO_HOMEBREW"
     exit 1
 fi
@@ -363,15 +466,14 @@ tar -xzf "$CACHED_PACKAGE" -C "$TEMP_EXTRACT"
 
 rm -rf "$EXTRACT_DIR"
 mkdir -p "$(dirname "$EXTRACT_DIR")"
-mv "$TEMP_EXTRACT" "$EXTRACT_DIR"
-TEMP_EXTRACT=""
-
-# Verify extraction
-if [[ ! -d "$EXTRACT_DIR/Frameworks" ]] || [[ ! -d "$EXTRACT_DIR/PlugIns" ]]; then
-    echo -e "${RED}ERROR:${NC} Extraction failed - missing Frameworks or PlugIns"
-    rm -rf "$EXTRACT_DIR"
+if ! validate_extracted_package "$TEMP_EXTRACT" "$QT_VERSION"; then
+    echo -e "${RED}ERROR:${NC} Extracted Qt package validation failed."
+    rm -rf "$TEMP_EXTRACT"
+    TEMP_EXTRACT=""
     exit 1
 fi
+mv "$TEMP_EXTRACT" "$EXTRACT_DIR"
+TEMP_EXTRACT=""
 
 echo ""
 echo -e "${GREEN}Qt frameworks ready!${NC}"

@@ -50,6 +50,7 @@ QT_SOURCE=""
 QT_PREFIX=""
 QT_VERSION_DISPLAY=""
 QT_SOURCE_DISPLAY=""
+BACKUP_MANIFEST_NAME="BACKUP_MANIFEST.tsv"
 
 # Colors for output (with fallback for non-color terminals)
 if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
@@ -199,13 +200,19 @@ auto_detect_game() {
         fi
     done
 
-    # Remove duplicates using associative array
-    local -A seen_games
+    # Remove duplicates without associative arrays so macOS Bash 3.2 can run it.
     local unique_games=()
+    local already_seen existing
     for game in "${found_games[@]}"; do
-        if [[ -z "${seen_games[$game]:-}" ]]; then
+        already_seen=false
+        for existing in "${unique_games[@]}"; do
+            if [[ "$existing" == "$game" ]]; then
+                already_seen=true
+                break
+            fi
+        done
+        if ! $already_seen; then
             unique_games+=("$game")
-            seen_games[$game]=1
         fi
     done
 
@@ -404,6 +411,95 @@ cleanup() {
     fi
 }
 
+write_game_backup_manifest() {
+    local backup_dir="$1"
+
+    worms_write_manifest "$backup_dir" "$backup_dir/$BACKUP_MANIFEST_NAME" \
+        Frameworks \
+        PlugIns \
+        Info.plist \
+        DataOSX
+}
+
+verify_game_backup_manifest() {
+    local backup_dir="$1"
+
+    [[ -f "$backup_dir/$BACKUP_MANIFEST_NAME" ]] || return 2
+    worms_verify_manifest "$backup_dir" "$backup_dir/$BACKUP_MANIFEST_NAME"
+}
+
+restore_game_backup_files() {
+    local backup_dir="$1"
+
+    if [[ -d "$backup_dir/Frameworks" ]]; then
+        rm -rf "$GAME_APP/Contents/Frameworks" 2>/dev/null || true
+        cp -R "$backup_dir/Frameworks" "$GAME_APP/Contents/" 2>/dev/null || true
+    fi
+
+    if [[ -d "$backup_dir/PlugIns" ]]; then
+        rm -rf "$GAME_APP/Contents/PlugIns" 2>/dev/null || true
+        cp -R "$backup_dir/PlugIns" "$GAME_APP/Contents/" 2>/dev/null || true
+    fi
+
+    if [[ -f "$backup_dir/Info.plist" ]]; then
+        cp "$backup_dir/Info.plist" "$GAME_APP/Contents/Info.plist" 2>/dev/null || true
+    fi
+
+    if [[ -d "$backup_dir/DataOSX" ]] && [[ -d "$GAME_APP/Contents/Resources/DataOSX" ]]; then
+        cp "$backup_dir/DataOSX/"* "$GAME_APP/Contents/Resources/DataOSX/" 2>/dev/null || true
+    fi
+}
+
+game_path_for_backup_relpath() {
+    local rel_path="$1"
+
+    case "$rel_path" in
+        Frameworks/*|PlugIns/*)
+            echo "$GAME_APP/Contents/$rel_path"
+            ;;
+        Info.plist)
+            echo "$GAME_APP/Contents/Info.plist"
+            ;;
+        DataOSX/*)
+            echo "$GAME_APP/Contents/Resources/$rel_path"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+verify_restored_game_backup() {
+    local backup_dir="$1"
+    local manifest="$backup_dir/$BACKUP_MANIFEST_NAME"
+    local expected_hash expected_size rel_path target actual_hash actual_size status=0
+
+    [[ -f "$manifest" ]] || return 0
+
+    while IFS=$'\t' read -r expected_hash expected_size rel_path extra; do
+        [[ -n "${expected_hash:-}" ]] || continue
+        [[ "$expected_hash" == \#* ]] && continue
+        if [[ -n "${extra:-}" ]] || [[ -z "${rel_path:-}" ]]; then
+            status=1
+            continue
+        fi
+        target=$(game_path_for_backup_relpath "$rel_path" || true)
+        if [[ -z "$target" ]] || [[ ! -f "$target" ]]; then
+            print_warning "Restored file missing: $rel_path"
+            status=1
+            continue
+        fi
+        actual_hash=$(worms_file_sha256 "$target")
+        actual_size=$(worms_file_size "$target")
+        if [[ "$actual_hash" != "$expected_hash" ]] || [[ "$actual_size" != "$expected_size" ]]; then
+            print_warning "Restored file did not match backup manifest: $rel_path"
+            status=1
+        fi
+    done < "$manifest"
+
+    return "$status"
+}
+
 rollback() {
     stop_spinner false
 
@@ -414,22 +510,20 @@ rollback() {
         echo ""
         print_step "Rolling back changes from backup..."
 
-        if [[ -d "$BACKUP_DIR/Frameworks" ]]; then
-            rm -rf "$GAME_APP/Contents/Frameworks" 2>/dev/null || true
-            cp -R "$BACKUP_DIR/Frameworks" "$GAME_APP/Contents/" 2>/dev/null || true
+        if verify_game_backup_manifest "$BACKUP_DIR"; then
+            print_substep "Backup manifest verified"
+        elif [[ -f "$BACKUP_DIR/$BACKUP_MANIFEST_NAME" ]]; then
+            print_warning "Backup manifest verification failed; rollback skipped to avoid copying unverified files."
+            print_info "Backup preserved at: $BACKUP_DIR"
+            cleanup
+            return 0
+        else
+            print_warning "Backup has no manifest; restoring as a legacy backup."
         fi
 
-        if [[ -d "$BACKUP_DIR/PlugIns" ]]; then
-            rm -rf "$GAME_APP/Contents/PlugIns" 2>/dev/null || true
-            cp -R "$BACKUP_DIR/PlugIns" "$GAME_APP/Contents/" 2>/dev/null || true
-        fi
-
-        if [[ -f "$BACKUP_DIR/Info.plist" ]]; then
-            cp "$BACKUP_DIR/Info.plist" "$GAME_APP/Contents/Info.plist" 2>/dev/null || true
-        fi
-
-        if [[ -d "$BACKUP_DIR/DataOSX" ]] && [[ -d "$GAME_APP/Contents/Resources/DataOSX" ]]; then
-            cp "$BACKUP_DIR/DataOSX/"* "$GAME_APP/Contents/Resources/DataOSX/" 2>/dev/null || true
+        restore_game_backup_files "$BACKUP_DIR"
+        if ! verify_restored_game_backup "$BACKUP_DIR"; then
+            print_warning "Rollback completed, but restored files could not be fully verified."
         fi
 
         print_success "Rolled back to original state."
@@ -523,7 +617,7 @@ prebuilt_qt_available() {
 detect_prebuilt_qt_version() {
     local package package_name version
 
-    package=$(worms_latest_path_by_mtime "$SCRIPT_DIR/dist" "qt-frameworks-x86_64-*.tar.gz" "f" || true)
+    package=$(worms_latest_qt_package_by_version "$SCRIPT_DIR/dist" true || true)
     if [[ -n "$package" ]]; then
         package_name=$(basename "$package")
         version=${package_name#qt-frameworks-x86_64-}
@@ -725,22 +819,25 @@ do_restore() {
 
     validate_game_app
 
-    print_step "Restoring Frameworks..."
-    rm -rf "$GAME_APP/Contents/Frameworks"
-    cp -R "$latest/Frameworks" "$GAME_APP/Contents/"
-
-    print_step "Restoring PlugIns..."
-    rm -rf "$GAME_APP/Contents/PlugIns"
-    cp -R "$latest/PlugIns" "$GAME_APP/Contents/"
-
-    if [[ -f "$latest/Info.plist" ]]; then
-        print_step "Restoring Info.plist..."
-        cp "$latest/Info.plist" "$GAME_APP/Contents/Info.plist"
+    if verify_game_backup_manifest "$latest"; then
+        print_step "Backup manifest verified"
+    elif [[ -f "$latest/$BACKUP_MANIFEST_NAME" ]]; then
+        print_error "Backup manifest verification failed; restore cancelled."
+        echo ""
+        echo "The backup was not copied because its recorded file checksums do not match."
+        exit 1
+    else
+        print_warning "Backup has no manifest; restoring as a legacy backup."
     fi
 
-    if [[ -d "$latest/DataOSX" ]] && [[ -d "$GAME_APP/Contents/Resources/DataOSX" ]]; then
-        print_step "Restoring config files..."
-        cp "$latest/DataOSX/"* "$GAME_APP/Contents/Resources/DataOSX/" 2>/dev/null || true
+    print_step "Restoring game files..."
+    restore_game_backup_files "$latest"
+    if ! verify_restored_game_backup "$latest"; then
+        print_error "Restore verification failed after copying files."
+        echo ""
+        echo "The backup was copied, but at least one restored file did not match its recorded checksum."
+        echo "Use Steam's file verification if you need to repair the game bundle."
+        exit 1
     fi
 
     echo ""
@@ -1005,6 +1102,9 @@ do_fix() {
         done
     fi
 
+    write_game_backup_manifest "$BACKUP_DIR"
+    verify_game_backup_manifest "$BACKUP_DIR"
+    print_substep "Backup manifest created: $BACKUP_MANIFEST_NAME"
     print_substep "Backup created: $BACKUP_DIR"
     CLEANUP_NEEDED=true
 

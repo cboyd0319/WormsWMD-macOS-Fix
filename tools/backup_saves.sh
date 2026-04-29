@@ -35,6 +35,7 @@ trap cleanup EXIT
 STEAM_SAVES="$HOME/Library/Application Support/Steam/userdata"
 TEAM17_SAVES="$HOME/Library/Application Support/Team17"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/WormsWMD-SaveBackups}"
+SAVE_MANIFEST_NAME="MANIFEST.tsv"
 
 print_help() {
     cat << 'EOF'
@@ -82,6 +83,94 @@ find_steam_saves() {
     done
 
     printf '%s\n' "${found[@]}"
+}
+
+validate_backup_archive_layout() {
+    local archive="$1"
+    local listing raw_entry entry
+
+    if ! listing=$(tar -tzf "$archive" 2>/dev/null); then
+        echo -e "${RED}ERROR:${NC} Unable to read backup archive."
+        return 1
+    fi
+
+    while IFS= read -r raw_entry; do
+        [[ -n "$raw_entry" ]] || continue
+        entry="${raw_entry#./}"
+        while [[ "$entry" == */ ]]; do
+            entry="${entry%/}"
+        done
+        [[ -n "$entry" ]] || continue
+
+        if [[ "$entry" == /* ]] || [[ "$entry" == *"../"* ]] || [[ "$entry" == *"/.."* ]] || [[ "$entry" == ".." ]]; then
+            echo -e "${RED}ERROR:${NC} Unsafe path in backup archive: $entry"
+            return 1
+        fi
+
+        case "$entry" in
+            Team17|Team17/*|Steam|Steam/*|BACKUP_INFO.txt|"$SAVE_MANIFEST_NAME")
+                ;;
+            *)
+                echo -e "${RED}ERROR:${NC} Unexpected entry in backup archive: $entry"
+                return 1
+                ;;
+        esac
+    done <<< "$listing"
+}
+
+restore_target_for_manifest_path() {
+    local rel_path="$1"
+    local steam_rel user_id save_rel
+
+    case "$rel_path" in
+        Team17/*)
+            echo "$TEAM17_SAVES/${rel_path#Team17/}"
+            ;;
+        Steam/*/*)
+            steam_rel="${rel_path#Steam/}"
+            user_id="${steam_rel%%/*}"
+            save_rel="${steam_rel#*/}"
+            [[ -n "$user_id" ]] && [[ -n "$save_rel" ]] || return 1
+            echo "$STEAM_SAVES/$user_id/327030/$save_rel"
+            ;;
+        BACKUP_INFO.txt|"$SAVE_MANIFEST_NAME")
+            return 1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+verify_restored_saves() {
+    local manifest="$TEMP_DIR/$SAVE_MANIFEST_NAME"
+    local expected_hash expected_size rel_path target actual_hash actual_size status=0
+
+    [[ -f "$manifest" ]] || return 0
+
+    while IFS=$'\t' read -r expected_hash expected_size rel_path extra; do
+        [[ -n "${expected_hash:-}" ]] || continue
+        [[ "$expected_hash" == \#* ]] && continue
+        [[ -z "${extra:-}" ]] || { status=1; continue; }
+
+        target=$(restore_target_for_manifest_path "$rel_path" || true)
+        [[ -n "$target" ]] || continue
+
+        if [[ ! -f "$target" ]]; then
+            echo -e "${YELLOW}WARNING:${NC} Restored file missing: $rel_path"
+            status=1
+            continue
+        fi
+
+        actual_hash=$(worms_file_sha256 "$target")
+        actual_size=$(worms_file_size "$target")
+        if [[ "$actual_hash" != "$expected_hash" ]] || [[ "$actual_size" != "$expected_size" ]]; then
+            echo -e "${YELLOW}WARNING:${NC} Restored file does not match backup manifest: $rel_path"
+            status=1
+        fi
+    done < "$manifest"
+
+    return "$status"
 }
 
 # Create backup
@@ -137,6 +226,9 @@ macOS: $(sw_vers -productVersion)
 Items: $items_backed_up save locations
 EOF
 
+    worms_write_manifest "$TEMP_DIR" "$TEMP_DIR/$SAVE_MANIFEST_NAME" Team17 Steam BACKUP_INFO.txt
+    worms_verify_manifest "$TEMP_DIR" "$TEMP_DIR/$SAVE_MANIFEST_NAME"
+
     # Create tarball
     echo ""
     echo "Creating archive..."
@@ -174,6 +266,8 @@ do_restore() {
         exit 1
     fi
 
+    validate_backup_archive_layout "$backup_file"
+
     echo -e "${YELLOW}WARNING: This will overwrite your current save games!${NC}"
     echo ""
     read -p "Continue? [y/N] " -n 1 -r < /dev/tty
@@ -191,6 +285,17 @@ do_restore() {
 
     # Extract backup
     tar -xzf "$backup_file" -C "$TEMP_DIR"
+
+    if [[ -f "$TEMP_DIR/$SAVE_MANIFEST_NAME" ]]; then
+        if worms_verify_manifest "$TEMP_DIR" "$TEMP_DIR/$SAVE_MANIFEST_NAME"; then
+            echo "Backup manifest verified."
+        else
+            echo -e "${RED}ERROR:${NC} Backup manifest verification failed; restore cancelled."
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}WARNING:${NC} Backup has no manifest; restoring as a legacy archive."
+    fi
 
     # Restore Team17 saves
     if [[ -d "$TEMP_DIR/Team17" ]]; then
@@ -212,6 +317,12 @@ do_restore() {
                 cp -R "$user_dir"/* "$target_dir/" 2>/dev/null || true
             fi
         done
+    fi
+
+    if ! verify_restored_saves; then
+        echo -e "${RED}ERROR:${NC} Restore verification failed after copying saves."
+        echo "At least one restored file did not match the backup manifest."
+        exit 1
     fi
 
     echo ""

@@ -35,3 +35,6 @@ the plan before continuing.
   completed application of the harness methodology to this repo.
 - [Installer diagnostics audit](2026-04-29-installer-diagnostics-audit.md) -
   completed audit of installer preview, diagnostics, and documentation behavior.
+- [Community hardening](2026-04-28-community-hardening.md) - completed
+  hardening pass for Qt package verification, reproducible packaging,
+  diagnostics bundles, and backup manifest validation.

@@ -52,9 +52,17 @@ Before destructive bundle changes, the fix creates a timestamped backup under
 - `Contents/PlugIns/`
 - `Contents/Info.plist` when backed up
 - DataOSX config files when backed up
+- `BACKUP_MANIFEST.tsv` for checksum and size verification of new backups
+
+When a game-bundle backup includes `BACKUP_MANIFEST.tsv`, restore and rollback
+must verify it before copying files back and must verify the restored files
+afterward. Backups without a manifest are legacy backups and may be restored
+only with an explicit warning.
 
 Save-game backup behavior belongs to `tools/backup_saves.sh` and must remain
-separate from game-bundle restore behavior.
+separate from game-bundle restore behavior. Save-game archives must validate
+their tar layout before extraction, verify `MANIFEST.tsv` when present, and warn
+when restoring older archives that do not include a manifest.
 
 ## Qt Distribution Contract
 
@@ -65,9 +73,21 @@ Homebrew is a fallback, not the primary happy path.
 When replacing the Qt archive:
 
 - Update the matching checksum file.
-- Validate the archive layout.
+- Validate the archive layout, package metadata, required frameworks/plugins,
+  package manifest when present, and x86_64 Mach-O slices.
 - Run the packaging or install verification relevant to the change.
 - Update user docs if the version, source, or fallback behavior changes.
+
+When multiple local Qt packages are present, scripts should choose the highest
+verified semantic version rather than the newest file by modification time. Qt
+5.15.19 can be packaged from a supplied compatible x86_64 Qt prefix with
+`tools/package_qt_frameworks.sh --qt-prefix ... --version 5.15.19`; do not
+document a shipped 5.15.19 artifact unless the archive and checksum are present
+in `dist/`.
+
+Maintainer packages should be reproducible where possible: deterministic file
+ordering, normalized timestamps from `SOURCE_DATE_EPOCH`, stable ownership in
+the tar stream, `gzip -n`, and a generated `MANIFEST.txt`.
 
 ## Network Contract
 
@@ -89,10 +109,13 @@ Diagnostics intended for bug reports should be collected with:
 
 ```bash
 ./tools/collect_diagnostics.sh
+./tools/collect_diagnostics.sh --bundle
 ```
 
 Diagnostics and reports must not expose secrets, private account data, or
-unredacted sensitive config values.
+unredacted sensitive config values. Support bundles should sanitize the
+diagnostics report, include Qt package verification details, and include backup
+manifests when available instead of copying full game or save contents.
 
 ## Validation Contract
 
@@ -103,6 +126,10 @@ For source-only changes, use the checks that match the blast radius:
 shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
 for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
+./scripts/download_qt_frameworks.sh --check
+./tools/package_qt_frameworks.sh --help
+./tools/collect_diagnostics.sh --help
+./tools/backup_saves.sh --help
 clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
 ```
 

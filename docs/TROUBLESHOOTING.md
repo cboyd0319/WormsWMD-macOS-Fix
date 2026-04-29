@@ -176,4 +176,9 @@ To gather system information for a bug report:
 ./tools/collect_diagnostics.sh --output ~/Desktop/worms-diagnostics.txt
 ./tools/collect_diagnostics.sh --copy
 ./tools/collect_diagnostics.sh --full --output ~/Desktop/worms-full-diagnostics.txt
+./tools/collect_diagnostics.sh --bundle
 ```
+
+Use `--bundle` when opening a community issue. It creates a sanitized support
+archive on your Desktop with diagnostics, Qt package verification details, and
+backup manifests when available.

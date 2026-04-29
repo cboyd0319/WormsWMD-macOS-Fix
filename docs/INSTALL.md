@@ -87,7 +87,15 @@ The fix creates a timestamped backup before making changes.
 ./fix_worms_wmd.sh --restore
 ```
 
+Automatic restore verifies the backup manifest when `BACKUP_MANIFEST.tsv` is
+present and cancels instead of restoring from a mismatched backup. Older backups
+without a manifest are treated as legacy backups and restored with a warning.
+
 ### Restore manually
+
+Prefer automatic restore when possible because it performs manifest validation.
+Manual restore is useful for inspection or recovery, but it bypasses the
+automated manifest checks.
 
 ```bash
 # Find your backup
@@ -96,6 +104,11 @@ ls ~/Documents/WormsWMD-Backup-*
 # Restore (replace YYYYMMDD-HHMMSS with your backup timestamp)
 BACKUP_DIR=~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS
 GAME_APP="$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+
+# Inspect the manifest if one exists.
+if [[ -f "$BACKUP_DIR/BACKUP_MANIFEST.tsv" ]]; then
+  sed -n '1,20p' "$BACKUP_DIR/BACKUP_MANIFEST.tsv"
+fi
 
 rm -rf "$GAME_APP/Contents/Frameworks"
 rm -rf "$GAME_APP/Contents/PlugIns"

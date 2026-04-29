@@ -2,6 +2,22 @@
 
 Notable changes are listed here. This project follows Keep a Changelog and Semantic Versioning.
 
+## Unreleased
+
+### Added
+- Added manifest creation and verification for game-bundle backups and save-game backup archives.
+- Added sanitized diagnostics support bundles for community issue reports.
+- Added deterministic Qt package creation controls, including explicit Qt prefix/version support for future Qt 5.15.x refreshes.
+
+### Changed
+- Pre-built Qt package discovery now selects the highest verified semantic version instead of relying on modification time.
+- Qt package validation now checks checksums, metadata, required frameworks/plugins, package manifests when present, safe archive layout, and x86_64 Mach-O slices before reporting a package as available.
+- Restore and rollback now verify backup manifests when present and warn when restoring older legacy backups.
+
+### Security
+- Save-game restore now validates archive layout before extraction.
+- Diagnostics support bundles redact home paths and email-like values from generated reports.
+
 ## 1.6.2 (2026-04-29)
 
 ### Fixed

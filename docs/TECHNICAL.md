@@ -76,3 +76,23 @@ The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL fun
 - It uses OpenGL APIs compatible with macOS.
 - It preserves binary compatibility with the Qt 5.3 APIs the game uses.
 - Pre-built x86_64 frameworks are available for distribution.
+
+## Qt package distribution
+
+The installer prefers the highest verified `qt-frameworks-x86_64-*.tar.gz`
+package in `dist/` with a matching `.sha256` file. Verification checks the
+checksum, tar layout, metadata, required Qt frameworks/plugins, optional package
+manifest, and `x86_64` Mach-O slices before the package is reported as
+available.
+
+Maintainers can build a replacement package with:
+
+```bash
+./tools/package_qt_frameworks.sh --output dist
+./tools/package_qt_frameworks.sh --output dist --qt-prefix /path/to/qt-5.15.19 --version 5.15.19
+```
+
+Generated packages include `METADATA.txt` and `MANIFEST.txt` and use
+deterministic ordering and timestamps from `SOURCE_DATE_EPOCH` where possible.
+This keeps future Qt 5.15.x refreshes inspectable without changing the default
+user install flow.

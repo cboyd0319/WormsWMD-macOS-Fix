@@ -34,6 +34,10 @@ Back up and restore your save games, settings, and replays:
 ./tools/backup_saves.sh --restore ~/Documents/WormsWMD-SaveBackups/saves-20251225-120000.tar.gz
 ```
 
+New save backups include a `MANIFEST.tsv` file. Restore validates archive
+layout before extraction, verifies the manifest when present, and warns when
+restoring older legacy backups that predate manifests.
+
 ## Steam update watcher
 
 Steam's **Verify integrity of game files** overwrites the fix. Use the watcher to detect when this happens:
@@ -84,7 +88,14 @@ Gather system information for bug reports:
 ./tools/collect_diagnostics.sh --output ~/Desktop/worms-diagnostics.txt
 ./tools/collect_diagnostics.sh --copy
 ./tools/collect_diagnostics.sh --full --output ~/Desktop/worms-full-diagnostics.txt
+./tools/collect_diagnostics.sh --bundle
+./tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop
 ```
+
+The support bundle mode writes a sanitized archive containing diagnostics,
+pre-built Qt package verification details, and available backup manifests. It
+is intended for community issue reports where users should not have to paste
+long terminal output by hand.
 
 ## Enhanced launcher
 
@@ -116,7 +127,17 @@ Check or refresh the pre-built Qt package used by the installer:
 ./scripts/download_qt_frameworks.sh --check
 ./scripts/download_qt_frameworks.sh --force
 ./tools/package_qt_frameworks.sh --output dist
+./tools/package_qt_frameworks.sh --output dist --qt-prefix /path/to/qt-5.15.19 --version 5.15.19
 ```
 
-`tools/package_qt_frameworks.sh` requires Intel Homebrew with `qt@5` installed
-and is intended for maintainers replacing the distribution archive in `dist/`.
+`scripts/download_qt_frameworks.sh --check` validates local package checksums,
+metadata, required files, safe tar layout, package manifests when present, and
+x86_64 binary slices before reporting the pre-built Qt package as available.
+
+`tools/package_qt_frameworks.sh` accepts either Intel Homebrew `qt@5` or an
+explicit Qt prefix. It writes deterministic gzip archives using
+`SOURCE_DATE_EPOCH`, emits `METADATA.txt` and `MANIFEST.txt`, and is intended
+for maintainers replacing the distribution archive in `dist/`. Qt 5.15.19 can
+be packaged from a supplied compatible x86_64 Qt prefix, but this repository
+does not claim to ship a 5.15.19 artifact unless that artifact and checksum are
+present in `dist/`.

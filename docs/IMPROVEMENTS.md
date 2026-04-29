@@ -23,6 +23,7 @@ These changes improve the security posture of the game.
 | Internal URLs exposed | Defunct internal Team17 URLs are in config files | Comments out internal/staging URLs in DataOSX config files (with backup) |
 | No code signing | The game binary is completely unsigned | Applies ad-hoc code signing to reduce warnings |
 | Quarantine flags | macOS marks downloaded files as quarantined | Clears quarantine flags to prevent "damaged app" dialogs |
+| Unverified helper archives | Restore and runtime packages could be hard to inspect manually | Validates Qt archive checksums/manifests and save-backup layouts before use |
 
 ## Display improvements
 
@@ -60,13 +61,13 @@ The fix includes utilities to help manage the game.
 | Tool | What it does |
 |------|--------------|
 | Pre-flight check | Verifies system requirements, Rosetta 2, and network connectivity |
-| Save game backup | Back up and restore saves, settings, and replays |
+| Save game backup | Back up and restore saves, settings, and replays with manifest verification |
 | Steam update watcher | Detects when Steam overwrites the fix and alerts you |
 | Enhanced launcher | Launch with logging, safe mode, and debug options |
 | Crash reporter | Saves crash reports with system information |
 | Update checker | Checks for new versions of the fix |
 | Controller helper | Diagnoses controller connectivity and provides tips |
-| Diagnostics collector | Gathers system info for bug reports |
+| Diagnostics collector | Gathers system info and can create sanitized support bundles for bug reports |
 
 See [TOOLS.md](TOOLS.md) for usage details.
 

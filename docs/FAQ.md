@@ -14,17 +14,28 @@ The fix operates on the macOS app bundle. If your GOG install uses the same app 
 
 **Q: Is this fix safe?**
 
-Yes. The fix only modifies files inside the game's app bundle, creates a backup first, and doesn't require `sudo`. See `SECURITY.md` for details.
+Yes. The fix only modifies files inside the game's app bundle, creates a
+backup first, verifies pre-built Qt packages with checksums and manifests, and
+doesn't require `sudo`. See `SECURITY.md` for details.
 
 **Q: Can I undo this fix?**
 
-Yes. Run `./fix_worms_wmd.sh --restore` or uninstall/reinstall the game. Steam "Verify integrity" does not remove extra files from prior fixes.
+Yes. Run `./fix_worms_wmd.sh --restore` or uninstall/reinstall the game. New
+backups include `BACKUP_MANIFEST.tsv`, which restore verifies before copying
+files back. Steam "Verify integrity" does not remove extra files from prior
+fixes.
 
 ## Technical
 
 **Q: Does this fix require Homebrew?**
 
 No. The fix downloads pre-built Qt frameworks automatically. Homebrew is a fallback if the download fails.
+
+**Q: Does this ship Qt 5.15.19?**
+
+The scripts can package and consume a supplied compatible Qt 5.15.19 x86_64
+prefix, but this repository only ships the Qt archive that is present in
+`dist/` with its matching checksum.
 
 **Q: Why Qt 5.15 instead of Qt 6?**
 
