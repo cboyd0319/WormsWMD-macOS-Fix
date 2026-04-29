@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="310" viewBox="0 0 1100 310" role="img" aria-labelledby="title desc">
+  <title id="title">Retro web ring control room</title>
+  <desc id="desc">A chaotic retro web ring control room for the community macOS fix.</desc>
+  <defs>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00ffff"/>
+      <stop offset="1" stop-color="#0033ff"/>
+    </linearGradient>
+    <pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse">
+      <rect width="34" height="34" fill="#14001f"/>
+      <path d="M34 0 H0 V34" fill="none" stroke="#ff00ff" stroke-width="3"/>
+    </pattern>
+    <filter id="shadow">
+      <feDropShadow dx="6" dy="6" stdDeviation="0" flood-color="#000"/>
+    </filter>
+  </defs>
+  <rect width="1100" height="310" fill="url(#grid)"/>
+  <path d="M0 218 L1100 138 L1100 310 L0 310 Z" fill="url(#floor)" opacity="0.92"/>
+  <g filter="url(#shadow)">
+    <rect x="72" y="52" width="956" height="170" fill="#111" stroke="#ffff00" stroke-width="8"/>
+    <rect x="103" y="83" width="257" height="104" fill="#00ff66" stroke="#fff" stroke-width="5"/>
+    <rect x="421" y="83" width="257" height="104" fill="#ff00ff" stroke="#fff" stroke-width="5"/>
+    <rect x="739" y="83" width="257" height="104" fill="#ffff00" stroke="#fff" stroke-width="5"/>
+  </g>
+  <g font-family="Impact, Arial Black, Helvetica, sans-serif" text-anchor="middle" filter="url(#shadow)">
+    <text x="550" y="40" font-size="37" fill="#ffff00">COMMUNITY FIX WEB RING CONTROL ROOM</text>
+    <text x="232" y="128" font-size="32" fill="#000">FIX</text>
+    <text x="232" y="166" font-size="25" fill="#000">PRESS 1</text>
+    <text x="550" y="128" font-size="32" fill="#fff">PANIC</text>
+    <text x="550" y="166" font-size="25" fill="#fff">PRESS 5</text>
+    <text x="868" y="128" font-size="32" fill="#000">UNDO</text>
+    <text x="868" y="166" font-size="25" fill="#000">PRESS 4</text>
+  </g>
+  <g font-family="Courier New, monospace" font-size="18" font-weight="700" fill="#ffffff">
+    <text x="91" y="250">[ HOME ] [ LATEST ZIP ] [ TROUBLESHOOTING ] [ SUPPORT BUNDLE ] [ RESTORE PORTAL ]</text>
+    <text x="146" y="282">MADE OF BASH, CHECKSUMS, ORIGINAL SVG NOISE, AND TOO MUCH CONFIDENCE</text>
+  </g>
+  <g fill="#ffff00" stroke="#000" stroke-width="4">
+    <circle cx="74" cy="36" r="18"/>
+    <circle cx="1026" cy="36" r="18"/>
+    <circle cx="74" cy="274" r="18"/>
+    <circle cx="1026" cy="274" r="18"/>
+  </g>
+</svg>

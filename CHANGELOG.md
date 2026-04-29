@@ -14,6 +14,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 - Added `README_FIRST.txt`, `SUPPORT.md`, `STEAM_POST.md`,
   `ATTRIBUTIONS.md`, and original project visuals for a clearer community
   support flow.
+- Expanded the README's intentionally loud retro visual treatment while keeping
+  the four-step player path at the very top.
 - Added manifest creation and verification for game-bundle backups and save-game backup archives.
 - Added sanitized diagnostics support bundles for community issue reports.
 - Added deterministic Qt package creation controls, including explicit Qt prefix/version support for future Qt 5.15.x refreshes.

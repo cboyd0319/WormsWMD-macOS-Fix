@@ -90,6 +90,8 @@ git diff --check
   user/support/maintainer docs around the one-zip flow.
 - 2026-04-29: Built a local smoke release. The first zip included macOS metadata
   sidecars, so the builder now prefers `zip -X` to keep release archives tidy.
+- 2026-04-29: Expanded the README's deliberately loud retro treatment with more
+  original visuals while keeping the quick-start answer at the very top.
 
 ## Surprises & Discoveries
 

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="260" viewBox="0 0 1100 260" role="img" aria-labelledby="title desc">
+  <title id="title">Quick start billboard</title>
+  <desc id="desc">A loud 1998-style billboard showing the four-step player path: download, unzip, double-click, press 1.</desc>
+  <defs>
+    <pattern id="stars" width="44" height="44" patternUnits="userSpaceOnUse">
+      <rect width="44" height="44" fill="#050033"/>
+      <path d="M22 2 L27 16 L42 16 L30 25 L35 40 L22 31 L9 40 L14 25 L2 16 L17 16 Z" fill="#ffff00"/>
+    </pattern>
+    <filter id="hard-shadow">
+      <feDropShadow dx="8" dy="8" stdDeviation="0" flood-color="#000"/>
+    </filter>
+  </defs>
+  <rect width="1100" height="260" fill="url(#stars)"/>
+  <rect x="20" y="18" width="1060" height="224" fill="#ff00ff" stroke="#00ffff" stroke-width="12"/>
+  <rect x="42" y="39" width="1016" height="182" fill="#000" stroke="#ffff00" stroke-width="7" stroke-dasharray="18 11"/>
+  <text x="550" y="92" text-anchor="middle" font-family="Impact, Arial Black, Helvetica, sans-serif" font-size="44" fill="#00ff66" stroke="#000" stroke-width="2" filter="url(#hard-shadow)">THE WHOLE QUEST</text>
+  <g font-family="Arial Black, Impact, Helvetica, sans-serif" font-size="26" text-anchor="middle" filter="url(#hard-shadow)">
+    <g transform="translate(77 124)">
+      <rect width="208" height="70" fill="#ffff00" stroke="#fff" stroke-width="5"/>
+      <text x="104" y="43" fill="#000">1 DOWNLOAD ZIP</text>
+    </g>
+    <g transform="translate(321 124)">
+      <rect width="208" height="70" fill="#00ffff" stroke="#fff" stroke-width="5"/>
+      <text x="104" y="43" fill="#000">2 UNZIP IT</text>
+    </g>
+    <g transform="translate(565 124)">
+      <rect width="208" height="70" fill="#00ff66" stroke="#fff" stroke-width="5"/>
+      <text x="104" y="31" fill="#000">3 DOUBLE</text>
+      <text x="104" y="58" fill="#000">CLICK</text>
+    </g>
+    <g transform="translate(809 124)">
+      <rect width="208" height="70" fill="#ff6600" stroke="#fff" stroke-width="5"/>
+      <text x="104" y="43" fill="#fff">4 PRESS 1</text>
+    </g>
+  </g>
+  <g font-family="Courier New, monospace" font-size="19" font-weight="700" fill="#ffffff">
+    <text x="58" y="228">NO TERMINAL DEGREE REQUIRED</text>
+    <text x="762" y="228">BACKUPS HAPPEN FIRST</text>
+  </g>
+</svg>

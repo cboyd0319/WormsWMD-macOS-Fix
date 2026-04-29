@@ -51,6 +51,10 @@ then choose **Open** again. If the fix fails, run the same file again and press
 
 <br />
 
+<img src="assets/quick-start-billboard.svg" alt="Retro quick start billboard showing download, unzip, double-click, and press 1" width="100%" />
+
+<br />
+
 <img src="assets/button-wall.svg" alt="Retro button wall showing press 1, no sudo, backups, Qt 5.15, diagnostics, restore, and play again" width="100%" />
 
 <br />
@@ -75,6 +79,23 @@ the outside for morale.
 No `sudo`. No system-wide surgery. No game files included. No official
 Team17/Worms art bundled. Just a community fix, a backup, and a menu that tries
 very hard not to make you learn Terminal.
+
+## Absolutely Unnecessary Emergency Control Room
+
+<div align="center">
+
+<img src="assets/webring-control-room.svg" alt="Retro web ring control room with fix, panic, and undo buttons" width="100%" />
+
+</div>
+
+This is the whole control panel in less dramatic words:
+
+- Want the fix? Press `1`.
+- Want to see what would happen first? Press `2`.
+- Want proof it worked? Press `3`.
+- Want to undo it? Press `4`.
+- Want help without explaining computers? Press `5`.
+- Want the little help page? Press `6`.
 
 ## Giant Flashing Button Map
 
@@ -128,6 +149,18 @@ If anything fails, run `Worms W.M.D Fix.command` again and choose option `5`.
 That puts a support bundle on your Desktop so you can open an issue without
 writing a detective novel about your Mac.
 
+## Guestbook Of Extremely Specific Promises
+
+Sign here with your eyes only:
+
+```text
+[x] I will not be asked for an admin password.
+[x] The fix backs up game-bundle files before changing them.
+[x] The repo does not ship official Worms art, game binaries, or save files.
+[x] The support button tries to sanitize useful diagnostics for bug reports.
+[x] The fun parts are silly. The installer parts are meant to be boring.
+```
+
 ## Choose Your 1998 Web Portal
 
 | I Am... | Click This Portal |
@@ -163,6 +196,16 @@ Not magic, sadly. Just a carefully labeled box of small repairs:
 - **The window un-shrinker:** resets incompatible old Qt window geometry.
 - **The support button:** creates a sanitized support bundle so players do not
   have to describe mysterious computer smoke in a forum post.
+
+## Fake Awards Shelf
+
+| Badge | Meaning |
+| --- | --- |
+| `MOST LIKELY TO SAY PRESS 1` | The README refuses to hide the useful answer. |
+| `NO SUDO ENERGY` | The fix stays inside user-writable project and game-bundle paths. |
+| `BACKUP GOBLET` | Restorable backups are part of the normal apply path. |
+| `SUPPORT BUNDLE FAX MACHINE` | Option `5` creates a report players can attach to an issue. |
+| `UNOFFICIAL BUT TRYING` | This is a community project, not a Team17 product. |
 
 ## Panic Decoder Ring
 

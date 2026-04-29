@@ -14,7 +14,10 @@ Official reference pages:
 
 ## Bundled visuals
 
-- `assets/worms-fix-badge.svg` is an original project graphic made for this
+- `assets/button-wall.svg`, `assets/geocities-chaos-banner.svg`,
+  `assets/quick-start-billboard.svg`, `assets/under-construction-strip.svg`,
+  `assets/visitor-counter.svg`, `assets/webring-control-room.svg`, and
+  `assets/worms-fix-badge.svg` are original project graphics made for this
   repository.
 - No official Team17 or Worms artwork is bundled.
 - No WebPets sample assets are bundled.
