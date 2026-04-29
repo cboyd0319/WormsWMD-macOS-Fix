@@ -1,0 +1,14 @@
+# Maintainer review is required for trust-sensitive project files.
+
+* @cboyd0319
+
+/.github/workflows/** @cboyd0319
+/install.sh @cboyd0319
+/fix_worms_wmd.sh @cboyd0319
+/*.command @cboyd0319
+/scripts/** @cboyd0319
+/tools/** @cboyd0319
+/src/** @cboyd0319
+/dist/** @cboyd0319
+/SECURITY.md @cboyd0319
+/docs/TRUST.md @cboyd0319

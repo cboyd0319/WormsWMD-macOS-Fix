@@ -25,8 +25,9 @@ change.
   keep the existing backup and restore story intact.
 - Keep downloads HTTPS-only and checksum-verified when the payload is executable
   code, frameworks, libraries, or archives.
-- Treat `GAME_APP`, `INSTALL_DIR`, `LOG_FILE`, and `QT_PREFIX` as untrusted user
-  input. Quote paths and preserve spaces in `Worms W.M.D.app`.
+- Treat `GAME_APP`, `INSTALL_DIR`, `INSTALL_REF`, `LOG_FILE`, and `QT_PREFIX`
+  as untrusted user input. Quote paths and preserve spaces in
+  `Worms W.M.D.app`.
 - Update code, tests/checks, docs, and runbooks together when behavior changes.
 - Do not publish secrets from game config files, logs, diagnostics, or reports.
 - Do not replace the Qt archive in `dist/` without updating its checksum and

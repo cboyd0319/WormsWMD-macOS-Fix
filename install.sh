@@ -3,16 +3,17 @@
 # install.sh - One-liner installer for Worms W.M.D macOS Fix
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.3/install.sh | INSTALL_REF=v1.6.3 bash
 #
 # Or with options:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.3/install.sh | INSTALL_REF=v1.6.3 bash -s -- --dry-run
 #
 
 set -euo pipefail
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
+INSTALL_REF="${INSTALL_REF:-main}"
 
 # Colors
 if [[ -t 1 ]]; then
@@ -30,6 +31,23 @@ print_error() { echo -e "${RED}✗${NC}  ${RED}ERROR:${NC} $1"; }
 print_success() { echo -e "${GREEN}✓${NC}  ${GREEN}SUCCESS:${NC} $1"; }
 print_info() { echo -e "${BLUE}ℹ${NC}  $1"; }
 
+validate_install_ref() {
+    if [[ -z "$INSTALL_REF" ]]; then
+        print_error "INSTALL_REF cannot be empty."
+        exit 1
+    fi
+
+    if [[ "$INSTALL_REF" == -* ]] || [[ "$INSTALL_REF" == *".."* ]] || [[ "$INSTALL_REF" == *"@{"* ]]; then
+        print_error "Unsafe INSTALL_REF value: $INSTALL_REF"
+        exit 1
+    fi
+
+    if [[ ! "$INSTALL_REF" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+        print_error "INSTALL_REF may only contain letters, numbers, dots, underscores, slashes, and hyphens."
+        exit 1
+    fi
+}
+
 backup_install_dir() {
     local src="$1"
     local backup
@@ -43,6 +61,35 @@ backup_install_dir() {
     fi
 }
 
+clone_install_ref() {
+    if [[ "$INSTALL_REF" == "main" ]]; then
+        git clone --progress "$REPO_URL.git" "$INSTALL_DIR"
+    else
+        git clone --progress --branch "$INSTALL_REF" --depth 1 "$REPO_URL.git" "$INSTALL_DIR"
+    fi
+}
+
+checkout_install_ref() {
+    local dir="$1"
+
+    if [[ "$INSTALL_REF" == "main" ]]; then
+        if ! git -C "$dir" checkout main >/dev/null 2>&1; then
+            git -C "$dir" checkout -B main origin/main
+        fi
+        git -C "$dir" pull --progress --ff-only origin main
+        return
+    fi
+
+    print_info "Using trusted release/reference: $INSTALL_REF"
+    if git -C "$dir" fetch --progress --force origin "refs/tags/$INSTALL_REF:refs/tags/$INSTALL_REF"; then
+        git -C "$dir" checkout --detach "$INSTALL_REF"
+        return
+    fi
+
+    git -C "$dir" fetch --progress --force origin "$INSTALL_REF"
+    git -C "$dir" checkout --detach FETCH_HEAD
+}
+
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║${NC}     ${GREEN}Worms W.M.D - macOS Tahoe Fix Installer${NC}                 ${BLUE}║${NC}"
@@ -51,6 +98,7 @@ echo ""
 
 # Check prerequisites
 print_step "Checking prerequisites..."
+validate_install_ref
 
 # Check macOS
 if [[ "$(uname)" != "Darwin" ]]; then
@@ -84,20 +132,19 @@ mkdir -p "$(dirname "$INSTALL_DIR")"
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
     print_info "Updating existing installation..."
-    # Try fast-forward pull first
-    if git -C "$INSTALL_DIR" pull --progress --ff-only origin main; then
+    if checkout_install_ref "$INSTALL_DIR"; then
         : # Success
     else
         print_info "Update failed; reinstalling..."
         backup_install_dir "$INSTALL_DIR"
-        git clone --progress "$REPO_URL.git" "$INSTALL_DIR"
+        clone_install_ref
     fi
 else
     # Fresh installation
     if [[ -d "$INSTALL_DIR" ]]; then
         backup_install_dir "$INSTALL_DIR"
     fi
-    git clone --progress "$REPO_URL.git" "$INSTALL_DIR"
+    clone_install_ref
 fi
 
 print_success "Fix downloaded to: $INSTALL_DIR"

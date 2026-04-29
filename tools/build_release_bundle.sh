@@ -96,6 +96,15 @@ Start here:
 2. Double-click "Worms W.M.D Fix.command".
 3. Use option 5 in the launcher if you need a support bundle.
 
+Verify before unzipping:
+Download the matching .zip.sha256 file from the same GitHub release, then run:
+
+    shasum -a 256 -c $bundle_name.zip.sha256
+
+GitHub CLI users can also verify release provenance with:
+
+    gh attestation verify $bundle_name.zip --repo cboyd0319/WormsWMD-macOS-Fix
+
 This community bundle includes original project files only. It does not include
 official game art, game binaries, save files, or user data.
 EOF

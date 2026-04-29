@@ -9,10 +9,12 @@ Use the release bundle:
 
 1. Download the latest release zip from:
    https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest
-2. Unzip it.
-3. Open `README_FIRST.txt`.
-4. Double-click `Worms W.M.D Fix.command`.
-5. Choose option 1.
+2. Optionally download the matching `.zip.sha256` file and verify it:
+   `shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.3.zip.sha256`
+3. Unzip it.
+4. Open `README_FIRST.txt`.
+5. Double-click `Worms W.M.D Fix.command`.
+6. Choose option 1.
 
 The launcher also includes:
 
@@ -34,12 +36,13 @@ when it is available.
 Terminal users can use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.3/install.sh | INSTALL_REF=v1.6.3 bash
 ```
 
 With no command-line flags and an interactive Terminal, `install.sh` opens the
 same friendly launcher menu. When flags are provided, it forwards them directly
-to `fix_worms_wmd.sh`.
+to `fix_worms_wmd.sh`. The `INSTALL_REF` value pins the cloned repository to
+the tagged release.
 
 ## Preview changes
 

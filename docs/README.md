@@ -19,6 +19,8 @@ current when adding, moving, renaming, or deleting Markdown files.
   expectations.
 - [Security](../SECURITY.md) - threat model, audit checklist, network policy,
   and security validation.
+- [Trust and safety](TRUST.md) - release verification, provenance checks, and
+  why the fix can be reviewed before it is run.
 - [Changelog](../CHANGELOG.md) - released changes.
 - [Team17 developer report](../TEAM17_DEVELOPER_REPORT.md) - technical report
   for the game vendor.

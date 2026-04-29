@@ -4,6 +4,10 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
+No changes yet.
+
+## 1.6.3 (2026-04-29)
+
 ### Added
 - Added a friendly double-click launcher with apply, preview, verify, restore,
   support bundle, and help menu actions.
@@ -11,11 +15,14 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   `RELEASE_MANIFEST.tsv`, zip output, and SHA-256 checksum output.
 - Added a GitHub release workflow for building and publishing release zips from
   version tags.
+- Added release SHA-256 verification instructions and GitHub artifact
+  attestations for release assets.
+- Added `docs/TRUST.md` with a player-readable trust and safety checklist.
+- Added `.github/CODEOWNERS` to require maintainer review for trust-sensitive
+  project files.
+- Added Dependabot checks for GitHub Actions updates.
 - Added `README_FIRST.txt`, `SUPPORT.md`, `STEAM_POST.md`,
-  `ATTRIBUTIONS.md`, and original project visuals for a clearer community
-  support flow.
-- Expanded the README's intentionally loud retro visual treatment while keeping
-  the four-step player path at the very top.
+  `ATTRIBUTIONS.md`, and clearer release-bundle guidance for community support.
 - Added manifest creation and verification for game-bundle backups and save-game backup archives.
 - Added sanitized diagnostics support bundles for community issue reports.
 - Added deterministic Qt package creation controls, including explicit Qt prefix/version support for future Qt 5.15.x refreshes.
@@ -23,6 +30,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 ### Changed
 - `Install Fix.command` and interactive no-argument `install.sh` runs now open
   the friendly launcher when available.
+- `install.sh` can pin clones to a tagged release through `INSTALL_REF`.
+- GitHub Actions now use current Node 24-compatible official action versions.
 - Pre-built Qt package discovery now selects the highest verified semantic version instead of relying on modification time.
 - Qt package validation now checks checksums, metadata, required frameworks/plugins, package manifests when present, safe archive layout, and x86_64 Mach-O slices before reporting a package as available.
 - Restore and rollback now verify backup manifests when present and warn when restoring older legacy backups.

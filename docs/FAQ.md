@@ -16,7 +16,8 @@ The fix operates on the macOS app bundle. If your GOG install uses the same app 
 
 Yes. The fix only modifies files inside the game's app bundle, creates a
 backup first, verifies pre-built Qt packages with checksums and manifests, and
-doesn't require `sudo`. See `SECURITY.md` for details.
+doesn't require `sudo`. Release zips also include checksum and provenance
+verification. See `SECURITY.md` and `docs/TRUST.md` for details.
 
 **Q: Can I undo this fix?**
 

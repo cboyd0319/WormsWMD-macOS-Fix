@@ -9,6 +9,13 @@ ask them to open `README_FIRST.txt`. The intended path is:
 4. If it fails, choose option 5 and attach the Desktop support bundle to an
    issue.
 
+If the person wants to verify the download first, ask them to download the
+matching `.zip.sha256` file from the same release and run:
+
+```bash
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.3.zip.sha256
+```
+
 ## What to include in an issue
 
 - macOS version and Mac model, if you know them.

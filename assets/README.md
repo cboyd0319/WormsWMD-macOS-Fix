@@ -1,6 +1,6 @@
 # Assets
 
-This folder is reserved for original project visuals and license notes.
+This folder is reserved for project-owned visual assets and license notes.
 
 No decorative README artwork is currently bundled.
 

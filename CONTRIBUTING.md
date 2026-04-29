@@ -134,3 +134,6 @@ Include:
 - A summary of the change
 - Test results
 - Any user-facing impact or migration steps
+
+Trust-sensitive files are covered by `.github/CODEOWNERS`; expect maintainer
+review and passing CI before changes are merged to `main`.

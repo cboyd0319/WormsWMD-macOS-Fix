@@ -68,6 +68,7 @@ This fix is designed to be safe against:
 | Purpose | Destination | Security |
 |---------|-------------|----------|
 | Qt framework download | `github.com` (repo dist/) | HTTPS + SHA256 checksum |
+| Release bundle download | `github.com` releases | HTTPS + SHA256 checksum + artifact attestation |
 | Repository clone/update | `github.com` | HTTPS via git |
 | Update check (optional) | `raw.githubusercontent.com` | HTTPS |
 | Pre-flight network check (optional) | `ads.t17service.com`, `steamcommunity.com` | HTTPS |
@@ -91,6 +92,30 @@ No analytics or telemetry are used, and network access is limited to the endpoin
 The `check_updates.sh --download` option downloads a ZIP snapshot from GitHub without cryptographic signature verification. For maximum security, prefer `git pull` which uses SSH/HTTPS authentication.
 
 ## Download verification
+
+Release bundles publish both a zip and a matching SHA-256 checksum file. For
+the `v1.6.3` release:
+
+```bash
+cd ~/Downloads
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.3.zip.sha256
+```
+
+Expected output:
+
+```text
+WormsWMD-macOS-Fix-v1.6.3.zip: OK
+```
+
+Release bundles also receive GitHub artifact attestations from the release
+workflow:
+
+```bash
+gh attestation verify WormsWMD-macOS-Fix-v1.6.3.zip --repo cboyd0319/WormsWMD-macOS-Fix
+```
+
+The checksum verifies the file content. The attestation verifies that GitHub
+Actions built the asset from this repository.
 
 Pre-built Qt framework packages undergo multiple verification steps:
 
@@ -156,6 +181,7 @@ User-controllable environment variables are validated:
 |----------|------------|
 | `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D` |
 | `INSTALL_DIR` | Checked for conflicts, backed up if exists |
+| `INSTALL_REF` | Optional installer ref; limited to safe Git ref characters |
 | `LOG_FILE` | Created in user-writable location only |
 | `QT_PREFIX` | Verified to contain expected Qt frameworks |
 
@@ -200,6 +226,7 @@ Last audit: 2026-04-29
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
 | Backup restore | Pass | Game backups and save archives validate manifests when present; legacy backups are flagged |
+| Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
 
 ## Verifying the fix
 

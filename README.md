@@ -31,6 +31,25 @@ If the fix fails, run `Worms W.M.D Fix.command` again and press `5`. This
 creates a sanitized support bundle on your Desktop that can be attached to a
 GitHub issue.
 
+## Verify The Download
+
+The release page includes a `.zip.sha256` checksum next to the zip file. To
+verify the `v1.6.3` release before unzipping it:
+
+```bash
+cd ~/Downloads
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.3.zip.sha256
+```
+
+Terminal should print `WormsWMD-macOS-Fix-v1.6.3.zip: OK`.
+
+For stronger provenance checking, GitHub CLI users can also verify the release
+attestation:
+
+```bash
+gh attestation verify WormsWMD-macOS-Fix-v1.6.3.zip --repo cboyd0319/WormsWMD-macOS-Fix
+```
+
 ## Launcher Options
 
 The launcher is a simple numbered menu:
@@ -84,15 +103,17 @@ This project is designed so players can inspect what it does before running it:
 - The launcher does not require `sudo` or administrator privileges.
 - Option `2` previews planned changes without modifying game files.
 - Option `4` restores original files from backup.
+- Release zips include SHA-256 checksums and GitHub artifact attestations.
 - Support bundles are designed to collect diagnostics without game binaries,
   save archives, or private account tokens.
 - The security model, review checklist, and source-audit commands are documented
   in [SECURITY.md](SECURITY.md).
+- A plain-English trust guide is available in [docs/TRUST.md](docs/TRUST.md).
 
 You can also review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.3/install.sh
 ```
 
 ## Terminal Install Option
@@ -100,11 +121,12 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/i
 Use the release zip above unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.3/install.sh | INSTALL_REF=v1.6.3 bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip.
+launcher menu as the release zip. The `INSTALL_REF=v1.6.3` part makes the
+bootstrap clone the tagged release instead of whatever is currently on `main`.
 
 ## Pre-Flight Check
 
@@ -140,6 +162,8 @@ Use `--quick` to skip network checks, or `--verbose` for detailed output.
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Solutions for common problems.
 - [FAQ](docs/FAQ.md) - Frequently asked questions.
 - [Security](SECURITY.md) - Threat model, review checklist, and audit commands.
+- [Trust and safety](docs/TRUST.md) - How to verify the download before running
+  it.
 - [Support](SUPPORT.md) - Issue reporting and support bundles.
 - [Tools](docs/TOOLS.md) - Helper utilities reference.
 - [Technical details](docs/TECHNICAL.md) - How the fix works.
