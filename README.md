@@ -70,12 +70,14 @@ Use `--quick` to skip network checks, or `--verbose` for detailed output.
 
 ## Documentation
 
+- [Documentation index](docs/README.md) - Complete durable docs map
 - [What this fix improves](docs/IMPROVEMENTS.md) - All fixes and enhancements explained
 - [Installation](docs/INSTALL.md) - Manual install and restore options
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Solutions for common problems
 - [FAQ](docs/FAQ.md) - Frequently asked questions
 - [Tools](docs/TOOLS.md) - Helper utilities reference
 - [Technical details](docs/TECHNICAL.md) - How the fix works
+- [Agent harness](docs/style/agent-harness.md) - Repo-local agent workflow and validation standard
 - [Security](SECURITY.md) - Security information
 - [Contributing](CONTRIBUTING.md) - How to contribute
 - [Changelog](CHANGELOG.md) - Version history

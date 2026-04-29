@@ -64,6 +64,7 @@ cd WormsWMD-macOS-Fix
 ### Verify your setup
 
 ```bash
+./tools/validate_harness.sh
 shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
 ./fix_worms_wmd.sh --help
 ./fix_worms_wmd.sh --dry-run
@@ -72,6 +73,15 @@ shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
 ```
 
 ## Make changes
+
+### Agent workflow
+
+If you are using an AI coding agent or making a multi-step change:
+
+1. Start with `AGENTS.md`, `docs/README.md`, and `docs/design/runtime-contracts.md`.
+2. For multi-file or risky work, create or update a plan under `docs/exec-plans/` using `docs/exec-plans/TEMPLATE.md`.
+3. Keep the plan current when scope, files, validation, or decisions change.
+4. Run `./tools/validate_harness.sh` after changing agent instructions, docs topology, or Markdown links.
 
 ### Branch naming
 
@@ -98,6 +108,7 @@ Types: `fix`, `feat`, `docs`, `refactor`, `test`, `chore`
 At minimum, run:
 
 ```bash
+./tools/validate_harness.sh
 shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
 ./fix_worms_wmd.sh --dry-run
 ./fix_worms_wmd.sh --verify

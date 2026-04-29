@@ -40,6 +40,9 @@ jobs:
           done
           echo "All scripts have valid syntax!"
 
+      - name: Validate agent harness docs
+        run: ./tools/validate_harness.sh
+
       - name: Check script permissions
         run: |
           echo "Verifying scripts are executable..."
