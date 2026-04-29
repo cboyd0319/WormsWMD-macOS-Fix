@@ -48,7 +48,7 @@ Planned commands:
 
 ```bash
 ./tools/validate_harness.sh
-for script in fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh; do bash -n "$script"; done
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
 ```
 
@@ -59,6 +59,8 @@ Run ShellCheck if it is installed locally.
 - 2026-04-29: Started applying the agent harness methodology to this repo.
 - 2026-04-29: Added agent entrypoints, harness docs, execution-plan standards,
   and CI-backed harness validation.
+- 2026-04-29: Refreshed validation examples to include the double-click
+  installer entrypoint.
 
 ## Surprises & Discoveries
 
@@ -79,8 +81,8 @@ Validation completed with:
 
 ```bash
 ./tools/validate_harness.sh
-for script in fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh; do bash -n "$script"; done
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
-shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
 clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
 ```

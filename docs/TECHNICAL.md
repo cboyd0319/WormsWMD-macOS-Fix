@@ -68,7 +68,7 @@ The exact list varies by Qt version and plugin set.
 
 ## How the AGL stub works
 
-The AGL stub (`src/agl_stub.c`) provides empty implementations of all 40 AGL functions. Qt 5.15 doesn't use AGL (it uses Core OpenGL directly), so the stub only needs to exist to satisfy the dynamic linker.
+The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL functions. Qt 5.15 doesn't use AGL (it uses Core OpenGL directly), so the stub only needs to exist to satisfy the dynamic linker.
 
 ## Why Qt 5.15
 

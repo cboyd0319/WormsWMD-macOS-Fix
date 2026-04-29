@@ -14,6 +14,7 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 - One-line and double-click installers now show Git clone and pull progress while preserving the existing guidance flow.
 - Diagnostics now report the bundled pre-built Qt package first and treat Intel Homebrew as an optional fallback.
 - Documentation now notes a confirmed macOS 15.7.3 keyboard input buffering/lag report resolved after the Qt 5.15 refresh.
+- Documentation now matches the current tool flags, AGL stub count, Team17 report notes, and validation command set.
 
 ## 1.6.1 (2025-12-27)
 

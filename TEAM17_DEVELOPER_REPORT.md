@@ -1,13 +1,18 @@
 # Worms W.M.D macOS compatibility report for Team17
 
-Document version: 3.0
-Date: 2025-12-26
+Document version: 3.1
+Date: 2026-04-29
 Prepared for: Team17 Digital Ltd.
 Platform: macOS 26 (Tahoe) and later
 
 ## Executive summary
 
 Worms W.M.D does not launch on macOS 26 (Tahoe) and later. The game displays a black screen and fails to initialize due to deprecated framework dependencies. This report is based on direct inspection of a Steam bundle captured on 2025-12-26. If a community fix has ever been applied, a full uninstall/reinstall is required to validate a pristine stock state (Steam integrity verification does not remove extra files).
+
+Repository documentation was refreshed on 2026-04-29 to reflect the current
+community fix package and a confirmed macOS 15.7.3 keyboard input
+buffering/lag report resolved after the Qt 5.15 refresh. That report does not
+replace a clean stock-bundle launch validation for macOS 15.x.
 
 **Severity**: Critical (game does not launch on macOS 26+)
 
@@ -609,7 +614,7 @@ The game bundle is completely unsigned, which:
 | macOS version | Code name | Fix required | Notes |
 |--------------|-----------|--------------|-------|
 | macOS 26.x | Tahoe | Yes | AGL removed, Qt 5.3.2 broken |
-| macOS 15.x | Sequoia | Unknown | Not verified; AGL still present |
+| macOS 15.x | Sequoia | Conditional | AGL still present; Qt 5.15 refresh has a confirmed macOS 15.7.3 keyboard input buffering/lag report, but stock launch behavior still needs clean-bundle validation |
 | macOS 14.x | Sonoma | Unknown | Not verified |
 | macOS 13.x | Ventura | Unknown | Not verified |
 | macOS 12.x | Monterey | Unknown | Not verified |
@@ -776,7 +781,7 @@ For native performance improvements:
 
 ### 11.5 Community fix components
 
-The community fix (v1.6.1) addresses the critical issues by:
+The community fix (v1.6.2) addresses the critical issues by:
 
 1. **AGL stub**: Provides `AGL.framework` with no-op implementations
 2. **Qt 5.15**: Replaces all Qt frameworks and plugins
@@ -784,6 +789,8 @@ The community fix (v1.6.1) addresses the critical issues by:
 4. **Info.plist updates**: Adds CFBundleIdentifier, NSHighResolutionCapable, updates LSMinimumSystemVersion
 5. **Ad-hoc signing**: Applies code signature to the modified bundle
 6. **HTTPS URLs**: Updates config files to use HTTPS
+7. **Installer diagnostics**: Prefers the bundled pre-built Qt package and keeps
+   Intel Homebrew as an optional fallback path
 
 **Not addressed by community fix**:
 - FMOD library update
@@ -803,4 +810,4 @@ Issues: https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
 
 ---
 
-*This report was prepared from a Steam bundle inspected on macOS 26.2 (Tahoe) on Apple Silicon (M4 Max), captured on 2025-12-26. If the bundle had ever been modified by a fix, reinstall to confirm a pristine stock state before re-validating these findings.*
+*This report was prepared from a Steam bundle inspected on macOS 26.2 (Tahoe) on Apple Silicon (M4 Max), captured on 2025-12-26, with repository documentation refreshed on 2026-04-29. If the bundle had ever been modified by a fix, reinstall to confirm a pristine stock state before re-validating these findings.*

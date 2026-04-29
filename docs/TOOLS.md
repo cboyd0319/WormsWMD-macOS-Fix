@@ -1,6 +1,7 @@
 # Tools
 
-The `tools/` directory includes helper utilities for backups, diagnostics, and launch options.
+The `tools/` directory includes helper utilities for backups, diagnostics,
+launch options, packaging, update checks, and harness validation.
 
 ## Pre-flight check
 
@@ -28,7 +29,9 @@ Back up and restore your save games, settings, and replays:
 ```bash
 ./tools/backup_saves.sh
 ./tools/backup_saves.sh --list
+./tools/backup_saves.sh --location
 ./tools/backup_saves.sh --restore
+./tools/backup_saves.sh --restore ~/Documents/WormsWMD-SaveBackups/saves-20251225-120000.tar.gz
 ```
 
 ## Steam update watcher
@@ -69,6 +72,7 @@ Diagnose controller connectivity and get configuration tips:
 ```bash
 ./tools/controller_helper.sh
 ./tools/controller_helper.sh --info
+./tools/controller_helper.sh --test
 ```
 
 ## Diagnostics collector
@@ -88,8 +92,31 @@ Launch the game with extra logging and debug options:
 
 ```bash
 ./tools/launch_worms.sh --log
+./tools/launch_worms.sh --check-fix --log
 ./tools/launch_worms.sh --safe-mode --log
+./tools/launch_worms.sh --log --log-file ~/Desktop/worms-launch.log
 ./tools/launch_worms.sh --qt-debug --opengl-debug --log --verbose
+./tools/launch_worms.sh --no-crash-report
 ```
 
 Crash reports are saved to `~/Library/Logs/WormsWMD/crashes/`.
+
+## Maintainer utilities
+
+Validate the repository documentation harness after Markdown, agent instruction,
+or docs-topology changes:
+
+```bash
+./tools/validate_harness.sh
+```
+
+Check or refresh the pre-built Qt package used by the installer:
+
+```bash
+./scripts/download_qt_frameworks.sh --check
+./scripts/download_qt_frameworks.sh --force
+./tools/package_qt_frameworks.sh --output dist
+```
+
+`tools/package_qt_frameworks.sh` requires Intel Homebrew with `qt@5` installed
+and is intended for maintainers replacing the distribution archive in `dist/`.

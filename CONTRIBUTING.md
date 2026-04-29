@@ -111,8 +111,12 @@ At minimum, run:
 ./tools/validate_harness.sh
 shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
 ./fix_worms_wmd.sh --dry-run
-./fix_worms_wmd.sh --verify
 ```
+
+For runtime validation, run `./fix_worms_wmd.sh --verify` after applying the
+fix to a test game bundle. On an unfixed local install, `--verify` is expected
+to report missing fix artifacts and should be recorded as a runtime state check,
+not a source failure.
 
 If you change packaging or update tools, run the related scripts.
 
