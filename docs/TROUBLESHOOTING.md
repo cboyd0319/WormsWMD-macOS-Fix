@@ -1,5 +1,16 @@
 # Troubleshooting
 
+## Easiest support path
+
+If you are not comfortable with Terminal:
+
+1. Double-click `Worms W.M.D Fix.command`.
+2. Choose option 3 to check whether the fix is installed.
+3. If something fails, choose option 5 to create a support bundle on the
+   Desktop.
+4. Attach that support bundle to a GitHub issue:
+   https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
+
 ## First: Run pre-flight check
 
 Before troubleshooting specific issues, run the pre-flight check to verify your system:
@@ -21,22 +32,26 @@ Use `--verbose` for detailed output or `--quick` to skip network checks.
 Gatekeeper blocks `.command` files downloaded from the internet. Try these options:
 
 1. **Right-click method:**
-   - Right-click `Install Fix.command` → select **Open** → select **Open** again in the dialog
+   - Right-click `Worms W.M.D Fix.command` or `Install Fix.command` → select **Open** → select **Open** again in the dialog
 
 2. **"Insufficient Privileges" or permission denied:**
    ```bash
+   chmod +x ~/Downloads/WormsWMD-macOS-Fix-*/Worms\ W.M.D\ Fix.command
    chmod +x ~/Downloads/Install\ Fix.command
    ```
-   Then double-click the file again.
+   Then double-click the file again. The exact folder name may vary depending
+   on the release version.
 
 3. **Remove quarantine flag:**
    ```bash
+   xattr -d com.apple.quarantine ~/Downloads/WormsWMD-macOS-Fix-*/Worms\ W.M.D\ Fix.command
    xattr -d com.apple.quarantine ~/Downloads/Install\ Fix.command
    ```
    Then double-click the file.
 
 4. **Run from Terminal:**
    ```bash
+   bash ~/Downloads/WormsWMD-macOS-Fix-*/Worms\ W.M.D\ Fix.command
    bash ~/Downloads/Install\ Fix.command
    ```
 

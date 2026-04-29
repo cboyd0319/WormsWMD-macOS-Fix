@@ -29,8 +29,8 @@ Harness or documentation topology:
 Shell scripts:
 
 ```bash
-shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
-for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ```
 
 Main entrypoint behavior:
@@ -38,6 +38,13 @@ Main entrypoint behavior:
 ```bash
 ./fix_worms_wmd.sh --help
 ./fix_worms_wmd.sh --dry-run
+```
+
+Release packaging:
+
+```bash
+./tools/build_release_bundle.sh --version local-smoke --skip-zip
+./tools/build_release_bundle.sh --version local-smoke
 ```
 
 AGL stub or C source:

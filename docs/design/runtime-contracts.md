@@ -9,6 +9,18 @@ Worms W.M.D macOS fix.
 `GAME_APP`, initializes logging, creates backups, runs the ordered fix scripts,
 verifies the resulting bundle, and offers optional helper setup.
 
+`Worms W.M.D Fix.command` is the friendly double-click launcher. It must remain
+a wrapper around `fix_worms_wmd.sh`, not a second implementation of the fix. The
+launcher may present menu actions for apply, dry-run, verify, restore, support
+bundle creation, and help, but behavior-changing work must delegate to the
+canonical engine or existing tools.
+
+`Install Fix.command` and `install.sh` are bootstrap entrypoints. They may clone
+or update this repository and should open `Worms W.M.D Fix.command` for
+interactive no-argument runs when that launcher is present. When command-line
+flags are provided, `install.sh` must continue forwarding them to
+`fix_worms_wmd.sh`.
+
 The ordered fix scripts are:
 
 1. `scripts/01_build_agl_stub.sh` - build the AGL compatibility framework from
@@ -98,6 +110,21 @@ checksum verification.
 
 The project does not collect telemetry.
 
+## Release Bundle Contract
+
+`tools/build_release_bundle.sh` builds the player-facing release folder and zip
+under `build/release/` by default. The bundle may include repository source,
+scripts, tools, docs, original project assets, and verified `dist/` packages.
+It must not include `.git`, local build output, downloaded sample projects,
+game binaries, save files, support bundles, logs, secrets, or user data.
+
+Release bundles must include `RELEASE_INFO.txt` and `RELEASE_MANIFEST.tsv`.
+When a zip is produced, a matching `.sha256` file must be written next to it.
+
+Visual assets bundled by this repository must be original or have a committed
+redistribution license and attribution. Do not commit official Team17/Worms art
+or third-party sample assets without documented permission.
+
 ## Logging And Diagnostics Contract
 
 Fix logs are written under `~/Library/Logs/WormsWMD-Fix/` unless `LOG_FILE`
@@ -116,6 +143,8 @@ Diagnostics and reports must not expose secrets, private account data, or
 unredacted sensitive config values. Support bundles should sanitize the
 diagnostics report, include Qt package verification details, and include backup
 manifests when available instead of copying full game or save contents.
+The friendly launcher's support option should delegate to
+`tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop`.
 
 ## Validation Contract
 
@@ -123,13 +152,15 @@ For source-only changes, use the checks that match the blast radius:
 
 ```bash
 ./tools/validate_harness.sh
-shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
-for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
+./fix_worms_wmd.sh --dry-run
 ./scripts/download_qt_frameworks.sh --check
 ./tools/package_qt_frameworks.sh --help
 ./tools/collect_diagnostics.sh --help
 ./tools/backup_saves.sh --help
+./tools/build_release_bundle.sh --version local-smoke --skip-zip
 clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
 ```
 

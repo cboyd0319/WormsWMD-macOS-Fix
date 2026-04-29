@@ -13,6 +13,17 @@ These changes make the game playable on macOS 26 (Tahoe) and later.
 | Missing Qt frameworks | QtDBus and QtSvg frameworks are missing but required by plugins | Bundles these frameworks with the game |
 | Broken library paths | Some libraries reference `/usr/local` paths that don't exist | Rewrites all paths to use `@executable_path` |
 
+## Player experience improvements
+
+These changes make the project easier to use without Terminal knowledge.
+
+| Issue | What was confusing | What the fix does |
+|-------|--------------------|-------------------|
+| Too many technical commands | Players had to pick flags like `--dry-run`, `--verify`, and `--restore` | Adds `Worms W.M.D Fix.command`, a double-click menu for apply, preview, verify, restore, help, and support |
+| GitHub file layout | Non-technical users had to know which repo files to download | Adds release-bundle tooling for one ready-to-unzip package with `README_FIRST.txt` |
+| Bug reports were hard to write | Players had to find logs and system details manually | Adds a launcher option that creates a sanitized support bundle on the Desktop |
+| The project felt plain | The fix looked like a technical script bundle | Adds original project visuals and clear attribution rules without bundling official game art |
+
 ## Security improvements
 
 These changes improve the security posture of the game.
@@ -68,6 +79,8 @@ The fix includes utilities to help manage the game.
 | Update checker | Checks for new versions of the fix |
 | Controller helper | Diagnoses controller connectivity and provides tips |
 | Diagnostics collector | Gathers system info and can create sanitized support bundles for bug reports |
+| Friendly launcher | Provides a double-click menu for common actions |
+| Release bundle builder | Creates a player-facing zip with a manifest and checksum |
 
 See [TOOLS.md](TOOLS.md) for usage details.
 

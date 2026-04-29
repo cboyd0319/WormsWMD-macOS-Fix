@@ -7,6 +7,11 @@ current when adding, moving, renaming, or deleting Markdown files.
 
 - [Project README](../README.md) - user-facing overview, quick start, and
   support links.
+- [Support](../SUPPORT.md) - community support flow and support bundle guidance.
+- [Steam forum post template](../STEAM_POST.md) - copy/paste player support
+  text.
+- [Attributions and asset policy](../ATTRIBUTIONS.md) - unofficial-project
+  status and bundled asset policy.
 - [Agent instructions](../AGENTS.md) - short map for coding agents.
 - [Copilot instructions](../.github/copilot-instructions.md) - thin loader for
   Copilot-style agents.
@@ -27,6 +32,7 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [What this fix improves](IMPROVEMENTS.md) - feature and behavior overview.
 - [Tools](TOOLS.md) - helper utility reference.
 - [Technical details](TECHNICAL.md) - implementation details and limitations.
+- [Assets](../assets/README.md) - original visual assets and asset rules.
 
 ## Agent Harness
 
@@ -42,6 +48,8 @@ current when adding, moving, renaming, or deleting Markdown files.
   - shipped plan for applying the harness methodology to this repo.
 - [Installer diagnostics audit plan](exec-plans/2026-04-29-installer-diagnostics-audit.md)
   - audit trail for installer, diagnostics, and documentation fixes.
+- [Zero-technical release experience plan](exec-plans/2026-04-29-zero-technical-release.md)
+  - audit trail for the friendly launcher, release bundle, and support flow.
 - [Community hardening plan](exec-plans/2026-04-28-community-hardening.md)
   - audit trail for Qt package verification, reproducible packaging,
     diagnostics bundles, and backup manifest validation.

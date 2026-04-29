@@ -4,11 +4,24 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![macOS](https://img.shields.io/badge/macOS-26.0%2B-blue.svg)](https://www.apple.com/macos/)
 
+![Worms W.M.D macOS Fix community badge](assets/worms-fix-badge.svg)
+
 Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibility and replacing the bundled Qt frameworks. The Qt refresh can also help older macOS installs that show keyboard input buffering or lag. The repo also includes tools for diagnostics, backups, and updates.
 
 ## Quick start
 
-### Option 1: Double-click installer
+### Option 1: Release zip for most players
+
+1. Download the latest release zip: https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest
+2. Unzip it.
+3. Open `README_FIRST.txt`.
+4. Double-click `Worms W.M.D Fix.command`.
+5. Choose option 1: **Apply the recommended fix**.
+
+If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
+**Open**, then choose **Open** again.
+
+### Option 2: Tiny bootstrap download
 
 1. Download [`Install Fix.command`](https://github.com/cboyd0319/WormsWMD-macOS-Fix/raw/main/Install%20Fix.command).
 2. Double-click the file.
@@ -16,15 +29,19 @@ Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibilit
 4. If you see "Insufficient Privileges", run: `chmod +x ~/Downloads/Install\ Fix.command`
 5. If it still won't run, see [Troubleshooting](docs/TROUBLESHOOTING.md#install-fixcommand-wont-run).
 
-### Option 2: One-liner (Terminal)
+`Install Fix.command` downloads or updates the repo, then opens the same
+friendly launcher menu.
+
+### Option 3: One-liner (Terminal)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
 ```
 
-Requires `git` (install Xcode Command Line Tools if missing).
+Requires `git` (install Xcode Command Line Tools if missing). With no command
+line flags and an interactive Terminal, it opens the friendly launcher menu.
 
-### Option 3: Manual / advanced
+### Option 4: Manual / advanced
 
 See `docs/INSTALL.md` for manual install, dry-run, and restore steps.
 
@@ -74,6 +91,9 @@ Use `--quick` to skip network checks, or `--verbose` for detailed output.
 ## Documentation
 
 - [Documentation index](docs/README.md) - Complete durable docs map
+- [Support](SUPPORT.md) - Normal-person issue reporting and support bundles
+- [Attributions](ATTRIBUTIONS.md) - Asset and unofficial-project policy
+- [Steam post template](STEAM_POST.md) - Copy/paste community support text
 - [What this fix improves](docs/IMPROVEMENTS.md) - All fixes and enhancements explained
 - [Installation](docs/INSTALL.md) - Manual install and restore options
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Solutions for common problems
@@ -89,11 +109,15 @@ Use `--quick` to skip network checks, or `--verbose` for detailed output.
 ## Support
 
 - Issues: https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
+- If a player is stuck, ask them to run `Worms W.M.D Fix.command` and choose
+  option 5 to create a sanitized support bundle on the Desktop.
 
 ## Credits
 
 - Steam community for reporting the issue
 - Qt Project for Qt 5.15
+- Original project badge and release visuals are included under this repo's
+  license; no official Team17/Worms art is bundled.
 - Fix developed with assistance from Claude
 
 ## Links

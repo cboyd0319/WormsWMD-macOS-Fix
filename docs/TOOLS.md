@@ -141,3 +141,15 @@ for maintainers replacing the distribution archive in `dist/`. Qt 5.15.19 can
 be packaged from a supplied compatible x86_64 Qt prefix, but this repository
 does not claim to ship a 5.15.19 artifact unless that artifact and checksum are
 present in `dist/`.
+
+Build the player-facing release folder and zip:
+
+```bash
+./tools/build_release_bundle.sh --version local-smoke --skip-zip
+./tools/build_release_bundle.sh --version local-smoke
+```
+
+The release builder copies the friendly launcher, bootstrap installers, docs,
+assets, source, tools, scripts, and `dist/` package into
+`build/release/WormsWMD-macOS-Fix-VERSION/`. It writes `RELEASE_INFO.txt`,
+`RELEASE_MANIFEST.tsv`, an optional zip, and a `.sha256` file for the zip.

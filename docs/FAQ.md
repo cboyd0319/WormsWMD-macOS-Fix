@@ -6,7 +6,7 @@
 
 This fix targets macOS 26 (Tahoe) where Apple removed AGL. Earlier macOS versions typically don't need it unless you're seeing the same black-screen symptoms.
 
-There is also a confirmed report that applying the Qt 5.15 refresh resolved keyboard input buffering/lag on macOS 15.7.3 (Sequoia). Run `./fix_worms_wmd.sh --dry-run` first if you are using an older macOS version for that reason.
+There is also a confirmed report that applying the Qt 5.15 refresh resolved keyboard input buffering/lag on macOS 15.7.3 (Sequoia). Use `Worms W.M.D Fix.command` option 2 first if you want to preview the changes, or run `./fix_worms_wmd.sh --dry-run` from Terminal.
 
 **Q: Does this fix work for the GOG version?**
 
@@ -20,10 +20,10 @@ doesn't require `sudo`. See `SECURITY.md` for details.
 
 **Q: Can I undo this fix?**
 
-Yes. Run `./fix_worms_wmd.sh --restore` or uninstall/reinstall the game. New
-backups include `BACKUP_MANIFEST.tsv`, which restore verifies before copying
-files back. Steam "Verify integrity" does not remove extra files from prior
-fixes.
+Yes. Use `Worms W.M.D Fix.command` option 4, run
+`./fix_worms_wmd.sh --restore`, or uninstall/reinstall the game. New backups
+include `BACKUP_MANIFEST.tsv`, which restore verifies before copying files
+back. Steam "Verify integrity" does not remove extra files from prior fixes.
 
 ## Technical
 
@@ -79,4 +79,6 @@ Run `./tools/controller_helper.sh` to check controller connectivity and get conf
 
 **Q: How can I verify my system is ready before launching?**
 
-Run `./tools/preflight_check.sh` to check system requirements, Rosetta 2 status, fix status, and network connectivity.
+Use `Worms W.M.D Fix.command` option 3 for the quick fix-status check. For a
+deeper system check, run `./tools/preflight_check.sh` to check system
+requirements, Rosetta 2 status, fix status, and network connectivity.

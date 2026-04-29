@@ -7,13 +7,17 @@ Use this guide to report issues or submit changes.
 Before you file an issue, do these steps:
 1. Check existing issues.
 2. Verify game files in Steam.
-3. Run `./fix_worms_wmd.sh --verify`.
+3. Run `Worms W.M.D Fix.command` and choose option 3, or run
+   `./fix_worms_wmd.sh --verify`.
+4. If you need help, choose option 5 in the launcher and attach the support
+   bundle.
 
 Include this information:
 - macOS version (`sw_vers -productVersion`)
 - Mac model and chip (Intel or Apple Silicon)
 - Error output or logs
 - Log file path from `~/Library/Logs/WormsWMD-Fix/`
+- Support bundle from `Worms W.M.D Fix.command` option 5, when available
 - Steps to reproduce
 - Whether you tried `--restore` and re-applied the fix
 
@@ -65,11 +69,13 @@ cd WormsWMD-macOS-Fix
 
 ```bash
 ./tools/validate_harness.sh
-shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
 ./fix_worms_wmd.sh --dry-run
 ./tools/check_updates.sh --help
 ./tools/collect_diagnostics.sh --help
+./tools/build_release_bundle.sh --version local-smoke --skip-zip
 ```
 
 ## Make changes
@@ -109,8 +115,10 @@ At minimum, run:
 
 ```bash
 ./tools/validate_harness.sh
-shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --dry-run
+./tools/build_release_bundle.sh --version local-smoke --skip-zip
 ```
 
 For runtime validation, run `./fix_worms_wmd.sh --verify` after applying the

@@ -1,6 +1,45 @@
 # Install
 
-This guide covers manual installation steps and restore options.
+This guide covers the friendly release path, manual installation steps, and
+restore options.
+
+## For most players
+
+Use the release bundle:
+
+1. Download the latest release zip from:
+   https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest
+2. Unzip it.
+3. Open `README_FIRST.txt`.
+4. Double-click `Worms W.M.D Fix.command`.
+5. Choose option 1.
+
+The launcher also includes:
+
+- option 2 to preview changes
+- option 3 to check whether the fix is installed
+- option 4 to restore from backup
+- option 5 to create a support bundle on the Desktop
+- option 6 to open the simple help file
+
+If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
+**Open**, then choose **Open** again.
+
+## Bootstrap installer
+
+If you only downloaded `Install Fix.command`, double-click it. It clones or
+updates this repository under `~/.wormswmd-fix` and opens the friendly launcher
+when it is available.
+
+Terminal users can use:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
+```
+
+With no command-line flags and an interactive Terminal, `install.sh` opens the
+same friendly launcher menu. When flags are provided, it forwards them directly
+to `fix_worms_wmd.sh`.
 
 ## Preview changes
 

@@ -158,9 +158,15 @@ index_targets="$tmp_dir/index-targets.txt"
 
 (
     cd "$ROOT_DIR"
-    find . -path ./.git -prune -o -name '*.md' -type f -print \
-        | sed 's#^\./##' \
-        | sort
+    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git ls-files --cached --others --exclude-standard '*.md' | sort
+    else
+        find . \
+            \( -path ./.git -o -path ./build \) -prune -o \
+            -name '*.md' -type f -print \
+            | sed 's#^\./##' \
+            | sort
+    fi
 ) > "$markdown_files"
 
 while IFS= read -r source; do

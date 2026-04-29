@@ -111,11 +111,22 @@ fi
 
 # Make scripts executable
 chmod +x "$INSTALL_DIR/fix_worms_wmd.sh"
+if [[ -f "$INSTALL_DIR/Worms W.M.D Fix.command" ]]; then
+    chmod +x "$INSTALL_DIR/Worms W.M.D Fix.command"
+fi
 if [[ -d "$INSTALL_DIR/scripts" ]]; then
     shopt -s nullglob
     script_files=("$INSTALL_DIR/scripts/"*.sh)
     if (( ${#script_files[@]} )); then
         chmod +x "${script_files[@]}"
+    fi
+    shopt -u nullglob
+fi
+if [[ -d "$INSTALL_DIR/tools" ]]; then
+    shopt -s nullglob
+    tool_files=("$INSTALL_DIR/tools/"*.sh)
+    if (( ${#tool_files[@]} )); then
+        chmod +x "${tool_files[@]}"
     fi
     shopt -u nullglob
 fi
@@ -125,4 +136,8 @@ print_step "Running fix..."
 echo ""
 
 cd "$INSTALL_DIR"
-./fix_worms_wmd.sh "$@"
+if [[ $# -eq 0 ]] && [[ -t 0 ]] && [[ -t 1 ]] && [[ -f "Worms W.M.D Fix.command" ]]; then
+    ./"Worms W.M.D Fix.command"
+else
+    ./fix_worms_wmd.sh "$@"
+fi

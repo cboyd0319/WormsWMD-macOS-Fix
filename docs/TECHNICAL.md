@@ -77,6 +77,23 @@ The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL fun
 - It preserves binary compatibility with the Qt 5.3 APIs the game uses.
 - Pre-built x86_64 frameworks are available for distribution.
 
+## Release package
+
+The player-facing release zip is built by `tools/build_release_bundle.sh`. It
+contains the friendly `Worms W.M.D Fix.command` launcher, the small bootstrap
+installer, the canonical `fix_worms_wmd.sh` engine, support docs, original
+visual assets, tools, scripts, source, and the verified `dist/` Qt package.
+
+The release builder writes:
+
+- `RELEASE_INFO.txt` with start-here instructions and build metadata
+- `RELEASE_MANIFEST.tsv` with SHA-256, size, and relative path entries
+- `WormsWMD-macOS-Fix-VERSION.zip`
+- `WormsWMD-macOS-Fix-VERSION.zip.sha256`
+
+The release bundle does not include game binaries, save files, user data,
+official game art, or third-party sample assets.
+
 ## Qt package distribution
 
 The installer prefers the highest verified `qt-frameworks-x86_64-*.tar.gz`

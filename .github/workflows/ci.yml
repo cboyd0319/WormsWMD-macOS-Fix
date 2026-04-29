@@ -32,7 +32,7 @@ jobs:
       - name: Check bash syntax
         run: |
           echo "Checking bash syntax..."
-          for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do
+          for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do
             if [[ -f "$script" ]]; then
               echo "  Checking $script"
               bash -n "$script"
@@ -46,12 +46,16 @@ jobs:
       - name: Check script permissions
         run: |
           echo "Verifying scripts are executable..."
-          chmod +x fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
+          chmod +x fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
           echo "Done!"
 
       - name: Test --help flag
         run: |
           ./fix_worms_wmd.sh --help
+
+      - name: Build release bundle smoke test
+        run: |
+          ./tools/build_release_bundle.sh --version ci --skip-zip
 
   validate-c-code:
     name: Validate C Code

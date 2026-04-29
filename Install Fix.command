@@ -106,9 +106,33 @@ fi
 
 cd "$INSTALL_DIR" || exit 1
 
-# Make the fix script executable and run it
+# Make scripts executable and run the friendly launcher when available.
 chmod +x fix_worms_wmd.sh
-./fix_worms_wmd.sh
+if [[ -f "Worms W.M.D Fix.command" ]]; then
+    chmod +x "Worms W.M.D Fix.command"
+fi
+if [[ -d scripts ]]; then
+    shopt -s nullglob
+    script_files=(scripts/*.sh)
+    if (( ${#script_files[@]} )); then
+        chmod +x "${script_files[@]}"
+    fi
+    shopt -u nullglob
+fi
+if [[ -d tools ]]; then
+    shopt -s nullglob
+    tool_files=(tools/*.sh)
+    if (( ${#tool_files[@]} )); then
+        chmod +x "${tool_files[@]}"
+    fi
+    shopt -u nullglob
+fi
+
+if [[ -f "Worms W.M.D Fix.command" ]]; then
+    ./"Worms W.M.D Fix.command"
+else
+    ./fix_worms_wmd.sh
+fi
 
 # Keep the window open so user can see the result
 echo ""

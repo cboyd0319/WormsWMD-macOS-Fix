@@ -224,7 +224,7 @@ less src/agl_stub.c
 ### Run ShellCheck
 
 ```bash
-shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
 ```
 
 ### Preview changes (dry run)

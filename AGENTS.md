@@ -7,7 +7,10 @@ change.
 ## Project Shape
 
 - `fix_worms_wmd.sh` is the primary installer/fix orchestrator.
+- `Worms W.M.D Fix.command` is the friendly double-click menu wrapper.
 - `install.sh` is the curl-pipe bootstrapper that clones or updates this repo.
+- `Install Fix.command` is the tiny double-click bootstrapper that downloads or
+  updates the repo and opens the friendly launcher.
 - `scripts/` contains ordered fix steps and shared shell helpers.
 - `tools/` contains diagnostics, backups, launch helpers, packaging, update
   checks, and harness validation.
@@ -28,6 +31,8 @@ change.
 - Do not publish secrets from game config files, logs, diagnostics, or reports.
 - Do not replace the Qt archive in `dist/` without updating its checksum and
   validating extraction layout.
+- Do not bundle official Team17/Worms art or third-party sample assets without
+  committed license and attribution evidence.
 
 ## Startup Path
 
@@ -42,10 +47,11 @@ change.
 
 ```bash
 ./tools/validate_harness.sh
-shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
-for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
 ./fix_worms_wmd.sh --dry-run
+./tools/build_release_bundle.sh --version local-smoke --skip-zip
 clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
 ```
 
