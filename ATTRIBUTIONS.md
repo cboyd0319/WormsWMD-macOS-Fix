@@ -14,8 +14,7 @@ Official reference pages:
 
 ## Bundled visuals
 
-- `assets/geocities-chaos-banner.svg` is an original project graphic made for
-  this repository.
+- No decorative project artwork is currently bundled.
 - No official Team17 or Worms artwork is bundled.
 - No WebPets sample assets are bundled.
 
