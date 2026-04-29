@@ -15,7 +15,7 @@ GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/W
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
-BUILD_DIR="/tmp/agl_stub_build"
+BUILD_DIR="${BUILD_DIR:-/tmp/agl_stub_build}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 

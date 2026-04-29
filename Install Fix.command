@@ -72,19 +72,19 @@ backup_install_dir() {
 # Clone or update the repository
 if [[ -d "$INSTALL_DIR/.git" ]]; then
     echo -e "${CYAN}Updating fix scripts...${NC}"
-    if git -C "$INSTALL_DIR" pull --quiet --ff-only origin main 2>/dev/null; then
+    if git -C "$INSTALL_DIR" pull --progress --ff-only origin main; then
         :
     else
         echo -e "${YELLOW}Update failed; reinstalling...${NC}"
         backup_install_dir "$INSTALL_DIR"
-        git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
+        git clone --progress "$REPO_URL.git" "$INSTALL_DIR"
     fi
 else
     echo -e "${CYAN}Downloading fix scripts...${NC}"
     if [[ -d "$INSTALL_DIR" ]]; then
         backup_install_dir "$INSTALL_DIR"
     fi
-    if ! git clone --quiet "$REPO_URL.git" "$INSTALL_DIR" 2>/dev/null; then
+    if ! git clone --progress "$REPO_URL.git" "$INSTALL_DIR"; then
         echo ""
         echo -e "${RED}Failed to download the fix.${NC}"
         echo ""

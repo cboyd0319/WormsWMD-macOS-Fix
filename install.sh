@@ -85,19 +85,19 @@ mkdir -p "$(dirname "$INSTALL_DIR")"
 if [[ -d "$INSTALL_DIR/.git" ]]; then
     print_info "Updating existing installation..."
     # Try fast-forward pull first
-    if git -C "$INSTALL_DIR" pull --quiet --ff-only origin main 2>/dev/null; then
+    if git -C "$INSTALL_DIR" pull --progress --ff-only origin main; then
         : # Success
     else
         print_info "Update failed; reinstalling..."
         backup_install_dir "$INSTALL_DIR"
-        git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
+        git clone --progress "$REPO_URL.git" "$INSTALL_DIR"
     fi
 else
     # Fresh installation
     if [[ -d "$INSTALL_DIR" ]]; then
         backup_install_dir "$INSTALL_DIR"
     fi
-    git clone --quiet "$REPO_URL.git" "$INSTALL_DIR"
+    git clone --progress "$REPO_URL.git" "$INSTALL_DIR"
 fi
 
 print_success "Fix downloaded to: $INSTALL_DIR"

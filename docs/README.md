@@ -40,6 +40,8 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Execution plan template](exec-plans/TEMPLATE.md) - reusable plan scaffold.
 - [Agent harness application plan](exec-plans/2026-04-29-agent-harness-application.md)
   - shipped plan for applying the harness methodology to this repo.
+- [Installer diagnostics audit plan](exec-plans/2026-04-29-installer-diagnostics-audit.md)
+  - audit trail for installer, diagnostics, and documentation fixes.
 
 ## Maintenance
 

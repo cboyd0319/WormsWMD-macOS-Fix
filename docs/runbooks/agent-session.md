@@ -29,8 +29,8 @@ Harness or documentation topology:
 Shell scripts:
 
 ```bash
-shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
-for script in fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh; do bash -n "$script"; done
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ```
 
 Main entrypoint behavior:

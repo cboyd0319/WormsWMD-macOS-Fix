@@ -274,8 +274,35 @@ collect_diagnostics() {
     fi
 
     # ================================================================
-    section "HOMEBREW STATUS"
+    section "QT SOURCE STATUS"
     # ================================================================
+
+    subsection "Pre-built Qt Package"
+    local prebuilt_status local_qt_package
+    prebuilt_status="unavailable"
+    if [[ -f "$REPO_DIR/scripts/download_qt_frameworks.sh" ]]; then
+        chmod +x "$REPO_DIR/scripts/download_qt_frameworks.sh" 2>/dev/null || true
+        prebuilt_status=$("$REPO_DIR/scripts/download_qt_frameworks.sh" --check 2>/dev/null || echo "unavailable")
+    fi
+
+    if [[ "$prebuilt_status" == "available" ]]; then
+        ok "Pre-built Qt frameworks available"
+    else
+        warn "Pre-built Qt frameworks not available"
+        info "The installer can use Intel Homebrew Qt as a fallback."
+    fi
+
+    local_qt_package=$(worms_latest_path_by_mtime "$REPO_DIR/dist" "qt-frameworks-x86_64-*.tar.gz" "f")
+    if [[ -n "$local_qt_package" ]]; then
+        info "Local package: $(basename "$local_qt_package")"
+        if [[ -f "${local_qt_package}.sha256" ]]; then
+            ok "Local package checksum file present"
+        else
+            warn "Local package checksum file missing"
+        fi
+    else
+        info "No local dist package found"
+    fi
 
     subsection "Intel Homebrew"
     if [[ -f "/usr/local/bin/brew" ]]; then
@@ -284,10 +311,10 @@ collect_diagnostics() {
         brew_version=$(/usr/local/bin/brew --version 2>/dev/null | head -1 || echo "unknown")
         info "Version: $brew_version"
     else
-        fail "Intel Homebrew NOT found"
+        warn "Intel Homebrew not found (only needed if pre-built Qt is unavailable)"
     fi
 
-    subsection "Qt 5 Installation"
+    subsection "Homebrew Qt 5 Installation"
     if [[ -d "/usr/local/opt/qt@5" ]]; then
         ok "Qt 5 found"
         local qt5_version
@@ -306,8 +333,8 @@ collect_diagnostics() {
             fail "QtCore.framework missing"
         fi
     else
-        fail "Qt 5 NOT found"
-        info "Install with: arch -x86_64 /usr/local/bin/brew install qt@5"
+        warn "Homebrew Qt 5 not found (fallback unavailable)"
+        info "Fallback install: arch -x86_64 /usr/local/bin/brew install qt@5"
     fi
 
     # ================================================================

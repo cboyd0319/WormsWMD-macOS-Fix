@@ -42,8 +42,8 @@ change.
 
 ```bash
 ./tools/validate_harness.sh
-shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
-for script in fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh; do bash -n "$script"; done
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
 ./fix_worms_wmd.sh --dry-run
 clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c

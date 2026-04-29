@@ -123,6 +123,8 @@ Logs are saved to `~/Library/Logs/WormsWMD/`.
 
 If you experience input lag, stuttering, or slow performance:
 
+On macOS 15.x, keyboard input buffering or lag may be caused by the original Qt 5.3.2 runtime rather than Apple Silicon alone. The Qt 5.15 refresh has been reported to resolve this on macOS 15.7.3. Run `./fix_worms_wmd.sh --dry-run` first, then apply the fix if the preview looks correct for your install.
+
 1. Disable V-Sync (often helps):
    - In-game: **Help & Options** → **Settings** → disable **Vertical Sync**
 2. Use windowed mode:

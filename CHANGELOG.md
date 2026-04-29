@@ -2,6 +2,19 @@
 
 Notable changes are listed here. This project follows Keep a Changelog and Semantic Versioning.
 
+## 1.6.2 (2026-04-29)
+
+### Fixed
+- Fixed dry-run Qt detection so the installer preview accepts the bundled pre-built Qt package before requiring Intel Homebrew.
+- Fixed already-applied detection for the universal AGL stub by accepting any library slice list that includes `x86_64`.
+- Fixed pre-built Qt preparation failures so the installer only falls back to Homebrew when a valid x86_64 Homebrew Qt install is actually present.
+
+### Changed
+- Main installer builds now use a per-run `mktemp` directory with cleanup instead of a shared `/tmp` path.
+- One-line and double-click installers now show Git clone and pull progress while preserving the existing guidance flow.
+- Diagnostics now report the bundled pre-built Qt package first and treat Intel Homebrew as an optional fallback.
+- Documentation now notes a confirmed macOS 15.7.3 keyboard input buffering/lag report resolved after the Qt 5.15 refresh.
+
 ## 1.6.1 (2025-12-27)
 
 ### Fixed

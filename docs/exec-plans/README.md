@@ -33,3 +33,5 @@ the plan before continuing.
 
 - [Agent harness application](2026-04-29-agent-harness-application.md) -
   completed application of the harness methodology to this repo.
+- [Installer diagnostics audit](2026-04-29-installer-diagnostics-audit.md) -
+  completed audit of installer preview, diagnostics, and documentation behavior.

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![macOS](https://img.shields.io/badge/macOS-26.0%2B-blue.svg)](https://www.apple.com/macos/)
 
-Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibility and replacing the bundled Qt frameworks. The repo also includes tools for diagnostics, backups, and updates.
+Fix the black screen on macOS 26 (Tahoe) and later by restoring AGL compatibility and replacing the bundled Qt frameworks. The Qt refresh can also help older macOS installs that show keyboard input buffering or lag. The repo also includes tools for diagnostics, backups, and updates.
 
 ## Quick start
 
@@ -30,7 +30,7 @@ See `docs/INSTALL.md` for manual install, dry-run, and restore steps.
 
 ## Requirements
 
-- Target: macOS 26 (Tahoe) or later (earlier macOS versions typically don't need the fix)
+- Target: macOS 26 (Tahoe) or later. Earlier macOS versions typically don't need the AGL fix, but macOS 15.x users with keyboard input buffering or lag may benefit from the Qt 5.15 refresh.
 - Worms W.M.D installed via Steam or GOG
 - Internet connection
 - git (installed by Xcode Command Line Tools)
@@ -45,6 +45,7 @@ The script can prompt to install these if needed (you may see system prompts):
 - Adds an AGL stub framework so the game launches on macOS 26+.
 - Replaces Qt 5.3.2 with Qt 5.15.
 - Bundles required dependencies and fixes install names.
+- May resolve keyboard input buffering or lag caused by the original Qt 5.3.2 runtime.
 - Updates Info.plist (bundle ID, HiDPI support, minimum version).
 - Fixes known HTTP URLs in DataOSX/CommonData config files.
 - Comments out internal/staging URLs in DataOSX config files.

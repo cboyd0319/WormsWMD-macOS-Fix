@@ -18,8 +18,22 @@ Run these scripts in order:
 git clone https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
 
+# Use an isolated build directory for the AGL stub.
+export BUILD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/agl_stub_build.XXXXXX")"
+trap 'rm -rf "$BUILD_DIR"' EXIT
+
 # Step 1: Build the AGL stub library
 ./scripts/01_build_agl_stub.sh
+
+# Prepare the pre-built Qt framework package.
+QT_OUTPUT="$(./scripts/download_qt_frameworks.sh)"
+QT_EXTRACT_DIR="$(printf '%s\n' "$QT_OUTPUT" | tail -1)"
+if [[ ! -d "$QT_EXTRACT_DIR/Frameworks" ]]; then
+  echo "Pre-built Qt package is unavailable. Use the Homebrew fallback below."
+  exit 1
+fi
+export QT_SOURCE=prebuild
+export QT_PREFIX="$QT_EXTRACT_DIR"
 
 # Step 2: Replace Qt frameworks
 ./scripts/02_replace_qt_frameworks.sh
@@ -38,6 +52,13 @@ cd WormsWMD-macOS-Fix
 
 # Step 7 (optional): Secure config URLs
 ./scripts/07_fix_config_urls.sh
+```
+
+If the pre-built Qt package is unavailable, install Intel Homebrew Qt and set:
+
+```bash
+export QT_SOURCE=homebrew
+export QT_PREFIX=/usr/local/opt/qt@5
 ```
 
 ## Set a custom game location

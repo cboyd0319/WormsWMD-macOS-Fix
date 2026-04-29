@@ -25,7 +25,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.6.1"
+VERSION="1.6.2"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -44,7 +44,12 @@ GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
 DRY_RUN=false
 BACKUP_DIR=""
 CLEANUP_NEEDED=false
-BUILD_DIR="/tmp/agl_stub_build"
+BUILD_DIR="${BUILD_DIR:-}"
+BUILD_DIR_MANAGED=false
+QT_SOURCE=""
+QT_PREFIX=""
+QT_VERSION_DISPLAY=""
+QT_SOURCE_DISPLAY=""
 
 # Colors for output (with fallback for non-color terminals)
 if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
@@ -393,8 +398,8 @@ offer_steam_watcher() {
 cleanup() {
     stop_spinner false
 
-    # Clean up build directory
-    if [[ -d "$BUILD_DIR" ]]; then
+    # Clean up the per-run build directory created by this script.
+    if $BUILD_DIR_MANAGED && [[ -n "$BUILD_DIR" ]] && [[ -d "$BUILD_DIR" ]]; then
         rm -rf "$BUILD_DIR" 2>/dev/null || true
     fi
 }
@@ -494,6 +499,83 @@ validate_game_app() {
     fi
 }
 
+ensure_build_dir() {
+    if [[ -n "$BUILD_DIR" ]]; then
+        mkdir -p "$BUILD_DIR"
+        export BUILD_DIR
+        return 0
+    fi
+
+    BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/agl_stub_build.XXXXXX")
+    BUILD_DIR_MANAGED=true
+    export BUILD_DIR
+}
+
+prebuilt_qt_available() {
+    chmod +x "$SCRIPTS_DIR/download_qt_frameworks.sh" 2>/dev/null || true
+    [[ -x "$SCRIPTS_DIR/download_qt_frameworks.sh" ]] || return 1
+
+    local prebuild_check
+    prebuild_check=$("$SCRIPTS_DIR/download_qt_frameworks.sh" --check 2>/dev/null || true)
+    [[ "$prebuild_check" == "available" ]]
+}
+
+detect_prebuilt_qt_version() {
+    local package package_name version
+
+    package=$(worms_latest_path_by_mtime "$SCRIPT_DIR/dist" "qt-frameworks-x86_64-*.tar.gz" "f" || true)
+    if [[ -n "$package" ]]; then
+        package_name=$(basename "$package")
+        version=${package_name#qt-frameworks-x86_64-}
+        version=${version%.tar.gz}
+        if [[ -n "$version" ]]; then
+            echo "$version"
+            return 0
+        fi
+    fi
+
+    echo "5.15"
+}
+
+homebrew_qt_available() {
+    [[ -f "/usr/local/bin/brew" ]] && [[ -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]
+}
+
+homebrew_qt_version() {
+    local qt_version_path
+
+    qt_version_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d" || true)
+    if [[ -n "$qt_version_path" ]]; then
+        basename "$qt_version_path"
+    else
+        echo "unknown"
+    fi
+}
+
+detect_qt_source() {
+    QT_SOURCE=""
+    QT_PREFIX=""
+    QT_VERSION_DISPLAY=""
+    QT_SOURCE_DISPLAY=""
+
+    if prebuilt_qt_available; then
+        QT_SOURCE="prebuild"
+        QT_VERSION_DISPLAY=$(detect_prebuilt_qt_version)
+        QT_SOURCE_DISPLAY="Pre-built Qt $QT_VERSION_DISPLAY frameworks (no Homebrew needed)"
+        return 0
+    fi
+
+    if homebrew_qt_available; then
+        QT_SOURCE="homebrew"
+        QT_PREFIX="/usr/local/opt/qt@5"
+        QT_VERSION_DISPLAY=$(homebrew_qt_version)
+        QT_SOURCE_DISPLAY="Homebrew Qt $QT_VERSION_DISPLAY (/usr/local/opt/qt@5)"
+        return 0
+    fi
+
+    return 1
+}
+
 check_already_applied() {
     local game_frameworks="$GAME_APP/Contents/Frameworks"
     local has_agl=false
@@ -504,7 +586,7 @@ check_already_applied() {
     if [[ -f "$game_frameworks/AGL.framework/Versions/A/AGL" ]]; then
         local agl_arch
         agl_arch=$(lipo -archs "$game_frameworks/AGL.framework/Versions/A/AGL" 2>/dev/null || echo "")
-        if [[ "$agl_arch" == "x86_64" ]]; then
+        if echo "$agl_arch" | tr ' ' '\n' | grep -qx "x86_64"; then
             local agl_size
             agl_size=$(stat -f%z "$game_frameworks/AGL.framework/Versions/A/AGL" 2>/dev/null || echo "0")
             if [[ "$agl_size" -lt 100000 ]]; then
@@ -727,27 +809,16 @@ do_dry_run() {
         fi
     fi
 
-    # Check Intel Homebrew
-    if [[ ! -f "/usr/local/bin/brew" ]]; then
-        print_error "Intel Homebrew not found"
+    # Check Qt source: prefer pre-built, fall back to Homebrew.
+    if ! detect_qt_source; then
+        print_error "Qt frameworks not available"
+        echo ""
+        echo "Pre-built Qt frameworks could not be found, and Intel Homebrew Qt is unavailable."
+        echo "Check your internet connection or install the Homebrew fallback:"
+        echo "  arch -x86_64 /usr/local/bin/brew install qt@5"
         exit 1
     fi
-    print_dry_run "Intel Homebrew: found"
-
-    # Check Qt 5
-    if [[ ! -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]; then
-        print_error "Qt 5 not found"
-        exit 1
-    fi
-    local qt_version
-    local qt_version_path
-    qt_version_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
-    if [[ -n "$qt_version_path" ]]; then
-        qt_version=$(basename "$qt_version_path")
-    else
-        qt_version="unknown"
-    fi
-    print_dry_run "Qt 5: $qt_version"
+    print_dry_run "Qt source: $QT_SOURCE_DISPLAY"
 
     echo ""
     print_step "Changes that would be made..."
@@ -756,17 +827,21 @@ do_dry_run() {
     print_dry_run "Create backup at: ~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS/"
     echo ""
 
-    print_dry_run "Build AGL stub library (x86_64)"
+    print_dry_run "Build AGL stub library (universal x86_64 + arm64)"
     print_dry_run "  Source: $SCRIPT_DIR/src/agl_stub.c"
     print_dry_run "  Target: $GAME_APP/Contents/Frameworks/AGL.framework/"
     echo ""
 
     print_dry_run "Replace Qt frameworks found in the game bundle"
-    print_dry_run "  (upgrade to Qt $qt_version and add QtDBus if missing)"
+    print_dry_run "  (upgrade to Qt $QT_VERSION_DISPLAY and add QtDBus if missing)"
     echo ""
 
     print_dry_run "Copy dependencies referenced by Qt frameworks/plugins"
-    print_dry_run "  (resolved from /usr/local and @rpath entries)"
+    if [[ "$QT_SOURCE" == "prebuild" ]]; then
+        print_dry_run "  (verify bundled dependencies from the pre-built package)"
+    else
+        print_dry_run "  (resolved from /usr/local and @rpath entries)"
+    fi
     echo ""
 
     print_dry_run "Update library paths to use @executable_path"
@@ -871,46 +946,15 @@ do_fix() {
     validate_game_app
     print_substep "Game found: $GAME_APP"
 
-    # Check Qt source: prefer pre-built, fall back to Homebrew
-    QT_SOURCE=""
-    QT_PREFIX=""
-
-    # First, try to use/download pre-built Qt frameworks
-    chmod +x "$SCRIPTS_DIR/download_qt_frameworks.sh" 2>/dev/null || true
-    if [[ -x "$SCRIPTS_DIR/download_qt_frameworks.sh" ]]; then
-        local prebuild_check
-        prebuild_check=$("$SCRIPTS_DIR/download_qt_frameworks.sh" --check 2>/dev/null || echo "unavailable")
-
-        if [[ "$prebuild_check" == "available" ]]; then
-            print_substep "Qt source: Pre-built frameworks (no Homebrew needed)"
-            QT_SOURCE="prebuild"
-        fi
-    fi
-
-    # Fall back to Homebrew if pre-built not available
-    if [[ -z "$QT_SOURCE" ]]; then
-        if [[ -f "/usr/local/bin/brew" ]] && [[ -d "/usr/local/opt/qt@5/lib/QtCore.framework" ]]; then
-            local qt_version
-            local qt_version_path
-            qt_version_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
-            if [[ -n "$qt_version_path" ]]; then
-                qt_version=$(basename "$qt_version_path")
-            else
-                qt_version="unknown"
-            fi
-            print_substep "Qt source: Homebrew ($qt_version)"
-            QT_SOURCE="homebrew"
-            QT_PREFIX="/usr/local/opt/qt@5"
-        fi
-    fi
-
-    # If neither available, show installation options
-    if [[ -z "$QT_SOURCE" ]]; then
+    # Check Qt source: prefer pre-built, fall back to Homebrew.
+    if detect_qt_source; then
+        print_substep "Qt source: $QT_SOURCE_DISPLAY"
+    else
         echo ""
         print_error "Qt frameworks not available"
         echo ""
-        echo "Option 1 (Recommended): The fix will automatically download pre-built frameworks."
-        echo "          Just run the fix and it will handle everything."
+        echo "Option 1 (Recommended): Check your internet connection and re-run the fix."
+        echo "          The fix downloads pre-built frameworks automatically when available."
         echo ""
         echo "Option 2: Install Intel Homebrew and Qt manually:"
         echo "  arch -x86_64 /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
@@ -969,6 +1013,8 @@ do_fix() {
     # ============================================================
     echo ""
     print_step "Building AGL stub library..."
+    ensure_build_dir
+    print_substep "Build directory: $BUILD_DIR"
     chmod +x "$SCRIPTS_DIR/01_build_agl_stub.sh"
     "$SCRIPTS_DIR/01_build_agl_stub.sh"
 
@@ -978,18 +1024,27 @@ do_fix() {
     # If using pre-built, download first
     if [[ "$QT_SOURCE" == "prebuild" ]]; then
         start_spinner "Downloading Qt frameworks..."
-        local qt_extract_dir
+        local qt_extract_dir qt_extract_output
         qt_extract_output=$("$SCRIPTS_DIR/download_qt_frameworks.sh" 2>/dev/null || true)
         qt_extract_dir=$(echo "$qt_extract_output" | tail -1)
         stop_spinner
 
         if [[ -n "$qt_extract_dir" ]] && [[ -d "$qt_extract_dir/Frameworks" ]]; then
             export QT_PREFIX="$qt_extract_dir"
-            print_substep "Using pre-built Qt 5.15"
+            print_substep "Using pre-built Qt $QT_VERSION_DISPLAY"
         else
-            print_warning "Pre-built download failed, falling back to Homebrew"
-            QT_SOURCE="homebrew"
-            QT_PREFIX="/usr/local/opt/qt@5"
+            if homebrew_qt_available; then
+                print_warning "Pre-built Qt prep failed, falling back to Homebrew"
+                QT_SOURCE="homebrew"
+                QT_PREFIX="/usr/local/opt/qt@5"
+                QT_VERSION_DISPLAY=$(homebrew_qt_version)
+            else
+                print_error "Pre-built Qt frameworks could not be prepared and Homebrew Qt is unavailable."
+                echo ""
+                echo "Try again with a working network connection, or install the Homebrew fallback:"
+                echo "  arch -x86_64 /usr/local/bin/brew install qt@5"
+                exit 1
+            fi
         fi
     fi
 
@@ -999,19 +1054,11 @@ do_fix() {
     "$SCRIPTS_DIR/02_replace_qt_frameworks.sh" > /dev/null
     stop_spinner
 
-    local qt_version_display
     if [[ "$QT_SOURCE" == "prebuild" ]]; then
-        qt_version_display="5.15 (pre-built)"
+        print_substep "Qt frameworks replaced (5.3.2 → $QT_VERSION_DISPLAY pre-built)"
     else
-        local qt_version_display_path
-        qt_version_display_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d")
-        if [[ -n "$qt_version_display_path" ]]; then
-            qt_version_display=$(basename "$qt_version_display_path")
-        else
-            qt_version_display="5.15"
-        fi
+        print_substep "Qt frameworks replaced (5.3.2 → $QT_VERSION_DISPLAY Homebrew)"
     fi
-    print_substep "Qt frameworks replaced (5.3.2 → $qt_version_display)"
 
     echo ""
     print_step "Copying dependencies..."

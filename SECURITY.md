@@ -50,7 +50,7 @@ This fix is designed to be safe against:
 | `~/Library/Logs/WormsWMD/` | Launcher logs and crash reports | Manual |
 | `~/.cache/wormswmd-fix/` | Cached Qt frameworks | Manual or `--force` |
 | `~/Library/LaunchAgents/com.wormswmd.fix.watcher.plist` | Optional update watcher | `--uninstall` |
-| `/tmp/agl_stub_build/` | Temporary build directory | Automatic |
+| `${TMPDIR:-/tmp}/agl_stub_build.*/` | Main installer AGL build directory | Automatic |
 
 ## What the fix does NOT do
 
@@ -103,7 +103,7 @@ Pre-built Qt framework packages undergo multiple verification steps:
 4. **Path traversal protection**: Archives containing `../`, `/..`, or absolute paths are rejected
 5. **Post-extraction verification**: Confirms expected directories exist
 
-If any verification fails, the script falls back to Homebrew or exits with an error.
+If any verification fails, the script falls back to Homebrew only when a valid Intel Homebrew Qt install is present; otherwise it exits before replacing game frameworks.
 
 ## Code signing
 
@@ -176,7 +176,7 @@ All interactive prompts:
 
 ## Security audit checklist
 
-Last audit: 2025-12-26
+Last audit: 2026-04-29
 
 | Category | Status | Notes |
 |----------|--------|-------|
@@ -184,7 +184,7 @@ Last audit: 2025-12-26
 | Path traversal | Pass | Archive validation, no unvalidated path concatenation |
 | Network security | Pass | HTTPS-only, TLS 1.2+, checksums required |
 | Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
-| Symlink attacks | Pass | `mktemp` for temp files, cleanup traps |
+| Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory and cleanup traps |
 | Race conditions | Pass | Atomic operations where possible |
 | Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
 | Dependency security | Pass | Checksums for downloads, Homebrew fallback |
@@ -215,7 +215,7 @@ less src/agl_stub.c
 ### Run ShellCheck
 
 ```bash
-shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
 ```
 
 ### Preview changes (dry run)

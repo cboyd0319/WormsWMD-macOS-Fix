@@ -6,6 +6,8 @@
 
 This fix targets macOS 26 (Tahoe) where Apple removed AGL. Earlier macOS versions typically don't need it unless you're seeing the same black-screen symptoms.
 
+There is also a confirmed report that applying the Qt 5.15 refresh resolved keyboard input buffering/lag on macOS 15.7.3 (Sequoia). Run `./fix_worms_wmd.sh --dry-run` first if you are using an older macOS version for that reason.
+
 **Q: Does this fix work for the GOG version?**
 
 The fix operates on the macOS app bundle. If your GOG install uses the same app bundle layout, it should work. Set `GAME_APP` to your GOG installation path.

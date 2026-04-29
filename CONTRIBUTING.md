@@ -65,7 +65,7 @@ cd WormsWMD-macOS-Fix
 
 ```bash
 ./tools/validate_harness.sh
-shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
 ./fix_worms_wmd.sh --help
 ./fix_worms_wmd.sh --dry-run
 ./tools/check_updates.sh --help
@@ -109,7 +109,7 @@ At minimum, run:
 
 ```bash
 ./tools/validate_harness.sh
-shellcheck fix_worms_wmd.sh install.sh scripts/*.sh tools/*.sh
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" scripts/*.sh tools/*.sh
 ./fix_worms_wmd.sh --dry-run
 ./fix_worms_wmd.sh --verify
 ```

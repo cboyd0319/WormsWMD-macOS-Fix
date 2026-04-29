@@ -10,7 +10,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SRC_DIR="$(dirname "$SCRIPT_DIR")/src"
-BUILD_DIR="/tmp/agl_stub_build"
+BUILD_DIR="${BUILD_DIR:-/tmp/agl_stub_build}"
+export BUILD_DIR
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
 # shellcheck disable=SC1091
