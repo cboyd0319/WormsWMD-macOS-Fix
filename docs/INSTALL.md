@@ -10,7 +10,7 @@ Use the release bundle:
 1. Download the latest release zip from:
    https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest
 2. Optionally download the matching `.zip.sha256` file and verify it:
-   `shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.4.zip.sha256`
+   `shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.5.zip.sha256`
 3. Unzip it.
 4. Open `README_FIRST.txt`.
 5. Double-click `Worms W.M.D Fix.command`.
@@ -40,14 +40,14 @@ and they refuse Git repositories with a different remote.
 Terminal users can use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.5/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, `install.sh` opens the
 same friendly launcher menu. When flags are provided, it forwards them directly
 to `fix_worms_wmd.sh`. By default, the bootstrap pins the cloned repository to
-release `v1.6.4` and verifies the expected commit before execution. Non-default
-refs require `WORMSWMD_ALLOW_UNPINNED_REF=1`.
+release `v1.6.5` before execution. Non-default refs require
+`WORMSWMD_ALLOW_UNPINNED_REF=1`.
 
 ## Preview changes
 
@@ -62,7 +62,7 @@ To see what the fix does without applying it, run:
 Run these scripts in order:
 
 ```bash
-git clone --branch v1.6.4 --depth 1 https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
+git clone --branch v1.6.5 --depth 1 https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
 
 # Use an isolated build directory for the AGL stub.

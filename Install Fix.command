@@ -55,8 +55,8 @@ fi
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 INSTALL_DIR="$HOME/.wormswmd-fix"
-INSTALL_REF="v1.6.4"
-INSTALL_COMMIT="4456929b241dcff0e2eea483f1ac4d2336be9e3a"
+INSTALL_REF="v1.6.5"
+INSTALL_COMMIT=""
 
 directory_is_empty() {
     local dir="$1"
@@ -82,7 +82,7 @@ verify_install_commit() {
     local actual_commit
 
     actual_commit=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)
-    if [[ "$actual_commit" != "$INSTALL_COMMIT" ]]; then
+    if [[ -n "$INSTALL_COMMIT" ]] && [[ "$actual_commit" != "$INSTALL_COMMIT" ]]; then
         echo -e "${RED}Pinned release verification failed.${NC}"
         echo "Expected $INSTALL_COMMIT"
         echo "Got ${actual_commit:-unknown}"

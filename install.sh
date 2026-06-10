@@ -3,17 +3,17 @@
 # install.sh - One-liner installer for Worms W.M.D macOS Fix
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.5/install.sh | bash
 #
 # Or with options:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.5/install.sh | bash -s -- --dry-run
 #
 
 set -euo pipefail
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
-DEFAULT_INSTALL_REF="v1.6.4"
-DEFAULT_INSTALL_COMMIT="4456929b241dcff0e2eea483f1ac4d2336be9e3a"
+DEFAULT_INSTALL_REF="v1.6.5"
+DEFAULT_INSTALL_COMMIT=""
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
 INSTALL_REF="${INSTALL_REF:-$DEFAULT_INSTALL_REF}"
 
@@ -144,6 +144,9 @@ verify_default_install_commit() {
     local actual_commit
 
     if [[ "$INSTALL_REF" != "$DEFAULT_INSTALL_REF" ]]; then
+        return 0
+    fi
+    if [[ -z "$DEFAULT_INSTALL_COMMIT" ]]; then
         return 0
     fi
 

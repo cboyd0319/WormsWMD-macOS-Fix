@@ -112,9 +112,9 @@ the tar stream, `gzip -n`, and a generated `MANIFEST.txt`.
 Network access is limited to documented endpoints for repository downloads,
 prebuilt Qt assets, update checks, preflight checks, and Apple-managed tool
 installation prompts. Payloads that affect executable code must use HTTPS and
-checksum verification. Bootstrap installers default to the latest stable release
-tag plus exact commit verification; mutable refs require explicit developer
-opt-in.
+checksum verification. Bootstrap installers default to the latest stable
+release tag; mainline bootstraps should also verify the exact release commit
+when that commit is known. Mutable refs require explicit developer opt-in.
 
 The project does not collect telemetry.
 

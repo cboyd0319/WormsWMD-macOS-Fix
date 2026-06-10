@@ -4,6 +4,10 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
+No changes yet.
+
+## 1.6.5 (2026-06-10)
+
 ### Fixed
 - Fixed main installer completion so verification errors fail the run before the
   success message and keep rollback enabled.
@@ -14,9 +18,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 ### Security
 - Hardened bootstrap installers so `INSTALL_DIR` cannot move or overwrite an
   arbitrary non-empty directory or unrelated Git repository.
-- Pinned bootstrap installers to release `v1.6.4` plus exact commit
-  verification by default; non-default refs now require explicit developer
-  opt-in.
+- Pinned bootstrap installers to release `v1.6.5` by default; non-default refs
+  now require explicit developer opt-in.
 - Pinned GitHub Actions to latest stable immutable commit SHAs.
 - Hardened Qt and save archive handling against unsafe symlinks, hardlinks,
   special files, and mutable remote `dist/` fallback.
