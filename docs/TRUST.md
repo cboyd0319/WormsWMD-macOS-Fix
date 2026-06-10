@@ -38,8 +38,9 @@ it.
 - No `sudo`, administrator password, kernel extension, or system-wide installer.
 - The default launcher has a dry-run preview option before applying changes.
 - Original game files are backed up before replacement and can be restored.
-- Pre-built Qt packages are checked with SHA-256, metadata, manifests, safe
-  archive paths, and x86_64 architecture validation before use.
+- Pre-built Qt packages are checked with SHA-256, metadata, safe archive paths,
+  generated or archive-provided manifests, and x86_64 architecture validation
+  before use.
 - Support bundles are designed to exclude game binaries, save archives, and
   private account tokens.
 - Maintainer review is required for trust-sensitive files through

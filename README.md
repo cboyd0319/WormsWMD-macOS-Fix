@@ -78,15 +78,15 @@ The launcher can prompt for these system components when needed:
 
 - Rosetta 2 on Apple Silicon Macs.
 - Xcode Command Line Tools.
-- Qt frameworks downloaded from this repository's GitHub releases, with a
-  Homebrew fallback.
+- Qt frameworks bundled with the release package or loaded from the pinned
+  repository `dist/` source, with a Homebrew fallback.
 
 ## What The Fix Changes
 
 - Adds an AGL stub framework so the game can launch on macOS 26+.
 - Replaces the bundled Qt 5.3.2 runtime with Qt 5.15.
-- Verifies pre-built Qt package checksums, metadata, manifests, and x86_64
-  slices before use.
+- Verifies pre-built Qt package checksums, metadata, archive/generated
+  manifests, and x86_64 slices before use.
 - Bundles required dependencies and fixes install names.
 - Updates Info.plist values for bundle identity, HiDPI support, and minimum
   macOS version.
@@ -121,12 +121,12 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4
 Use the release zip above unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | INSTALL_REF=v1.6.4 bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The `INSTALL_REF=v1.6.4` part makes the
-bootstrap clone the tagged release instead of whatever is currently on `main`.
+launcher menu as the release zip. The bootstrap is pinned to release `v1.6.4`
+and verifies the expected commit before running downloaded code.
 
 ## Pre-Flight Check
 

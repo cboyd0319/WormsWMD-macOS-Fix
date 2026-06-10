@@ -70,7 +70,8 @@ This fix is designed to be safe against:
 | Qt framework download | `github.com` (repo dist/) | HTTPS + SHA256 checksum |
 | Release bundle download | `github.com` releases | HTTPS + SHA256 checksum + artifact attestation |
 | Repository clone/update | `github.com` | HTTPS via git |
-| Update check (optional) | `raw.githubusercontent.com` | HTTPS |
+| Terminal bootstrap script (optional) | `raw.githubusercontent.com` pinned release tag | HTTPS |
+| Update check (optional) | `api.github.com`, `github.com` release assets | HTTPS + SHA256 checksum for downloads |
 | Pre-flight network check (optional) | `ads.t17service.com`, `steamcommunity.com` | HTTPS |
 | Rosetta 2 install | Apple servers | System-managed |
 | Xcode CLT install | Apple servers | System-managed |
@@ -89,7 +90,10 @@ No analytics or telemetry are used, and network access is limited to the endpoin
 
 ### Security note on updates
 
-The `check_updates.sh --download` option downloads a ZIP snapshot from GitHub without cryptographic signature verification. For maximum security, prefer `git pull` which uses SSH/HTTPS authentication.
+The `check_updates.sh --download` option downloads the latest release zip and
+matching `.sha256` file, then verifies the checksum before leaving the zip in
+`~/Downloads`. GitHub release attestations can be verified separately with
+`gh attestation verify`.
 
 ## Download verification
 
@@ -119,7 +123,8 @@ Actions built the asset from this repository.
 
 Pre-built Qt framework packages undergo multiple verification steps:
 
-1. **Source verification**: Downloaded only from the repository's `dist/` directory
+1. **Source verification**: Downloaded only from local `dist/` or the pinned
+   release commit's `dist/` directory
 2. **Checksum validation**: SHA256 hash must match the `.sha256` file
 3. **Version and metadata validation**: Package names and `METADATA.txt` must
    agree on a numeric Qt 5.15.x version and x86_64 architecture
@@ -128,13 +133,18 @@ Pre-built Qt framework packages undergo multiple verification steps:
    - `PlugIns/` and contents
    - `METADATA.txt`
    - `MANIFEST.txt`
-5. **Path traversal protection**: Archives containing `../`, `/..`, or absolute paths are rejected
+5. **Path traversal and link protection**: Archives containing `../`, `/..`,
+   absolute paths, unsafe symlink targets, hardlinks, or special files are
+   rejected
 6. **Required content validation**: Required Qt frameworks, the Cocoa platform
    plugin, metadata, and plugin directories must be present after extraction
 7. **Architecture validation**: Framework and plugin binaries must contain an
    `x86_64` Mach-O slice
-8. **Package manifest validation**: `MANIFEST.txt` is verified when present
-9. **Post-extraction verification**: Confirms expected directories exist before use
+8. **Package manifest validation**: `MANIFEST.txt` is verified when present in
+   the archive; extracted cache directories get a generated manifest when the
+   legacy archive does not include one
+9. **Post-extraction verification**: Confirms expected directories and the
+   extracted cache manifest exist before use
 
 If any verification fails, the script falls back to Homebrew only when a valid Intel Homebrew Qt install is present; otherwise it exits before replacing game frameworks.
 
@@ -179,11 +189,11 @@ User-controllable environment variables are validated:
 
 | Variable | Validation |
 |----------|------------|
-| `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D` |
-| `INSTALL_DIR` | Checked for conflicts, backed up if exists |
-| `INSTALL_REF` | Optional installer ref; limited to safe Git ref characters |
-| `LOG_FILE` | Created in user-writable location only |
-| `QT_PREFIX` | Verified to contain expected Qt frameworks |
+| `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D`; writable bundle subpaths must not be symlinks or resolve outside `Contents` |
+| `INSTALL_DIR` | Refuses system paths, home directory, non-empty non-repo directories, and Git repositories with a different remote |
+| `INSTALL_REF` | Defaults to pinned release `v1.6.4` and exact commit verification; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
+| `LOG_FILE` | Must be a regular `.log` path under `~/Library/Logs` |
+| `QT_PREFIX` | Verified to contain expected Qt frameworks; direct custom Homebrew prefixes require explicit opt-in |
 
 ### User input
 
@@ -215,17 +225,17 @@ Last audit: 2026-04-29
 | Category | Status | Notes |
 |----------|--------|-------|
 | Command injection | Pass | No `eval` on user input, no unsafe shell expansion |
-| Path traversal | Pass | Qt and save-backup archive validation, no unvalidated path concatenation |
+| Path traversal | Pass | Qt and save-backup archive validation, link rejection, no unvalidated path concatenation |
 | Network security | Pass | HTTPS-only, TLS 1.2+, checksums required |
 | Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
-| Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory and cleanup traps |
+| Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory, cleanup traps, bundle containment checks, and archive link rejection |
 | Race conditions | Pass | Atomic operations where possible |
 | Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
 | Dependency security | Pass | Checksums, metadata, manifests, and x86_64 slice checks for pre-built Qt |
 | Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
-| Backup restore | Pass | Game backups and save archives validate manifests when present; legacy backups are flagged |
+| Backup restore | Pass | Game backups validate manifests and safe symlinks; save archives reject links and special files before restore; legacy backups are flagged |
 | Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
 
 ## Verifying the fix
@@ -315,7 +325,7 @@ The fix automatically creates a backup before making changes:
 
 | Component | Source | Verification |
 |-----------|--------|--------------|
-| Qt 5.15 | Pre-built in repo `dist/`, or Homebrew | SHA256 checksum, metadata, package manifest, x86_64 slices |
+| Qt 5.15 | Pre-built in repo `dist/`, or Homebrew | SHA256 checksum, metadata, archive/generated manifest, x86_64 slices |
 | GLib, PCRE2, etc. | Bundled with Qt or from Homebrew | Transitive from Qt |
 
 Pre-built Qt packages:
@@ -326,9 +336,9 @@ Pre-built Qt packages:
 
 ## Known limitations
 
-1. **Pre-built packages are not signed**: The Qt framework tarball uses SHA256 checksums, metadata, and manifests but not cryptographic signatures. The checksum file is in the same repository.
+1. **Pre-built packages are not signed**: The pre-built Qt path uses SHA256 checksums, metadata, archive or generated cache manifests, and binary-slice checks, but not cryptographic package signatures. The checksum file is in the same repository.
 
-2. **Update downloads lack signatures**: `check_updates.sh --download` retrieves code without signature verification. Use `git pull` for authenticated updates.
+2. **Update downloads are checksum-verified but not independently signed**: `check_updates.sh --download` verifies the release zip checksum. Use `gh attestation verify` for release provenance.
 
 3. **Ad-hoc code signature**: The app is signed with an ad-hoc signature, not a Developer ID. This may trigger Gatekeeper warnings on some systems.
 

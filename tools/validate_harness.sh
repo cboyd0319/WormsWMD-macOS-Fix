@@ -32,6 +32,20 @@ normalize_existing_path() {
     printf '%s/%s\n' "$dir" "$base"
 }
 
+path_is_inside_repo() {
+    local path="$1"
+    local abs_path
+
+    abs_path=$(normalize_existing_path "$path")
+    case "$abs_path" in
+        "$ROOT_DIR"|"$ROOT_DIR"/*)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
 is_external_link() {
     local target="$1"
 
@@ -79,6 +93,8 @@ check_local_links() {
         target_path="$source_dir/$target"
         if [[ ! -e "$target_path" ]]; then
             fail "$source has a broken local link: $target"
+        elif ! path_is_inside_repo "$target_path"; then
+            fail "$source has a local link outside the repository: $target"
         fi
     done < <(grep -Eo '\[[^]]+\]\([^)]+\)' "$source_abs" || true)
 }

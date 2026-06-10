@@ -21,7 +21,7 @@ interactive no-argument runs when that launcher is present. When command-line
 flags are provided, `install.sh` must continue forwarding them to
 `fix_worms_wmd.sh`.
 
-The ordered fix scripts are:
+The main installer runs the fix scripts in this logical order:
 
 1. `scripts/01_build_agl_stub.sh` - build the AGL compatibility framework from
    `src/agl_stub.c`.
@@ -31,11 +31,11 @@ The ordered fix scripts are:
    app bundle.
 4. `scripts/04_fix_library_paths.sh` - rewrite install names to bundle-relative
    paths.
-5. `scripts/05_verify_installation.sh` - verify framework, plugin, dependency,
-   metadata, code-signing, and quarantine state.
-6. `scripts/06_fix_info_plist.sh` - update bundle metadata and display flags.
-7. `scripts/07_fix_config_urls.sh` - upgrade known HTTP URLs and disable
+5. `scripts/06_fix_info_plist.sh` - update bundle metadata and display flags.
+6. `scripts/07_fix_config_urls.sh` - upgrade known HTTP URLs and disable
    internal/staging URLs.
+7. `scripts/05_verify_installation.sh` - verify framework, plugin, dependency,
+   metadata, code-signing, quarantine, and config URL state.
 
 Do not reorder these steps unless the verification contract is updated in the
 same change.
@@ -64,6 +64,7 @@ Before destructive bundle changes, the fix creates a timestamped backup under
 - `Contents/PlugIns/`
 - `Contents/Info.plist` when backed up
 - DataOSX config files when backed up
+- CommonData config files when backed up
 - `BACKUP_MANIFEST.tsv` for checksum and size verification of new backups
 
 When a game-bundle backup includes `BACKUP_MANIFEST.tsv`, restore and rollback
@@ -73,20 +74,25 @@ only with an explicit warning.
 
 Save-game backup behavior belongs to `tools/backup_saves.sh` and must remain
 separate from game-bundle restore behavior. Save-game archives must validate
-their tar layout before extraction, verify `MANIFEST.tsv` when present, and warn
-when restoring older archives that do not include a manifest.
+their tar layout and entry metadata before extraction, reject symlinks,
+hardlinks, and special files, verify `MANIFEST.tsv` when present, and warn when
+restoring older archives that do not include a manifest.
 
 ## Qt Distribution Contract
 
 The preferred Qt source is the prebuilt archive in `dist/` plus its `.sha256`
-file. Archive extraction must reject unsafe layouts and traversal paths.
+file. Archive extraction must reject unsafe layouts, traversal paths, unsafe
+symlink targets, hardlinks, and special files. Remote fallback must use a pinned
+commit for `dist/` contents. If a legacy archive lacks `MANIFEST.txt`, the
+downloader must generate and verify a cache-local manifest before installer use.
 Homebrew is a fallback, not the primary happy path.
 
 When replacing the Qt archive:
 
 - Update the matching checksum file.
 - Validate the archive layout, package metadata, required frameworks/plugins,
-  package manifest when present, and x86_64 Mach-O slices.
+  archive manifest when present, generated cache manifest, and x86_64 Mach-O
+  slices.
 - Run the packaging or install verification relevant to the change.
 - Update user docs if the version, source, or fallback behavior changes.
 
@@ -106,7 +112,9 @@ the tar stream, `gzip -n`, and a generated `MANIFEST.txt`.
 Network access is limited to documented endpoints for repository downloads,
 prebuilt Qt assets, update checks, preflight checks, and Apple-managed tool
 installation prompts. Payloads that affect executable code must use HTTPS and
-checksum verification.
+checksum verification. Bootstrap installers default to the latest stable release
+tag plus exact commit verification; mutable refs require explicit developer
+opt-in.
 
 The project does not collect telemetry.
 
@@ -128,8 +136,8 @@ or third-party sample assets without documented permission.
 ## Logging And Diagnostics Contract
 
 Fix logs are written under `~/Library/Logs/WormsWMD-Fix/` unless `LOG_FILE`
-sets a user-writable file path. Debug tracing writes a `.trace` file next to the
-selected log.
+sets another regular `.log` path under `~/Library/Logs`. Debug tracing writes a
+`.trace` file next to the selected log.
 
 Launcher logs and crash reports are written under `~/Library/Logs/WormsWMD/`.
 Diagnostics intended for bug reports should be collected with:

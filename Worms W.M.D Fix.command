@@ -5,7 +5,13 @@
 
 set -euo pipefail
 
-LAUNCHER_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+LAUNCHER_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$LAUNCHER_PATH" ]]; do
+    LAUNCHER_DIR="$(cd -P "$(dirname "$LAUNCHER_PATH")" && pwd)"
+    LAUNCHER_PATH="$(readlink "$LAUNCHER_PATH")"
+    [[ "$LAUNCHER_PATH" != /* ]] && LAUNCHER_PATH="$LAUNCHER_DIR/$LAUNCHER_PATH"
+done
+LAUNCHER_DIR="$(cd -P "$(dirname "$LAUNCHER_PATH")" && pwd)"
 TTY_DEVICE=""
 
 if [[ -r /dev/tty ]] && [[ -w /dev/tty ]]; then

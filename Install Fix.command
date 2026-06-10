@@ -55,36 +55,71 @@ fi
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 INSTALL_DIR="$HOME/.wormswmd-fix"
+INSTALL_REF="v1.6.4"
+INSTALL_COMMIT="4456929b241dcff0e2eea483f1ac4d2336be9e3a"
 
-backup_install_dir() {
-    local src="$1"
-    local backup
-    backup="${src}.backup.$(date +%s)"
+directory_is_empty() {
+    local dir="$1"
 
-    if mv "$src" "$backup"; then
-        echo -e "${CYAN}Existing install backed up to: $backup${NC}"
-    else
-        echo -e "${RED}Failed to back up existing install at: $src${NC}"
+    [[ -z "$(find "$dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]
+}
+
+repo_remote_matches() {
+    local dir="$1"
+    local remote
+
+    remote=$(git -C "$dir" config --get remote.origin.url 2>/dev/null || true)
+    case "$remote" in
+        "$REPO_URL"|"$REPO_URL.git"|git@github.com:cboyd0319/WormsWMD-macOS-Fix.git)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+verify_install_commit() {
+    local actual_commit
+
+    actual_commit=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)
+    if [[ "$actual_commit" != "$INSTALL_COMMIT" ]]; then
+        echo -e "${RED}Pinned release verification failed.${NC}"
+        echo "Expected $INSTALL_COMMIT"
+        echo "Got ${actual_commit:-unknown}"
+        read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
         exit 1
     fi
 }
 
 # Clone or update the repository
 if [[ -d "$INSTALL_DIR/.git" ]]; then
+    if ! repo_remote_matches "$INSTALL_DIR"; then
+        echo -e "${RED}$INSTALL_DIR is a Git repository for a different remote.${NC}"
+        echo "Move it yourself or choose the Terminal installer with a different INSTALL_DIR."
+        read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
+        exit 1
+    fi
     echo -e "${CYAN}Updating fix scripts...${NC}"
-    if git -C "$INSTALL_DIR" pull --progress --ff-only origin main; then
+    if git -C "$INSTALL_DIR" fetch --progress --force origin "refs/tags/$INSTALL_REF:refs/tags/$INSTALL_REF" \
+        && git -C "$INSTALL_DIR" checkout --detach "$INSTALL_REF"; then
+        verify_install_commit
         :
     else
-        echo -e "${YELLOW}Update failed; reinstalling...${NC}"
-        backup_install_dir "$INSTALL_DIR"
-        git clone --progress "$REPO_URL.git" "$INSTALL_DIR"
+        echo -e "${RED}Update failed. Existing installation was left untouched.${NC}"
+        read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
+        exit 1
     fi
 else
     echo -e "${CYAN}Downloading fix scripts...${NC}"
     if [[ -d "$INSTALL_DIR" ]]; then
-        backup_install_dir "$INSTALL_DIR"
+        if ! directory_is_empty "$INSTALL_DIR"; then
+            echo -e "${RED}$INSTALL_DIR already exists and is not an empty fix checkout.${NC}"
+            echo "Move it yourself, then run this installer again."
+            read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
+            exit 1
+        fi
     fi
-    if ! git clone --progress "$REPO_URL.git" "$INSTALL_DIR"; then
+    if ! git clone --progress --branch "$INSTALL_REF" --depth 1 "$REPO_URL.git" "$INSTALL_DIR"; then
         echo ""
         echo -e "${RED}Failed to download the fix.${NC}"
         echo ""
@@ -93,6 +128,7 @@ else
         read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
         exit 1
     fi
+    verify_install_commit
 fi
 
 echo ""

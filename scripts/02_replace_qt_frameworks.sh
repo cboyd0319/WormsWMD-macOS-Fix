@@ -16,7 +16,13 @@ GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/W
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
 # Determine Qt source location
@@ -48,6 +54,48 @@ if [[ -z "$LOGGING_PRESET" ]]; then
     fi
 fi
 
+validate_qt_prefix() {
+    case "$QT_SOURCE" in
+        prebuild|homebrew)
+            ;;
+        *)
+            echo "ERROR: Invalid QT_SOURCE: $QT_SOURCE"
+            exit 1
+            ;;
+    esac
+
+    worms_reject_control_chars "$QT_PREFIX" "QT_PREFIX"
+
+    if [[ "$QT_SOURCE" == "homebrew" ]] && [[ "$QT_PREFIX" != "/usr/local/opt/qt@5" ]]; then
+        if ! worms_bool_true "${WORMSWMD_ALLOW_CUSTOM_QT_PREFIX:-}"; then
+            echo "ERROR: Refusing custom Homebrew QT_PREFIX without WORMSWMD_ALLOW_CUSTOM_QT_PREFIX=1"
+            exit 1
+        fi
+    fi
+
+    if [[ "$QT_SOURCE" == "prebuild" ]]; then
+        if [[ ! -f "$QT_PREFIX/METADATA.txt" ]] || [[ ! -f "$QT_PREFIX/MANIFEST.txt" ]]; then
+            echo "ERROR: Pre-built QT_PREFIX is missing METADATA.txt or MANIFEST.txt: $QT_PREFIX"
+            exit 1
+        fi
+        worms_validate_tree_symlinks "$QT_PREFIX" || {
+            echo "ERROR: Pre-built QT_PREFIX contains unsafe symlinks: $QT_PREFIX"
+            exit 1
+        }
+        worms_verify_manifest "$QT_PREFIX" "$QT_PREFIX/MANIFEST.txt" || {
+            echo "ERROR: Pre-built QT_PREFIX manifest verification failed: $QT_PREFIX"
+            exit 1
+        }
+    fi
+}
+
+worms_reject_control_chars "$GAME_APP" "GAME_APP"
+worms_validate_game_app_for_mutation "$GAME_APP" || {
+    echo "ERROR: Unsafe game bundle mutation path: $GAME_APP"
+    exit 1
+}
+validate_qt_prefix
+
 if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]] || [[ ! -f "$GAME_EXEC" ]]; then
     echo "ERROR: Invalid GAME_APP: $GAME_APP"
     echo "Expected a Worms W.M.D.app bundle containing: $GAME_EXEC"
@@ -55,6 +103,10 @@ if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]] || [[ ! -f "$GAME_EXE
 fi
 
 mkdir -p "$GAME_FRAMEWORKS" "$GAME_PLUGINS/platforms" "$GAME_PLUGINS/imageformats"
+worms_validate_game_app_for_mutation "$GAME_APP" || {
+    echo "ERROR: Unsafe game bundle mutation path: $GAME_APP"
+    exit 1
+}
 
 echo "=== Replacing Qt Frameworks ==="
 echo "Source: $NEW_QT ($QT_SOURCE)"

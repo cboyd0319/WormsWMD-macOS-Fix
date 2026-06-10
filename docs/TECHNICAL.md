@@ -45,7 +45,7 @@ The fix replaces Qt frameworks bundled with the game (commonly QtCore, QtGui, Qt
 | QtDBus.framework | Not present (if missing) | Added (required by plugins) |
 | QtSvg.framework | Not present (if missing) | Added (required by SVG plugin) |
 | Info.plist | Missing identifiers and HiDPI flags | Adds CFBundleIdentifier, HiDPI flags, graphics switching, updates minimum version |
-| DataOSX configs | HTTP/internal URLs | HTTPS for known URLs; internal URLs commented out (with .backup) |
+| DataOSX configs | HTTP/internal URLs | HTTPS for known URLs; internal URLs commented out |
 | CommonData configs | HTTP URLs | HTTPS in AnalyticsConfig.txt and HttpConfig.txt |
 
 ## Libraries added
@@ -98,9 +98,12 @@ official game art, or third-party sample assets.
 
 The installer prefers the highest verified `qt-frameworks-x86_64-*.tar.gz`
 package in `dist/` with a matching `.sha256` file. Verification checks the
-checksum, tar layout, metadata, required Qt frameworks/plugins, optional package
-manifest, and `x86_64` Mach-O slices before the package is reported as
-available.
+checksum, tar layout, tar entry metadata, symlink targets, metadata, required
+Qt frameworks/plugins, any archive manifest, and `x86_64` Mach-O slices before
+the package is reported as available. If a legacy archive lacks `MANIFEST.txt`,
+the downloader writes and verifies a cache-local manifest before installer use.
+Remote fallback uses the pinned release commit for `dist/` contents, not the
+mutable default branch.
 
 Maintainers can build a replacement package with:
 

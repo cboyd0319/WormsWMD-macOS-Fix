@@ -14,7 +14,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 # shellcheck disable=SC1091
 source "$REPO_DIR/scripts/common.sh"
@@ -36,6 +42,7 @@ STEAM_SAVES="$HOME/Library/Application Support/Steam/userdata"
 TEAM17_SAVES="$HOME/Library/Application Support/Team17"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/WormsWMD-SaveBackups}"
 SAVE_MANIFEST_NAME="MANIFEST.tsv"
+worms_reject_control_chars "$BACKUP_DIR" "BACKUP_DIR"
 
 print_help() {
     cat << 'EOF'
@@ -102,7 +109,7 @@ validate_backup_archive_layout() {
         done
         [[ -n "$entry" ]] || continue
 
-        if [[ "$entry" == /* ]] || [[ "$entry" == *"../"* ]] || [[ "$entry" == *"/.."* ]] || [[ "$entry" == ".." ]]; then
+        if worms_path_has_parent_escape "$entry"; then
             echo -e "${RED}ERROR:${NC} Unsafe path in backup archive: $entry"
             return 1
         fi
@@ -116,6 +123,11 @@ validate_backup_archive_layout() {
                 ;;
         esac
     done <<< "$listing"
+
+    if ! worms_validate_tar_entry_metadata "$archive" reject-symlinks; then
+        echo -e "${RED}ERROR:${NC} Unsafe backup archive entry metadata."
+        return 1
+    fi
 }
 
 restore_target_for_manifest_path() {
@@ -226,6 +238,7 @@ macOS: $(sw_vers -productVersion)
 Items: $items_backed_up save locations
 EOF
 
+    worms_validate_no_special_entries "$TEMP_DIR"
     worms_write_manifest "$TEMP_DIR" "$TEMP_DIR/$SAVE_MANIFEST_NAME" Team17 Steam BACKUP_INFO.txt
     worms_verify_manifest "$TEMP_DIR" "$TEMP_DIR/$SAVE_MANIFEST_NAME"
 
@@ -265,6 +278,7 @@ do_restore() {
         echo -e "${RED}Backup file not found: $backup_file${NC}"
         exit 1
     fi
+    worms_reject_control_chars "$backup_file" "backup file"
 
     validate_backup_archive_layout "$backup_file"
 
@@ -285,6 +299,7 @@ do_restore() {
 
     # Extract backup
     tar -xzf "$backup_file" -C "$TEMP_DIR"
+    worms_validate_no_special_entries "$TEMP_DIR"
 
     if [[ -f "$TEMP_DIR/$SAVE_MANIFEST_NAME" ]]; then
         if worms_verify_manifest "$TEMP_DIR" "$TEMP_DIR/$SAVE_MANIFEST_NAME"; then

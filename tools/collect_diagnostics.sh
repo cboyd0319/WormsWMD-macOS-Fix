@@ -9,7 +9,7 @@
 #   ./collect_diagnostics.sh [OPTIONS]
 #
 # Options:
-#   --output FILE   Write to specific file (default: stdout)
+#   --output FILE   Write to a .txt or .log file (default: stdout)
 #   --full          Include extended diagnostics (larger output)
 #   --copy          Copy output to clipboard (macOS)
 #   --bundle        Create a sanitized support bundle for GitHub issues
@@ -18,7 +18,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 # shellcheck disable=SC1091
 source "$REPO_DIR/scripts/common.sh"
@@ -59,7 +65,7 @@ USAGE:
     ./collect_diagnostics.sh [OPTIONS]
 
 OPTIONS:
-    --output FILE   Write diagnostics to a file
+    --output FILE   Write diagnostics to a .txt or .log file
     --full          Include extended diagnostics (library details, etc.)
     --copy          Copy output to clipboard (macOS pbcopy)
     --bundle        Create a sanitized .tar.gz support bundle
@@ -159,6 +165,32 @@ done
 
 # Setup output
 setup_colors
+
+prepare_output_file() {
+    local output_file="$1"
+
+    worms_reject_control_chars "$output_file" "output file"
+    case "$output_file" in
+        *.txt|*.log)
+            ;;
+        *)
+            echo "ERROR: --output must end with .txt or .log"
+            exit 1
+            ;;
+    esac
+
+    mkdir -p "$(dirname "$output_file")"
+    if [[ -L "$output_file" ]] || [[ -d "$output_file" ]]; then
+        echo "ERROR: --output must be a regular file path"
+        exit 1
+    fi
+}
+
+worms_reject_control_chars "$GAME_APP" "GAME_APP"
+worms_reject_control_chars "$BUNDLE_OUTPUT_DIR" "bundle output directory"
+if [[ -n "$OUTPUT_FILE" ]]; then
+    prepare_output_file "$OUTPUT_FILE"
+fi
 
 collect_diagnostics() {
     section "WORMS W.M.D DIAGNOSTICS REPORT"
@@ -531,6 +563,10 @@ sanitize_report() {
     awk -v home="$HOME" '
         {
             gsub(home, "~")
+            gsub(/\/Volumes\/[^[:space:]]+([\/][^[:space:]]+)*/, "[redacted-path]")
+            gsub(/\/private\/var\/[^[:space:]]+([\/][^[:space:]]+)*/, "[redacted-path]")
+            gsub(/\/var\/folders\/[^[:space:]]+([\/][^[:space:]]+)*/, "[redacted-path]")
+            gsub(/\/tmp\/[^[:space:]]+([\/][^[:space:]]+)*/, "[redacted-path]")
             gsub(/[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}/, "[redacted-email]")
             print
         }

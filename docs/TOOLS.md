@@ -69,6 +69,9 @@ Check for new versions of the fix:
 ./tools/check_updates.sh --download
 ```
 
+`--download` retrieves the latest release zip and its matching `.sha256` file,
+then verifies the checksum before leaving the zip in `~/Downloads`.
+
 ## Controller helper
 
 Diagnose controller connectivity and get configuration tips:
@@ -95,7 +98,8 @@ Gather system information for bug reports:
 The support bundle mode writes a sanitized archive containing diagnostics,
 pre-built Qt package verification details, and available backup manifests. It
 is intended for community issue reports where users should not have to paste
-long terminal output by hand.
+long terminal output by hand. Bundle sanitization redacts home paths, external
+volume paths, temporary paths, and email addresses.
 
 ## Enhanced launcher
 
@@ -105,12 +109,13 @@ Launch the game with extra logging and debug options:
 ./tools/launch_worms.sh --log
 ./tools/launch_worms.sh --check-fix --log
 ./tools/launch_worms.sh --safe-mode --log
-./tools/launch_worms.sh --log --log-file ~/Desktop/worms-launch.log
+./tools/launch_worms.sh --log --log-file ~/Library/Logs/WormsWMD/worms-launch.log
 ./tools/launch_worms.sh --qt-debug --opengl-debug --log --verbose
 ./tools/launch_worms.sh --no-crash-report
 ```
 
-Crash reports are saved to `~/Library/Logs/WormsWMD/crashes/`.
+Log files must be regular `.log` files under `~/Library/Logs/`. Crash reports
+are saved to `~/Library/Logs/WormsWMD/crashes/`.
 
 ## Maintainer utilities
 
@@ -131,8 +136,11 @@ Check or refresh the pre-built Qt package used by the installer:
 ```
 
 `scripts/download_qt_frameworks.sh --check` validates local package checksums,
-metadata, required files, safe tar layout, package manifests when present, and
+metadata, required files, safe tar layout, archive manifests when present, and
 x86_64 binary slices before reporting the pre-built Qt package as available.
+Before installer use, extracted cache directories have a verified manifest;
+legacy archives get one generated after extraction. Remote fallback checks the
+pinned release commit for `dist/` contents.
 
 `tools/package_qt_frameworks.sh` accepts either Intel Homebrew `qt@5` or an
 explicit Qt prefix. It writes deterministic gzip archives using

@@ -8,9 +8,17 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 SRC_DIR="$(dirname "$SCRIPT_DIR")/src"
-BUILD_DIR="${BUILD_DIR:-/tmp/agl_stub_build}"
+if [[ -z "${BUILD_DIR:-}" ]]; then
+    BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/agl_stub_build.XXXXXX")
+fi
 export BUILD_DIR
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 

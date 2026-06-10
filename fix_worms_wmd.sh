@@ -23,7 +23,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 VERSION="1.6.4"
 LOG_FILE="${LOG_FILE:-}"
@@ -414,39 +420,51 @@ cleanup() {
 write_game_backup_manifest() {
     local backup_dir="$1"
 
+    worms_validate_tree_symlinks "$backup_dir"
     worms_write_manifest "$backup_dir" "$backup_dir/$BACKUP_MANIFEST_NAME" \
         Frameworks \
         PlugIns \
         Info.plist \
-        DataOSX
+        DataOSX \
+        CommonData
 }
 
 verify_game_backup_manifest() {
     local backup_dir="$1"
 
     [[ -f "$backup_dir/$BACKUP_MANIFEST_NAME" ]] || return 2
+    worms_validate_tree_symlinks "$backup_dir" || return 1
     worms_verify_manifest "$backup_dir" "$backup_dir/$BACKUP_MANIFEST_NAME"
 }
 
 restore_game_backup_files() {
     local backup_dir="$1"
 
+    worms_validate_tree_symlinks "$backup_dir"
+    worms_validate_game_app_for_mutation "$GAME_APP"
+
     if [[ -d "$backup_dir/Frameworks" ]]; then
-        rm -rf "$GAME_APP/Contents/Frameworks" 2>/dev/null || true
-        cp -R "$backup_dir/Frameworks" "$GAME_APP/Contents/" 2>/dev/null || true
+        rm -rf "$GAME_APP/Contents/Frameworks"
+        cp -R "$backup_dir/Frameworks" "$GAME_APP/Contents/"
     fi
 
     if [[ -d "$backup_dir/PlugIns" ]]; then
-        rm -rf "$GAME_APP/Contents/PlugIns" 2>/dev/null || true
-        cp -R "$backup_dir/PlugIns" "$GAME_APP/Contents/" 2>/dev/null || true
+        rm -rf "$GAME_APP/Contents/PlugIns"
+        cp -R "$backup_dir/PlugIns" "$GAME_APP/Contents/"
     fi
 
     if [[ -f "$backup_dir/Info.plist" ]]; then
-        cp "$backup_dir/Info.plist" "$GAME_APP/Contents/Info.plist" 2>/dev/null || true
+        cp "$backup_dir/Info.plist" "$GAME_APP/Contents/Info.plist"
     fi
 
-    if [[ -d "$backup_dir/DataOSX" ]] && [[ -d "$GAME_APP/Contents/Resources/DataOSX" ]]; then
-        cp "$backup_dir/DataOSX/"* "$GAME_APP/Contents/Resources/DataOSX/" 2>/dev/null || true
+    if [[ -d "$backup_dir/DataOSX" ]]; then
+        mkdir -p "$GAME_APP/Contents/Resources/DataOSX"
+        cp -R "$backup_dir/DataOSX/." "$GAME_APP/Contents/Resources/DataOSX/"
+    fi
+
+    if [[ -d "$backup_dir/CommonData" ]]; then
+        mkdir -p "$GAME_APP/Contents/Resources/CommonData"
+        cp -R "$backup_dir/CommonData/." "$GAME_APP/Contents/Resources/CommonData/"
     fi
 }
 
@@ -461,6 +479,9 @@ game_path_for_backup_relpath() {
             echo "$GAME_APP/Contents/Info.plist"
             ;;
         DataOSX/*)
+            echo "$GAME_APP/Contents/Resources/$rel_path"
+            ;;
+        CommonData/*)
             echo "$GAME_APP/Contents/Resources/$rel_path"
             ;;
         *)
@@ -546,6 +567,8 @@ trap cleanup EXIT
 # ============================================================
 
 validate_game_app() {
+    worms_reject_control_chars "$GAME_APP" "GAME_APP"
+
     # If GAME_APP wasn't explicitly set, try auto-detection
     if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]] && [[ ! -d "$GAME_APP" ]]; then
         print_step "Looking for Worms W.M.D..."
@@ -589,6 +612,13 @@ validate_game_app() {
         echo "Location: $GAME_APP"
         echo ""
         echo "Try reinstalling the game through Steam or GOG, then run this fix again."
+        exit 1
+    fi
+
+    if ! worms_validate_game_app_for_mutation "$GAME_APP"; then
+        print_error "Game bundle contains unsafe linked mutation paths."
+        echo ""
+        echo "Refusing to modify a bundle whose writable subpaths resolve outside Contents."
         exit 1
     fi
 }
@@ -741,14 +771,14 @@ ${BOLD}OPTIONS:${NC}
     --restore, -r   Restore game from backup
     --dry-run, -n   Preview changes without applying them
     --force, -f     Skip confirmation prompts
-    --log-file      Write logs to a specific file path
+    --log-file PATH Write logs to a .log file under ~/Library/Logs
     --verbose       Show full verification output
     --debug         Enable debug tracing (writes a .trace log)
 
 ${BOLD}ENVIRONMENT VARIABLES:${NC}
     GAME_APP        Path to "Worms W.M.D.app" (for non-standard locations)
-    LOG_FILE        Override the log file path
-    LOG_DIR         Override the log directory
+    LOG_FILE        Override log file path (.log under ~/Library/Logs)
+    LOG_DIR         Override log directory (under ~/Library/Logs)
     WORMSWMD_DEBUG  Enable debug tracing (1/true/yes)
     WORMSWMD_VERBOSE Enable verbose output (1/true/yes)
 
@@ -1102,6 +1132,16 @@ do_fix() {
         done
     fi
 
+    local common_data_dir="$GAME_APP/Contents/Resources/CommonData"
+    if [[ -d "$common_data_dir" ]]; then
+        mkdir -p "$BACKUP_DIR/CommonData"
+        for config_file in AnalyticsConfig.txt HttpConfig.txt; do
+            if [[ -f "$common_data_dir/$config_file" ]]; then
+                cp "$common_data_dir/$config_file" "$BACKUP_DIR/CommonData/$config_file"
+            fi
+        done
+    fi
+
     write_game_backup_manifest "$BACKUP_DIR"
     verify_game_backup_manifest "$BACKUP_DIR"
     print_substep "Backup manifest created: $BACKUP_MANIFEST_NAME"
@@ -1171,7 +1211,7 @@ do_fix() {
         if [[ -n "$copy_output" ]]; then
             echo "$copy_output"
         fi
-        exit 1
+        return 1
     fi
     stop_spinner
 
@@ -1250,8 +1290,6 @@ do_fix() {
         print_substep "Reset incompatible Qt window geometry"
     fi
 
-    CLEANUP_NEEDED=false  # Success - don't rollback on exit
-
     # ============================================================
     # Verify installation
     # ============================================================
@@ -1260,23 +1298,39 @@ do_fix() {
     chmod +x "$SCRIPTS_DIR/05_verify_installation.sh"
 
     # Capture verification output
-    local verify_output
+    local verify_output verify_status
+    verify_output=""
+    verify_status=0
     if worms_verbose_enabled; then
         if "$SCRIPTS_DIR/05_verify_installation.sh"; then
-            print_substep "All checks passed"
+            print_substep "Verification completed"
         else
-            print_warning "Some verification checks had warnings"
+            verify_status=$?
+            print_error "Installation verification failed"
         fi
     else
         if verify_output=$("$SCRIPTS_DIR/05_verify_installation.sh" 2>&1); then
-            print_substep "All checks passed"
+            if echo "$verify_output" | grep -q "^PASSED with"; then
+                echo "$verify_output" | grep -E "^PASSED with" | tail -1 | while read -r line; do
+                    print_substep "$line"
+                done
+            else
+                print_substep "All checks passed"
+            fi
         else
-            print_warning "Some verification checks had warnings"
-            echo "$verify_output" | grep -E "WARNING|ERROR" | head -5 | while read -r line; do
+            verify_status=$?
+            print_error "Installation verification failed"
+            echo "$verify_output" | grep -E "^(ERROR|WARNING|FAILED)" | head -10 | while read -r line; do
                 print_substep "$line"
             done || true
         fi
     fi
+
+    if [[ "$verify_status" -ne 0 ]]; then
+        return "$verify_status"
+    fi
+
+    CLEANUP_NEEDED=false  # Success - don't rollback on exit
 
     # ============================================================
     # Offer optional extras

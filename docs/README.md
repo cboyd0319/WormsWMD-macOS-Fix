@@ -46,6 +46,10 @@ current when adding, moving, renaming, or deleting Markdown files.
   standard.
 - [Execution plans](exec-plans/README.md) - plan lifecycle and required shape.
 - [Execution plan template](exec-plans/TEMPLATE.md) - reusable plan scaffold.
+- [Deep repository audit plan](exec-plans/2026-06-10-deep-repo-audit.md) -
+  completed audit trail for the repository-wide defect pass.
+- [Security hardening plan](exec-plans/2026-06-10-security-hardening.md) -
+  completed audit trail for repository-wide security hardening.
 - [Agent harness application plan](exec-plans/2026-04-29-agent-harness-application.md)
   - shipped plan for applying the harness methodology to this repo.
 - [Installer diagnostics audit plan](exec-plans/2026-04-29-installer-diagnostics-audit.md)

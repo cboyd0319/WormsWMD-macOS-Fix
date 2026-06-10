@@ -4,7 +4,28 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
-No changes yet.
+### Fixed
+- Fixed main installer completion so verification errors fail the run before the
+  success message and keep rollback enabled.
+- Added CommonData config files to game-bundle backup and restore coverage.
+- Made Info.plist metadata fixes correct existing false or missing values.
+- Stopped writing in-bundle `.backup` copies of config files during URL fixes.
+
+### Security
+- Hardened bootstrap installers so `INSTALL_DIR` cannot move or overwrite an
+  arbitrary non-empty directory or unrelated Git repository.
+- Pinned bootstrap installers to release `v1.6.4` plus exact commit
+  verification by default; non-default refs now require explicit developer
+  opt-in.
+- Pinned GitHub Actions to latest stable immutable commit SHAs.
+- Hardened Qt and save archive handling against unsafe symlinks, hardlinks,
+  special files, and mutable remote `dist/` fallback.
+- Added game-bundle containment checks before framework, plugin, Info.plist, and
+  config mutation.
+- Rejected control-character path injection in diagnostics and launcher logging,
+  constrained log files to `~/Library/Logs`, and expanded support-bundle path
+  redaction.
+- Made installation verification fail on external absolute Mach-O dependencies.
 
 ## 1.6.4 (2026-04-29)
 
@@ -39,7 +60,7 @@ No changes yet.
 - `install.sh` can pin clones to a tagged release through `INSTALL_REF`.
 - GitHub Actions now use current Node 24-compatible official action versions.
 - Pre-built Qt package discovery now selects the highest verified semantic version instead of relying on modification time.
-- Qt package validation now checks checksums, metadata, required frameworks/plugins, package manifests when present, safe archive layout, and x86_64 Mach-O slices before reporting a package as available.
+- Qt package validation now checks checksums, metadata, required frameworks/plugins, safe archive layout, archive manifests when present, generated cache manifests, and x86_64 Mach-O slices before installer use.
 - Restore and rollback now verify backup manifests when present and warn when restoring older legacy backups.
 
 ### Security

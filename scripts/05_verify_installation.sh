@@ -12,7 +12,13 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
 while [[ $# -gt 0 ]]; do
@@ -58,6 +64,8 @@ GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/W
 GAME_FRAMEWORKS="$GAME_APP/Contents/Frameworks"
 GAME_PLUGINS="$GAME_APP/Contents/PlugIns"
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
+
+worms_reject_control_chars "$GAME_APP" "GAME_APP" || exit 1
 
 if [[ -z "$GAME_APP" ]] || [[ ! -d "$GAME_APP/Contents" ]]; then
     echo "ERROR: Game not found at: $GAME_APP"
@@ -142,20 +150,37 @@ check_missing_deps() {
     done < <(otool -L "$bin" 2>/dev/null | awk 'NR>1 {print $1}' || true)
 }
 
+check_unsafe_deps() {
+    local bin="$1"
+    local label="$2"
+    local dep
+
+    while IFS= read -r dep; do
+        case "$dep" in
+            @executable_path/*|@loader_path/*)
+                ;;
+            @rpath/*)
+                echo "ERROR: $label has unresolved @rpath dependency: $dep"
+                ((errors++))
+                ;;
+            /usr/lib/*|/System/Library/*)
+                ;;
+            /*)
+                echo "ERROR: $label has external absolute dependency: $dep"
+                ((errors++))
+                ;;
+        esac
+    done < <(otool -L "$bin" 2>/dev/null | awk 'NR>1 {print $1}' || true)
+}
+
 # Check main executable
 echo "--- Checking main executable ---"
 if [ ! -f "$GAME_EXEC" ]; then
     echo "ERROR: Main executable not found!"
     ((errors++))
 else
-    bad_refs=$(otool -L "$GAME_EXEC" 2>/dev/null | grep -E "@rpath|/usr/local" || true)
-    if [ -n "$bad_refs" ]; then
-        echo "WARNING: Main executable has unresolved references:"
-        echo "$bad_refs"
-        ((warnings++))
-    else
-        echo "OK: Main executable references look good"
-    fi
+    check_unsafe_deps "$GAME_EXEC" "Main executable"
+    echo "OK: Main executable dependency policy checked"
     check_arch "$GAME_EXEC" "Main executable"
     check_missing_deps "$GAME_EXEC"
     print_deps "$GAME_EXEC" "Main executable"
@@ -180,14 +205,8 @@ for fw_dir in "$GAME_FRAMEWORKS"/*.framework; do
             continue
         fi
 
-        bad_refs=$(otool -L "$lib" 2>/dev/null | grep -E "/usr/local|@rpath" | grep -v "@executable_path" || true)
-        if [ -n "$bad_refs" ]; then
-            echo "WARNING: $fw_name has unresolved references:"
-            echo "$bad_refs"
-            ((warnings++))
-        else
-            echo "OK: $fw_name.framework"
-        fi
+        check_unsafe_deps "$lib" "$fw_name.framework"
+        echo "OK: $fw_name.framework"
         check_arch "$lib" "$fw_name.framework"
         check_missing_deps "$lib"
         print_deps "$lib" "$fw_name.framework"
@@ -241,12 +260,7 @@ echo "--- Checking library dependencies ---"
 for lib in "$GAME_FRAMEWORKS"/*.dylib; do
     if [ -f "$lib" ]; then
         name=$(basename "$lib")
-        bad_refs=$(otool -L "$lib" 2>/dev/null | grep -E "/usr/local|@rpath" | grep -v "@executable_path" || true)
-        if [ -n "$bad_refs" ]; then
-            echo "WARNING: $name has unresolved references:"
-            echo "$bad_refs"
-            ((warnings++))
-        fi
+        check_unsafe_deps "$lib" "$name"
         check_arch "$lib" "$name"
         check_missing_deps "$lib"
         print_deps "$lib" "$name"
@@ -260,12 +274,7 @@ echo "--- Checking plugins ---"
 for plugin in "$GAME_PLUGINS/platforms/"*.dylib "$GAME_PLUGINS/imageformats/"*.dylib; do
     if [ -f "$plugin" ]; then
         name=$(basename "$plugin")
-        bad_refs=$(otool -L "$plugin" 2>/dev/null | grep -E "/usr/local|@rpath" | grep -v "@executable_path" || true)
-        if [ -n "$bad_refs" ]; then
-            echo "WARNING: $name has unresolved references:"
-            echo "$bad_refs"
-            ((warnings++))
-        fi
+        check_unsafe_deps "$plugin" "$name"
         check_arch "$plugin" "$name"
         check_missing_deps "$plugin"
         print_deps "$plugin" "$name"
@@ -301,19 +310,43 @@ else
 fi
 
 data_dir="$GAME_APP/Contents/Resources/DataOSX"
+common_data_dir="$GAME_APP/Contents/Resources/CommonData"
+
+check_config_urls() {
+    local config_path="$1"
+    local label="$2"
+
+    if [ ! -f "$config_path" ]; then
+        return
+    fi
+
+    if grep -q "http://www\\.team17\\.com" "$config_path"; then
+        echo "WARNING: $label contains HTTP Team17 URLs"
+        ((warnings++))
+    fi
+    if grep -q "^[[:space:]]*URL_Internal.*xom\\.team17\\.com" "$config_path"; then
+        echo "WARNING: $label contains an internal staging URL"
+        ((warnings++))
+    fi
+    if grep -q "http://www\\.google-analytics\\.com" "$config_path"; then
+        echo "WARNING: $label contains HTTP Google Analytics URLs"
+        ((warnings++))
+    fi
+    if grep -q 'MainUrl.*=.*"http://' "$config_path"; then
+        echo "WARNING: $label contains an HTTP MainUrl"
+        ((warnings++))
+    fi
+}
+
 if [ -d "$data_dir" ]; then
     for config_file in SteamConfig.txt SteamConfigDemo.txt GOGConfig.txt; do
-        config_path="$data_dir/$config_file"
-        if [ -f "$config_path" ]; then
-            if grep -q "http://www\\.team17\\.com" "$config_path"; then
-                echo "WARNING: $config_file contains HTTP Team17 URLs"
-                ((warnings++))
-            fi
-            if grep -q "^[[:space:]]*URL_Internal.*xom\\.team17\\.com" "$config_path"; then
-                echo "WARNING: $config_file contains an internal staging URL"
-                ((warnings++))
-            fi
-        fi
+        check_config_urls "$data_dir/$config_file" "DataOSX/$config_file"
+    done
+fi
+
+if [ -d "$common_data_dir" ]; then
+    for config_file in AnalyticsConfig.txt HttpConfig.txt; do
+        check_config_urls "$common_data_dir/$config_file" "CommonData/$config_file"
     done
 fi
 

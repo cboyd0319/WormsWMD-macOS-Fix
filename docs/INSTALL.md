@@ -33,16 +33,21 @@ If you only downloaded `Install Fix.command`, double-click it. It clones or
 updates this repository under `~/.wormswmd-fix` and opens the friendly launcher
 when it is available.
 
+The bootstrap installers only update an existing checkout of this repository.
+They refuse to move or overwrite non-empty directories that are not this fix,
+and they refuse Git repositories with a different remote.
+
 Terminal users can use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | INSTALL_REF=v1.6.4 bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, `install.sh` opens the
 same friendly launcher menu. When flags are provided, it forwards them directly
-to `fix_worms_wmd.sh`. The `INSTALL_REF` value pins the cloned repository to
-the tagged release.
+to `fix_worms_wmd.sh`. By default, the bootstrap pins the cloned repository to
+release `v1.6.4` and verifies the expected commit before execution. Non-default
+refs require `WORMSWMD_ALLOW_UNPINNED_REF=1`.
 
 ## Preview changes
 
@@ -57,7 +62,7 @@ To see what the fix does without applying it, run:
 Run these scripts in order:
 
 ```bash
-git clone https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
+git clone --branch v1.6.4 --depth 1 https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
 
 # Use an isolated build directory for the AGL stub.
@@ -86,14 +91,14 @@ export QT_PREFIX="$QT_EXTRACT_DIR"
 # Step 4: Fix all library path references
 ./scripts/04_fix_library_paths.sh
 
-# Step 5: Verify the installation
-./scripts/05_verify_installation.sh
-
-# Step 6 (optional): Fix Info.plist metadata
+# Step 5: Fix Info.plist metadata
 ./scripts/06_fix_info_plist.sh
 
-# Step 7 (optional): Secure config URLs
+# Step 6: Secure config URLs
 ./scripts/07_fix_config_urls.sh
+
+# Step 7: Verify the installation
+./scripts/05_verify_installation.sh
 ```
 
 If the pre-built Qt package is unavailable, install Intel Homebrew Qt and set:
@@ -164,6 +169,11 @@ fi
 
 # Restore config files (if backed up)
 if [[ -d "$BACKUP_DIR/DataOSX" ]]; then
-  cp "$BACKUP_DIR/DataOSX/"* "$GAME_APP/Contents/Resources/DataOSX/" 2>/dev/null || true
+  mkdir -p "$GAME_APP/Contents/Resources/DataOSX"
+  cp -R "$BACKUP_DIR/DataOSX/." "$GAME_APP/Contents/Resources/DataOSX/"
+fi
+if [[ -d "$BACKUP_DIR/CommonData" ]]; then
+  mkdir -p "$GAME_APP/Contents/Resources/CommonData"
+  cp -R "$BACKUP_DIR/CommonData/." "$GAME_APP/Contents/Resources/CommonData/"
 fi
 ```

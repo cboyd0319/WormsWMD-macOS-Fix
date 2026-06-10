@@ -497,7 +497,7 @@ jobs:
   build:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
       - name: Build
         run: xcodebuild -arch x86_64 -arch arm64
       - name: Sign

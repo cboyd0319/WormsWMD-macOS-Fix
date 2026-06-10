@@ -2,22 +2,27 @@
 #
 # check_updates.sh - Check for fix updates on GitHub
 #
-# Compares the installed version with the latest version on GitHub (main branch)
+# Compares the installed version with the latest GitHub release
 # and notifies if an update is available.
 #
 # Usage:
 #   ./check_updates.sh              # Check and show result
 #   ./check_updates.sh --quiet      # Silent, exit code only
-#   ./check_updates.sh --download   # Download latest if available
+#   ./check_updates.sh --download   # Download and verify latest release
 #
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 GITHUB_REPO="cboyd0319/WormsWMD-macOS-Fix"
-RAW_FIX_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/fix_worms_wmd.sh"
-ZIP_URL="https://github.com/${GITHUB_REPO}/archive/refs/heads/main.zip"
+LATEST_RELEASE_API_URL="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
 CURL_BASE=(--proto '=https' --tlsv1.2 --retry 3 --retry-delay 1 --retry-connrefused)
 
 # shellcheck disable=SC1091
@@ -36,14 +41,14 @@ print_help() {
     cat << 'EOF'
 Worms W.M.D Fix - Update Checker
 
-Checks for new versions of the fix on GitHub (main branch).
+Checks for new versions of the fix on GitHub releases.
 
 USAGE:
     ./check_updates.sh [OPTIONS]
 
 OPTIONS:
     --quiet, -q     Silent mode (exit code only: 0=up to date, 1=update available)
-    --download, -d  Download latest main-branch snapshot if available
+    --download, -d  Download latest release zip and verify its checksum
     --help, -h      Show this help
 
 EXIT CODES:
@@ -74,24 +79,36 @@ get_current_version() {
     fi
 }
 
-# Get latest version from GitHub
-get_latest_version() {
-    local response
-    response=$(curl "${CURL_BASE[@]}" -sf --max-time 15 "$RAW_FIX_URL" 2>/dev/null) || return 1
+# Get latest release tag from GitHub
+get_latest_release_tag() {
+    local response tag
+    response=$(curl "${CURL_BASE[@]}" -sf --max-time 15 "$LATEST_RELEASE_API_URL" 2>/dev/null) || return 1
 
-    # Extract VERSION="x.y.z"
-    local version
-    version=$(echo "$response" | grep -m1 'VERSION=' | cut -d'"' -f2 || true)
-    if [[ -z "$version" ]]; then
+    tag=$(printf '%s\n' "$response" | awk -F'"' '/"tag_name"[[:space:]]*:/ {print $4; exit}')
+    if [[ -z "$tag" ]] || [[ ! "$tag" =~ ^v?[0-9]+([.][0-9]+)*$ ]]; then
         return 2
     fi
-    echo "$version"
+    echo "$tag"
 }
 
 # Get download URL for latest version
 get_download_url() {
-    if curl "${CURL_BASE[@]}" -sfI --max-time 10 "$ZIP_URL" >/dev/null 2>&1; then
-        echo "$ZIP_URL"
+    local tag="$1"
+    local url="https://github.com/${GITHUB_REPO}/releases/download/${tag}/WormsWMD-macOS-Fix-${tag}.zip"
+
+    if curl "${CURL_BASE[@]}" -sfI --max-time 10 "$url" >/dev/null 2>&1; then
+        echo "$url"
+    else
+        return 1
+    fi
+}
+
+get_checksum_url() {
+    local tag="$1"
+    local url="https://github.com/${GITHUB_REPO}/releases/download/${tag}/WormsWMD-macOS-Fix-${tag}.zip.sha256"
+
+    if curl "${CURL_BASE[@]}" -sfI --max-time 10 "$url" >/dev/null 2>&1; then
+        echo "$url"
     else
         return 1
     fi
@@ -157,7 +174,8 @@ done
 
 # Get versions
 current=$(get_current_version)
-if latest=$(get_latest_version); then
+if latest_tag=$(get_latest_release_tag); then
+    latest="${latest_tag#v}"
     :
 else
     status=$?
@@ -205,35 +223,47 @@ else
     if $DOWNLOAD; then
         echo "Downloading latest version..."
 
-        if download_url=$(get_download_url); then
+        if download_url=$(get_download_url "$latest_tag") && checksum_url=$(get_checksum_url "$latest_tag"); then
             :
         else
-            echo -e "${RED}Could not get download URL${NC}"
+            echo -e "${RED}Could not get release download URLs${NC}"
             exit 2
         fi
 
-        if [[ -z "$download_url" ]]; then
-            echo -e "${RED}Could not get download URL${NC}"
+        if [[ -z "$download_url" ]] || [[ -z "$checksum_url" ]]; then
+            echo -e "${RED}Could not get release download URLs${NC}"
             exit 2
         fi
 
-        download_file="$HOME/Downloads/WormsWMD-Fix-${latest}.zip"
-        if curl "${CURL_BASE[@]}" -L --max-time 120 -o "$download_file" "$download_url"; then
-            echo -e "${GREEN}Downloaded: $download_file${NC}"
-            echo ""
-            echo "To install:"
-            echo "  1. Extract the zip file"
-            echo "  2. Replace your current fix folder"
-            echo "  3. Run ./fix_worms_wmd.sh"
-        else
+        mkdir -p "$HOME/Downloads"
+        download_file="$HOME/Downloads/WormsWMD-macOS-Fix-${latest_tag}.zip"
+        checksum_file="$download_file.sha256"
+        if ! curl "${CURL_BASE[@]}" -L --max-time 120 -o "$download_file" "$download_url"; then
             echo -e "${RED}Download failed${NC}"
             exit 2
         fi
+        if ! curl "${CURL_BASE[@]}" -L --max-time 30 -o "$checksum_file" "$checksum_url"; then
+            rm -f "$download_file" "$checksum_file"
+            echo -e "${RED}Checksum download failed${NC}"
+            exit 2
+        fi
+        if ! (cd "$(dirname "$download_file")" && shasum -a 256 -c "$(basename "$checksum_file")"); then
+            rm -f "$download_file" "$checksum_file"
+            echo -e "${RED}Checksum verification failed${NC}"
+            exit 2
+        fi
+        echo -e "${GREEN}Downloaded and verified: $download_file${NC}"
+        echo ""
+        echo "To install:"
+        echo "  1. Extract the zip file"
+        echo "  2. Replace your current fix folder"
+        echo "  3. Run ./fix_worms_wmd.sh"
+        exit 0
     else
         echo "To update:"
         echo "  git -C \"$REPO_DIR\" pull"
         echo ""
-        echo "Or download: ./check_updates.sh --download"
+        echo "Or download and verify the release zip: ./check_updates.sh --download"
     fi
 
     exit 1

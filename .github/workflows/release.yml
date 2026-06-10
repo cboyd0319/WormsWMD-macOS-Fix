@@ -19,7 +19,8 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        # actions/checkout v6.0.3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Make scripts executable
         run: chmod +x fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
@@ -40,14 +41,16 @@ jobs:
         run: ./tools/build_release_bundle.sh --version "${GITHUB_REF_NAME:-manual}"
 
       - name: Attest release assets
-        uses: actions/attest@v4
+        # actions/attest v4.1.0
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26
         with:
           subject-path: |
             build/release/WormsWMD-macOS-Fix-*.zip
             build/release/WormsWMD-macOS-Fix-*.zip.sha256
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v7
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: WormsWMD-macOS-Fix-${{ github.ref_name || 'manual' }}
           path: |

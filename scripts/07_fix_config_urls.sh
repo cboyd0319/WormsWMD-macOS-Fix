@@ -13,11 +13,19 @@ set -euo pipefail
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 DATA_OSX_DIR="$GAME_APP/Contents/Resources/DataOSX"
 COMMON_DATA_DIR="$GAME_APP/Contents/Resources/CommonData"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/common.sh"
 worms_log_init "07_fix_config_urls"
 worms_debug_init
 
@@ -30,6 +38,12 @@ fi
 
 echo "=== Fixing Configuration URLs ==="
 
+worms_reject_control_chars "$GAME_APP" "GAME_APP"
+worms_validate_game_app_for_mutation "$GAME_APP" || {
+    echo "ERROR: Unsafe game bundle mutation path: $GAME_APP"
+    exit 1
+}
+
 fix_count=0
 
 # Function to fix a single config file
@@ -41,13 +55,13 @@ fix_config_file() {
     if [[ ! -f "$config_path" ]]; then
         return 0
     fi
+    worms_refuse_linked_file_for_mutation "$config_path" "$config_name" || return 1
+    worms_path_inside_root "$GAME_APP/Contents/Resources" "$config_path" || {
+        echo "ERROR: Config file resolves outside the game bundle: $config_path"
+        return 1
+    }
 
     echo "Processing $config_name..."
-
-    # Create backup
-    if [[ ! -f "${config_path}.backup" ]]; then
-        cp "$config_path" "${config_path}.backup"
-    fi
 
     # Fix HTTP to HTTPS for external Team17 URL
     if grep -q 'http://www\.team17\.com' "$config_path"; then
@@ -107,4 +121,4 @@ else
     echo "No URL fixes needed (already fixed or not present)."
 fi
 echo ""
-echo "Backups saved with .backup extension"
+echo "Configuration URL fixes complete."

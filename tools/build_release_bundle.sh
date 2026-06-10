@@ -5,7 +5,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # shellcheck disable=SC1091
@@ -225,6 +231,7 @@ if [[ -d "$bundle_dir/tools" ]]; then
     find "$bundle_dir/tools" -type f -name "*.sh" -exec chmod +x {} +
 fi
 
+worms_validate_no_special_entries "$bundle_dir"
 worms_write_manifest "$bundle_dir" "$bundle_dir/RELEASE_MANIFEST.tsv" "${COPIED_ITEMS[@]}"
 worms_verify_manifest "$bundle_dir" "$bundle_dir/RELEASE_MANIFEST.tsv"
 

@@ -19,7 +19,7 @@
 #   --steam         Steam mode (expects %command% as next arg)
 #   --safe-mode     Launch with reduced graphics settings
 #   --log           Enable diagnostic logging
-#   --log-file PATH Write logs to specific file
+#   --log-file PATH Write logs to a .log file under ~/Library/Logs
 #   --verbose       Extra verbose output
 #   --qt-debug      Enable Qt debugging output
 #   --opengl-debug  Enable OpenGL debugging
@@ -30,7 +30,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Configuration
@@ -49,6 +55,8 @@ CRASH_REPORT=true
 STEAM_MODE=false
 
 # shellcheck disable=SC1091
+source "$REPO_DIR/scripts/common.sh"
+# shellcheck disable=SC1091
 source "$REPO_DIR/scripts/ui.sh"
 worms_color_init
 
@@ -63,7 +71,7 @@ OPTIONS:
     --steam             Steam launch mode (use with %command%)
     --safe-mode         Launch with reduced graphics (software rendering hints)
     --log               Enable diagnostic logging to ~/Library/Logs/WormsWMD/
-    --log-file PATH     Write logs to a specific file
+    --log-file PATH     Write logs to a .log file under ~/Library/Logs
     --verbose           Extra verbose output
     --qt-debug          Enable Qt plugin and platform debugging
     --opengl-debug      Enable OpenGL debugging output
@@ -79,7 +87,7 @@ STEAM LAUNCH OPTIONS:
 
 ENVIRONMENT VARIABLES:
     GAME_APP            Path to "Worms W.M.D.app"
-    LOG_DIR             Override log directory
+    LOG_DIR             Override log directory under ~/Library/Logs
     QT_DEBUG_PLUGINS    Qt plugin debugging (set by --qt-debug)
     LIBGL_DEBUG         OpenGL debugging (set by --opengl-debug)
 
@@ -101,10 +109,47 @@ EOF
 
 log_message() {
     local timestamp
+    local message
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] $1"
+    message=$(printf '%s' "$1" | tr '\r\n' '  ')
+    echo "[$timestamp] $message"
     if [[ -n "$LOG_FILE" ]]; then
-        echo "[$timestamp] $1" >> "$LOG_FILE"
+        echo "[$timestamp] $message" >> "$LOG_FILE"
+    fi
+}
+
+prepare_logging_paths() {
+    local logs_root="$HOME/Library/Logs"
+
+    worms_reject_control_chars "$GAME_APP" "GAME_APP"
+    worms_reject_control_chars "$GAME_EXEC" "GAME_EXEC"
+    worms_reject_control_chars "$LOG_DIR" "LOG_DIR"
+    worms_reject_control_chars "$LOG_FILE" "LOG_FILE"
+
+    mkdir -p "$logs_root" "$LOG_DIR"
+    if ! worms_path_inside_root "$logs_root" "$LOG_DIR"; then
+        echo -e "${RED}LOG_DIR must be inside $logs_root${NC}"
+        exit 1
+    fi
+
+    if [[ -n "$LOG_FILE" ]]; then
+        case "$LOG_FILE" in
+            *.log)
+                ;;
+            *)
+                echo -e "${RED}--log-file must end with .log${NC}"
+                exit 1
+                ;;
+        esac
+        mkdir -p "$(dirname "$LOG_FILE")"
+        if ! worms_path_inside_root "$logs_root" "$LOG_FILE"; then
+            echo -e "${RED}--log-file must be inside $logs_root${NC}"
+            exit 1
+        fi
+        if [[ -L "$LOG_FILE" ]] || [[ -d "$LOG_FILE" ]]; then
+            echo -e "${RED}--log-file must be a regular log file path${NC}"
+            exit 1
+        fi
     fi
 }
 
@@ -181,6 +226,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+worms_reject_control_chars "$GAME_APP" "GAME_APP"
+worms_reject_control_chars "$GAME_EXEC" "GAME_EXEC"
+
 # Validate game exists
 if [[ ! -f "$GAME_EXEC" ]]; then
     echo -e "${RED}ERROR: Game executable not found at:${NC}"
@@ -193,6 +241,7 @@ fi
 
 # Setup logging
 if [[ "$ENABLE_LOGGING" == true ]]; then
+    prepare_logging_paths
     if [[ -n "$LOG_FILE" ]]; then
         mkdir -p "$(dirname "$LOG_FILE")"
     else

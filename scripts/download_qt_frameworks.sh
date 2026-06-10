@@ -11,13 +11,20 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 DIST_DIR="$REPO_DIR/dist"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/wormswmd-fix"
 
 GITHUB_REPO="cboyd0319/WormsWMD-macOS-Fix"
-GITHUB_API_URL="https://api.github.com/repos/${GITHUB_REPO}/contents/dist"
+QT_DIST_REF="${WORMSWMD_QT_DIST_REF:-4456929b241dcff0e2eea483f1ac4d2336be9e3a}"
+GITHUB_API_URL="https://api.github.com/repos/${GITHUB_REPO}/contents/dist?ref=${QT_DIST_REF}"
 DOWNLOAD_URL=""
 CHECKSUM_URL=""
 PACKAGE_NAME=""
@@ -56,6 +63,11 @@ for cmd in curl tar shasum mktemp; do
         exit 1
     fi
 done
+
+if [[ ! "$QT_DIST_REF" =~ ^[a-fA-F0-9]{40}$ ]]; then
+    echo -e "${RED}ERROR:${NC} WORMSWMD_QT_DIST_REF must be a full commit SHA."
+    exit 1
+fi
 
 read_checksum() {
     local checksum_file="$1"
@@ -100,7 +112,7 @@ validate_tar_layout() {
         done
         [[ -z "$entry" ]] && continue
 
-        if [[ "$entry" == /* ]] || [[ "$entry" == *"../"* ]] || [[ "$entry" == *"/.."* ]]; then
+        if worms_path_has_parent_escape "$entry"; then
             echo -e "${RED}ERROR:${NC} Unsafe path in archive: $entry"
             return 1
         fi
@@ -114,6 +126,11 @@ validate_tar_layout() {
                 ;;
         esac
     done <<< "$listing"
+
+    if ! worms_validate_tar_entry_metadata "$archive" allow-relative-symlinks; then
+        echo -e "${RED}ERROR:${NC} Unsafe archive entry metadata."
+        return 1
+    fi
 }
 
 validate_archive_metadata() {
@@ -221,6 +238,19 @@ validate_extracted_package() {
             return 1
         }
     fi
+}
+
+ensure_extracted_manifest() {
+    local extract_dir="$1"
+
+    if [[ ! -f "$extract_dir/MANIFEST.txt" ]]; then
+        worms_write_manifest "$extract_dir" "$extract_dir/MANIFEST.txt" Frameworks PlugIns METADATA.txt
+    fi
+
+    worms_verify_manifest "$extract_dir" "$extract_dir/MANIFEST.txt" || {
+        echo -e "${RED}ERROR:${NC} Package manifest verification failed."
+        return 1
+    }
 }
 
 verify_local_package() {
@@ -381,7 +411,8 @@ fi
 
 # Check if already cached and extracted
 if [[ -d "$EXTRACT_DIR/Frameworks" ]] && [[ -d "$EXTRACT_DIR/PlugIns" ]] && ! $FORCE; then
-    if validate_extracted_package "$EXTRACT_DIR" "$QT_VERSION"; then
+    if validate_extracted_package "$EXTRACT_DIR" "$QT_VERSION" \
+        && ensure_extracted_manifest "$EXTRACT_DIR"; then
         echo -e "${GREEN}Using cached Qt frameworks${NC}"
         echo "$EXTRACT_DIR"
         exit 0
@@ -466,7 +497,8 @@ tar -xzf "$CACHED_PACKAGE" -C "$TEMP_EXTRACT"
 
 rm -rf "$EXTRACT_DIR"
 mkdir -p "$(dirname "$EXTRACT_DIR")"
-if ! validate_extracted_package "$TEMP_EXTRACT" "$QT_VERSION"; then
+if ! validate_extracted_package "$TEMP_EXTRACT" "$QT_VERSION" \
+    || ! ensure_extracted_manifest "$TEMP_EXTRACT"; then
     echo -e "${RED}ERROR:${NC} Extracted Qt package validation failed."
     rm -rf "$TEMP_EXTRACT"
     TEMP_EXTRACT=""

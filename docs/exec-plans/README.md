@@ -31,6 +31,12 @@ the plan before continuing.
 
 ## Current Plans
 
+- [Deep repository audit](2026-06-10-deep-repo-audit.md) - completed
+  repository-wide defect pass for installer, restore, verification, docs, and
+  harness behavior.
+- [Security hardening](2026-06-10-security-hardening.md) - active
+  repository-wide security pass for archive extraction, update downloads, CI
+  pinning, LaunchAgent generation, and temporary build handling.
 - [Agent harness application](2026-04-29-agent-harness-application.md) -
   completed application of the harness methodology to this repo.
 - [Installer diagnostics audit](2026-04-29-installer-diagnostics-audit.md) -

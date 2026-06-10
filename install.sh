@@ -3,17 +3,19 @@
 # install.sh - One-liner installer for Worms W.M.D macOS Fix
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | INSTALL_REF=v1.6.4 bash
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | bash
 #
 # Or with options:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | INSTALL_REF=v1.6.4 bash -s -- --dry-run
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | bash -s -- --dry-run
 #
 
 set -euo pipefail
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
+DEFAULT_INSTALL_REF="v1.6.4"
+DEFAULT_INSTALL_COMMIT="4456929b241dcff0e2eea483f1ac4d2336be9e3a"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
-INSTALL_REF="${INSTALL_REF:-main}"
+INSTALL_REF="${INSTALL_REF:-$DEFAULT_INSTALL_REF}"
 
 # Colors
 if [[ -t 1 ]]; then
@@ -46,27 +48,74 @@ validate_install_ref() {
         print_error "INSTALL_REF may only contain letters, numbers, dots, underscores, slashes, and hyphens."
         exit 1
     fi
+
+    if [[ "$INSTALL_REF" != "$DEFAULT_INSTALL_REF" ]]; then
+        case "${WORMSWMD_ALLOW_UNPINNED_REF:-}" in
+            1|true|TRUE|yes|YES)
+                print_info "Using developer-selected ref: $INSTALL_REF"
+                ;;
+            *)
+                print_error "Default install is pinned to $DEFAULT_INSTALL_REF."
+                print_info "Set WORMSWMD_ALLOW_UNPINNED_REF=1 only if you intentionally want another ref."
+                exit 1
+                ;;
+        esac
+    fi
 }
 
-backup_install_dir() {
-    local src="$1"
-    local backup
-    backup="${src}.backup.$(date +%s)"
+normalize_install_dir() {
+    local raw_dir="$INSTALL_DIR"
+    local parent
+    local base
+    local home_real
 
-    if mv "$src" "$backup"; then
-        print_info "Existing install backed up to: $backup"
-    else
-        print_error "Failed to back up existing install at: $src"
+    if [[ -z "$raw_dir" ]]; then
+        print_error "INSTALL_DIR cannot be empty."
+        exit 1
+    fi
+
+    case "$raw_dir" in
+        /|/Applications|/Applications/*|/Library|/Library/*|/System|/System/*|/bin|/bin/*|/etc|/etc/*|/sbin|/sbin/*|/usr|/usr/*)
+            print_error "INSTALL_DIR must be a user-writable project directory, not a system path: $raw_dir"
+            exit 1
+            ;;
+    esac
+
+    parent=$(dirname "$raw_dir")
+    base=$(basename "$raw_dir")
+    mkdir -p "$parent"
+    parent=$(cd "$parent" && pwd -P)
+    INSTALL_DIR="$parent/$base"
+    home_real=$(cd "$HOME" && pwd -P)
+
+    if [[ "$INSTALL_DIR" == "/" ]] || [[ "$INSTALL_DIR" == "$home_real" ]]; then
+        print_error "INSTALL_DIR cannot be the filesystem root or your home directory."
         exit 1
     fi
 }
 
+directory_is_empty() {
+    local dir="$1"
+
+    [[ -z "$(find "$dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]
+}
+
+repo_remote_matches() {
+    local dir="$1"
+    local remote
+
+    remote=$(git -C "$dir" config --get remote.origin.url 2>/dev/null || true)
+    case "$remote" in
+        "$REPO_URL"|"$REPO_URL.git"|git@github.com:cboyd0319/WormsWMD-macOS-Fix.git)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
 clone_install_ref() {
-    if [[ "$INSTALL_REF" == "main" ]]; then
-        git clone --progress "$REPO_URL.git" "$INSTALL_DIR"
-    else
-        git clone --progress --branch "$INSTALL_REF" --depth 1 "$REPO_URL.git" "$INSTALL_DIR"
-    fi
+    git clone --progress --branch "$INSTALL_REF" --depth 1 "$REPO_URL.git" "$INSTALL_DIR"
 }
 
 checkout_install_ref() {
@@ -90,6 +139,22 @@ checkout_install_ref() {
     git -C "$dir" checkout --detach FETCH_HEAD
 }
 
+verify_default_install_commit() {
+    local dir="$1"
+    local actual_commit
+
+    if [[ "$INSTALL_REF" != "$DEFAULT_INSTALL_REF" ]]; then
+        return 0
+    fi
+
+    actual_commit=$(git -C "$dir" rev-parse HEAD 2>/dev/null || true)
+    if [[ "$actual_commit" != "$DEFAULT_INSTALL_COMMIT" ]]; then
+        print_error "Pinned release verification failed for $DEFAULT_INSTALL_REF."
+        print_info "Expected $DEFAULT_INSTALL_COMMIT but got ${actual_commit:-unknown}."
+        exit 1
+    fi
+}
+
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║${NC}     ${GREEN}Worms W.M.D - macOS Tahoe Fix Installer${NC}                 ${BLUE}║${NC}"
@@ -99,6 +164,7 @@ echo ""
 # Check prerequisites
 print_step "Checking prerequisites..."
 validate_install_ref
+normalize_install_dir
 
 # Check macOS
 if [[ "$(uname)" != "Darwin" ]]; then
@@ -131,20 +197,30 @@ fi
 mkdir -p "$(dirname "$INSTALL_DIR")"
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
+    if ! repo_remote_matches "$INSTALL_DIR"; then
+        print_error "INSTALL_DIR is a Git repository for a different remote: $INSTALL_DIR"
+        print_info "Choose another INSTALL_DIR or move that repository yourself."
+        exit 1
+    fi
     print_info "Updating existing installation..."
     if checkout_install_ref "$INSTALL_DIR"; then
         : # Success
     else
-        print_info "Update failed; reinstalling..."
-        backup_install_dir "$INSTALL_DIR"
-        clone_install_ref
+        print_error "Update failed. Existing installation was left untouched: $INSTALL_DIR"
+        exit 1
     fi
+    verify_default_install_commit "$INSTALL_DIR"
 else
     # Fresh installation
     if [[ -d "$INSTALL_DIR" ]]; then
-        backup_install_dir "$INSTALL_DIR"
+        if ! directory_is_empty "$INSTALL_DIR"; then
+            print_error "INSTALL_DIR already exists and is not an empty fix checkout: $INSTALL_DIR"
+            print_info "Choose another INSTALL_DIR or move that directory yourself."
+            exit 1
+        fi
     fi
     clone_install_ref
+    verify_default_install_commit "$INSTALL_DIR"
 fi
 
 print_success "Fix downloaded to: $INSTALL_DIR"

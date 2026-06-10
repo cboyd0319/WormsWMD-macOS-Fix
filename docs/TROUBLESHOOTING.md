@@ -57,7 +57,7 @@ Gatekeeper blocks `.command` files downloaded from the internet. Try these optio
 
 5. **Use the one-liner instead:**
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | INSTALL_REF=v1.6.4 bash
+   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.4/install.sh | bash
    ```
    Requires `git` (installed by Xcode Command Line Tools).
 
@@ -109,10 +109,10 @@ Run the verification script to identify missing dependencies:
 
 The fix writes logs to `~/Library/Logs/WormsWMD-Fix/` by default.
 
-To specify a custom log file:
+To specify a custom log file under `~/Library/Logs`:
 
 ```bash
-./fix_worms_wmd.sh --log-file /path/to/log.txt
+./fix_worms_wmd.sh --log-file ~/Library/Logs/WormsWMD-Fix/worms-fix.log
 ```
 
 For more detail:

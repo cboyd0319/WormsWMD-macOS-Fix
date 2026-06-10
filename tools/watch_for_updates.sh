@@ -16,7 +16,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 LAUNCH_AGENT_ID="com.wormswmd.fix.watcher"
@@ -24,8 +30,11 @@ LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_ID}.plist"
 CHECK_INTERVAL=300  # 5 minutes
 
 # shellcheck disable=SC1091
+source "$REPO_DIR/scripts/common.sh"
+# shellcheck disable=SC1091
 source "$REPO_DIR/scripts/ui.sh"
 worms_color_init
+worms_reject_control_chars "$GAME_APP" "GAME_APP"
 
 print_help() {
     cat << 'EOF'
@@ -96,6 +105,15 @@ send_notification() {
     local message="$2"
 
     osascript -e "display notification \"$message\" with title \"$title\"" 2>/dev/null || true
+}
+
+xml_escape() {
+    sed \
+        -e 's/&/\&amp;/g' \
+        -e 's/</\&lt;/g' \
+        -e 's/>/\&gt;/g' \
+        -e 's/"/\&quot;/g' \
+        -e "s/'/\&apos;/g"
 }
 
 # Prompt user to reapply
@@ -178,6 +196,11 @@ do_daemon() {
 do_install() {
     echo "Installing update watcher as LaunchAgent..."
     local launch_domain="gui/${UID}"
+    local watcher_path log_path
+
+    mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/WormsWMD-Fix"
+    watcher_path=$(printf '%s' "${SCRIPT_DIR}/watch_for_updates.sh" | xml_escape)
+    log_path=$(printf '%s' "${HOME}/Library/Logs/WormsWMD-Fix/watcher.log" | xml_escape)
 
     # Create LaunchAgent plist
     cat > "$LAUNCH_AGENT_PATH" << EOF
@@ -189,7 +212,7 @@ do_install() {
     <string>${LAUNCH_AGENT_ID}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${SCRIPT_DIR}/watch_for_updates.sh</string>
+        <string>${watcher_path}</string>
         <string>--daemon</string>
     </array>
     <key>RunAtLoad</key>
@@ -197,15 +220,12 @@ do_install() {
     <key>KeepAlive</key>
     <false/>
     <key>StandardOutPath</key>
-    <string>${HOME}/Library/Logs/WormsWMD-Fix/watcher.log</string>
+    <string>${log_path}</string>
     <key>StandardErrorPath</key>
-    <string>${HOME}/Library/Logs/WormsWMD-Fix/watcher.log</string>
+    <string>${log_path}</string>
 </dict>
 </plist>
 EOF
-
-    # Create log directory
-    mkdir -p "$HOME/Library/Logs/WormsWMD-Fix"
 
     # Load the agent
     launchctl bootout "$launch_domain" "$LAUNCH_AGENT_PATH" 2>/dev/null || true

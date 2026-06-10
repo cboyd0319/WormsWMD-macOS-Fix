@@ -11,7 +11,7 @@ change.
 - `install.sh` is the curl-pipe bootstrapper that clones or updates this repo.
 - `Install Fix.command` is the tiny double-click bootstrapper that downloads or
   updates the repo and opens the friendly launcher.
-- `scripts/` contains ordered fix steps and shared shell helpers.
+- `scripts/` contains fix steps and shared shell helpers.
 - `tools/` contains diagnostics, backups, launch helpers, packaging, update
   checks, and harness validation.
 - `src/agl_stub.c` is the AGL compatibility stub source.

@@ -34,7 +34,7 @@ These changes improve the security posture of the game.
 | Internal URLs exposed | Defunct internal Team17 URLs are in config files | Comments out internal/staging URLs in DataOSX config files (with backup) |
 | No code signing | The game binary is completely unsigned | Applies ad-hoc code signing to reduce warnings |
 | Quarantine flags | macOS marks downloaded files as quarantined | Clears quarantine flags to prevent "damaged app" dialogs |
-| Unverified helper archives | Restore and runtime packages could be hard to inspect manually | Validates Qt archive checksums/manifests and save-backup layouts before use |
+| Unverified helper archives | Restore and runtime packages could be hard to inspect manually | Validates Qt archive checksums, archive/generated manifests, and save-backup layouts before use |
 
 ## Display improvements
 
