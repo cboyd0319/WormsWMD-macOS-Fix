@@ -135,6 +135,57 @@ collect_index_targets() {
     sort -u -o "$output_file" "$output_file"
 }
 
+check_exec_plan_index_statuses() {
+    local plan_file
+    local plan_name
+    local status
+    local expected
+    local index_line
+    local lower_line
+
+    for plan_file in "$ROOT_DIR"/docs/exec-plans/*.md; do
+        plan_name=$(basename "$plan_file")
+        case "$plan_name" in
+            README.md|TEMPLATE.md)
+                continue
+                ;;
+        esac
+
+        status=$(awk -F': *' '/^Status: / {print $2; exit}' "$plan_file")
+        if [[ -z "$status" ]]; then
+            fail "Execution plan is missing Status: docs/exec-plans/$plan_name"
+            continue
+        fi
+
+        case "$status" in
+            Active)
+                expected="active"
+                ;;
+            Completed)
+                expected="completed"
+                ;;
+            Superseded)
+                expected="superseded"
+                ;;
+            *)
+                fail "Execution plan has unknown Status '$status': docs/exec-plans/$plan_name"
+                continue
+                ;;
+        esac
+
+        index_line=$(grep -F "($plan_name)" "$ROOT_DIR/docs/exec-plans/README.md" || true)
+        if [[ -z "$index_line" ]]; then
+            fail "docs/exec-plans/README.md does not link execution plan: $plan_name"
+            continue
+        fi
+
+        lower_line=$(printf '%s\n' "$index_line" | tr '[:upper:]' '[:lower:]')
+        if ! printf '%s\n' "$lower_line" | grep -Fq "$expected"; then
+            fail "docs/exec-plans/README.md status for $plan_name must say $expected"
+        fi
+    done
+}
+
 require_file "AGENTS.md"
 require_file ".github/copilot-instructions.md"
 require_file "docs/README.md"
@@ -200,6 +251,8 @@ while IFS= read -r doc; do
         fail "docs/README.md does not link tracked Markdown file: $doc"
     fi
 done < "$markdown_files"
+
+check_exec_plan_index_statuses
 
 if (( failures > 0 )); then
     printf 'Harness validation failed with %d issue(s).\n' "$failures" >&2

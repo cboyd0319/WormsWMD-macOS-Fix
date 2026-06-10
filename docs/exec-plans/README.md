@@ -34,13 +34,16 @@ the plan before continuing.
 - [Deep repository audit](2026-06-10-deep-repo-audit.md) - completed
   repository-wide defect pass for installer, restore, verification, docs, and
   harness behavior.
-- [Security hardening](2026-06-10-security-hardening.md) - active
+- [Security hardening](2026-06-10-security-hardening.md) - completed
   repository-wide security pass for archive extraction, update downloads, CI
   pinning, LaunchAgent generation, and temporary build handling.
-- [Agent harness application](2026-04-29-agent-harness-application.md) -
-  completed application of the harness methodology to this repo.
-- [Installer diagnostics audit](2026-04-29-installer-diagnostics-audit.md) -
-  completed audit of installer preview, diagnostics, and documentation behavior.
+- [Agent harness application](2026-04-29-agent-harness-application.md) - completed
+  application of the harness methodology to this repo.
+- [Installer diagnostics audit](2026-04-29-installer-diagnostics-audit.md) - completed
+  audit of installer preview, diagnostics, and documentation behavior.
+- [Zero-technical release experience](2026-04-29-zero-technical-release.md) - completed
+  release experience pass for the friendly launcher, release bundle, and
+  support flow.
 - [Community hardening](2026-04-28-community-hardening.md) - completed
   hardening pass for Qt package verification, reproducible packaging,
   diagnostics bundles, and backup manifest validation.

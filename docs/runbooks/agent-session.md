@@ -47,6 +47,32 @@ Release packaging:
 ./tools/build_release_bundle.sh --version local-smoke
 ```
 
+Release publication:
+
+```bash
+./tools/validate_harness.sh
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
+for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
+./fix_worms_wmd.sh --dry-run
+./tools/build_release_bundle.sh --version vX.Y.Z --skip-zip
+```
+
+When cutting a release, bump `VERSION`, `CHANGELOG.md`, release examples, and
+the bootstrap default tag together. If bootstrap exact-commit verification is
+used, the release commit cannot contain its own hash. Cut and push the tag
+first, verify the release workflow, then add a follow-up `main` commit pinning
+the bootstrap commit guard to the tag target.
+
+After the tag workflow publishes assets, verify:
+
+```bash
+gh run watch RUN_ID --exit-status
+gh release view vX.Y.Z --json tagName,isDraft,isPrerelease,publishedAt,url,assets
+gh release download vX.Y.Z -p "WormsWMD-macOS-Fix-vX.Y.Z.zip" -p "WormsWMD-macOS-Fix-vX.Y.Z.zip.sha256" -D /tmp/wormswmd-release-check
+(cd /tmp/wormswmd-release-check && shasum -a 256 -c "WormsWMD-macOS-Fix-vX.Y.Z.zip.sha256")
+gh attestation verify /tmp/wormswmd-release-check/WormsWMD-macOS-Fix-vX.Y.Z.zip --repo cboyd0319/WormsWMD-macOS-Fix
+```
+
 AGL stub or C source:
 
 ```bash
