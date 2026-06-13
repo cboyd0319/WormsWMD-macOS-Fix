@@ -202,7 +202,7 @@ while [ ${#queue[@]} -gt 0 ]; do
         fi
 
         queue+=("$target")
-    done < <(otool -L "$bin" 2>/dev/null | awk 'NR>1 {print $1}' || true)
+    done < <(worms_otool_dependencies "$bin")
 done
 
 echo ""

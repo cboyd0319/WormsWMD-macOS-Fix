@@ -34,20 +34,20 @@ GitHub issue.
 ## Verify The Download
 
 The release page includes a `.zip.sha256` checksum next to the zip file. To
-verify the `v1.6.5` release before unzipping it:
+verify the `v1.6.6` release before unzipping it:
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.5.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.6.zip.sha256
 ```
 
-Terminal should print `WormsWMD-macOS-Fix-v1.6.5.zip: OK`.
+Terminal should print `WormsWMD-macOS-Fix-v1.6.6.zip: OK`.
 
 For stronger provenance checking, GitHub CLI users can also verify the release
 attestation:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.6.5.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.6.6.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 ## Launcher Options
@@ -113,7 +113,7 @@ This project is designed so players can inspect what it does before running it:
 You can also review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.5/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6/install.sh
 ```
 
 ## Terminal Install Option
@@ -121,12 +121,12 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.5
 Use the release zip above unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.5/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The bootstrap is pinned to release `v1.6.5`
-and verifies the expected commit before running downloaded code.
+launcher menu as the release zip. The bootstrap is pinned to release `v1.6.6`
+before running downloaded code.
 
 ## Pre-Flight Check
 

@@ -324,8 +324,7 @@ copy_deps() {
             fi
         fi
     done < <(
-        otool -L "$binary" 2>/dev/null \
-            | awk 'NR>1 {print $1}' \
+        worms_otool_dependencies "$binary" \
             | while IFS= read -r candidate; do
                 if [[ "$candidate" == /usr/local/* ]] || [[ "$candidate" == "$QT_PREFIX"/* ]]; then
                     printf '%s\n' "$candidate"

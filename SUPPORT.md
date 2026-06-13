@@ -13,10 +13,14 @@ If the person wants to verify the download first, ask them to download the
 matching `.zip.sha256` file from the same release and run:
 
 ```bash
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.4.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.6.zip.sha256
 ```
 
 ## What to include in an issue
+
+Use the installation failure template for failed apply, verify, or restore runs.
+Use the bug report template when the fix installs but the game or a repo tool
+still behaves incorrectly.
 
 - macOS version and Mac model, if you know them.
 - Steam or GOG install.

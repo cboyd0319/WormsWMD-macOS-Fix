@@ -89,6 +89,10 @@ validate_qt_prefix() {
     fi
 }
 
+prebuilt_webp_supported() {
+    [[ "$QT_SOURCE" != "prebuild" ]] || [[ -f "$NEW_QT/libsharpyuv.0.dylib" ]]
+}
+
 worms_reject_control_chars "$GAME_APP" "GAME_APP"
 worms_validate_game_app_for_mutation "$GAME_APP" || {
     echo "ERROR: Unsafe game bundle mutation path: $GAME_APP"
@@ -196,6 +200,11 @@ if [[ "$QT_SOURCE" == "prebuild" ]]; then
             if [[ "$name" == libq*.dylib ]]; then
                 continue
             fi
+            if ! prebuilt_webp_supported && [[ "$name" == libwebp*.dylib ]]; then
+                echo "Skipping optional $name (libsharpyuv.0.dylib unavailable)"
+                rm -f "$GAME_FRAMEWORKS/$name"
+                continue
+            fi
             echo "Copying $name..."
             cp "$dylib" "$GAME_FRAMEWORKS/"
             chmod 755 "$GAME_FRAMEWORKS/$name"
@@ -224,6 +233,10 @@ rm -f "$GAME_PLUGINS/imageformats/"*.dylib 2>/dev/null || true
 for plugin in "$NEW_QT_PLUGINS/imageformats/"*.dylib; do
     if [ -f "$plugin" ]; then
         name=$(basename "$plugin")
+        if ! prebuilt_webp_supported && [[ "$name" == "libqwebp.dylib" ]]; then
+            echo "  Skipping optional $name (libsharpyuv.0.dylib unavailable)"
+            continue
+        fi
         echo "  Copying $name..."
         cp "$plugin" "$GAME_PLUGINS/imageformats/"
     fi

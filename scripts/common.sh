@@ -114,6 +114,23 @@ worms_file_sha256() {
     shasum -a 256 "$path" | awk '{print $1}'
 }
 
+worms_otool_dependencies_from_stdin() {
+    sed -n '
+        /^[[:space:]]/ {
+            s/^[[:space:]]*//
+            s/[[:space:]]*(compatibility version .*$//
+            /^$/d
+            p
+        }
+    '
+}
+
+worms_otool_dependencies() {
+    local bin="$1"
+
+    otool -L "$bin" 2>/dev/null | worms_otool_dependencies_from_stdin || true
+}
+
 worms_file_link_count() {
     local path="$1"
 

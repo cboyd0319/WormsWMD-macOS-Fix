@@ -197,7 +197,7 @@ fix_binary() {
         if [ -n "$dep_id" ]; then
             install_name_tool -change "$dep" "$dep_id" "$bin" 2>/dev/null || true
         fi
-    done < <(otool -L "$bin" 2>/dev/null | awk 'NR>1 {print $1}' || true)
+    done < <(worms_otool_dependencies "$bin")
 }
 
 echo ""

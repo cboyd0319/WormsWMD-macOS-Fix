@@ -49,6 +49,9 @@ jobs:
       - name: Validate agent harness docs
         run: ./tools/validate_harness.sh
 
+      - name: Test dependency parsing
+        run: ./tools/test_dependency_parsing.sh
+
       - name: Check script permissions
         run: |
           echo "Verifying scripts are executable..."

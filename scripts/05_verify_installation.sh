@@ -147,7 +147,7 @@ check_missing_deps() {
             echo "ERROR: Missing dependency for $(basename "$bin"): $dep"
             ((errors++))
         fi
-    done < <(otool -L "$bin" 2>/dev/null | awk 'NR>1 {print $1}' || true)
+    done < <(worms_otool_dependencies "$bin")
 }
 
 check_unsafe_deps() {
@@ -160,8 +160,13 @@ check_unsafe_deps() {
             @executable_path/*|@loader_path/*)
                 ;;
             @rpath/*)
-                echo "ERROR: $label has unresolved @rpath dependency: $dep"
-                ((errors++))
+                if [[ "$dep" == "@rpath/libsharpyuv.0.dylib" ]] && [[ "$label" == libwebp*.dylib ]]; then
+                    echo "WARNING: $label has optional unresolved WebP dependency: $dep"
+                    ((warnings++))
+                else
+                    echo "ERROR: $label has unresolved @rpath dependency: $dep"
+                    ((errors++))
+                fi
                 ;;
             /usr/lib/*|/System/Library/*)
                 ;;
@@ -170,7 +175,7 @@ check_unsafe_deps() {
                 ((errors++))
                 ;;
         esac
-    done < <(otool -L "$bin" 2>/dev/null | awk 'NR>1 {print $1}' || true)
+    done < <(worms_otool_dependencies "$bin")
 }
 
 # Check main executable

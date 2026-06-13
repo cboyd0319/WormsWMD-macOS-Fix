@@ -1,0 +1,95 @@
+name: Bug report
+description: Report a problem after the fix installs or with a repo tool.
+title: "Bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for game behavior after a successful install, launcher bugs, diagnostics bugs, or documentation problems.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before you submit
+      options:
+        - label: I checked the latest release and documentation for the same issue.
+          required: true
+        - label: I did not attach save files, game binaries, private config files, or Steam account tokens.
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Fix version
+      description: Run `./fix_worms_wmd.sh --help` or check the release zip name.
+      placeholder: "v1.6.6"
+    validations:
+      required: false
+
+  - type: input
+    id: macos_version
+    attributes:
+      label: macOS version
+      placeholder: "26.x"
+    validations:
+      required: true
+
+  - type: input
+    id: mac_model
+    attributes:
+      label: Mac model and chip
+      placeholder: "MacBook Pro M1 Pro"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Game launch or black screen
+        - Window size or display
+        - Keyboard or controller input
+        - Launcher or installer UI
+        - Diagnostics or support bundle
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+      description: Describe the behavior you saw.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the shortest steps that trigger the problem.
+      placeholder: |
+        1. Open ...
+        2. Choose ...
+        3. See ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: support_bundle
+    attributes:
+      label: Support bundle or logs
+      description: If this is not documentation-only, attach a support bundle from launcher option 5 or paste sanitized output.
+    validations:
+      required: false

@@ -4,8 +4,21 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
-### Security
-- Pinned mainline bootstrap commit verification to the `v1.6.5` tag target.
+No changes yet.
+
+## 1.6.6 (2026-06-13)
+
+### Added
+- Added GitHub issue templates for installation failures and bug reports.
+
+### Changed
+- Updated bootstrap defaults and release verification examples for `v1.6.6`.
+
+### Fixed
+- Fixed installation verification failures caused by Mach-O dependency paths
+  containing spaces.
+- Skipped the optional WebP image plugin from incomplete pre-built Qt packages
+  instead of rolling back an otherwise working install.
 
 ## 1.6.5 (2026-06-10)
 

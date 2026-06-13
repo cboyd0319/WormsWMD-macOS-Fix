@@ -55,8 +55,8 @@ fi
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 INSTALL_DIR="$HOME/.wormswmd-fix"
-INSTALL_REF="v1.6.5"
-INSTALL_COMMIT="369f92a5e5f2f725906cb70dbb91266521714dda"
+INSTALL_REF="v1.6.6"
+INSTALL_COMMIT=""
 
 directory_is_empty() {
     local dir="$1"

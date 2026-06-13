@@ -1,0 +1,88 @@
+name: Installation failure
+description: Report a failed install, verify, or restore run.
+title: "Install failed on "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when the launcher or installer says the fix failed. The fastest path is to attach the support bundle from launcher option 5.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before you submit
+      options:
+        - label: I used the latest release zip or latest documented Terminal command.
+          required: true
+        - label: I ran `Worms W.M.D Fix.command` option 5 and can attach the support bundle, or I explain below why I cannot.
+          required: true
+        - label: I did not attach save files, game binaries, private config files, or Steam account tokens.
+          required: true
+
+  - type: input
+    id: macos_version
+    attributes:
+      label: macOS version
+      description: "Example: 26.5.1"
+      placeholder: "26.x"
+    validations:
+      required: true
+
+  - type: input
+    id: mac_model
+    attributes:
+      label: Mac model and chip
+      description: "Example: MacBook Air M2, MacBook Pro M1 Pro, Intel Mac"
+      placeholder: "MacBook Air M2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: store
+    attributes:
+      label: Game source
+      options:
+        - Steam
+        - GOG
+        - Other or unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Install method
+      options:
+        - Release zip and double-click launcher
+        - Terminal curl command
+        - Manual clone or source checkout
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure_output
+    attributes:
+      label: What failed?
+      description: Paste the visible error text, or summarize what happened.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: support_bundle
+    attributes:
+      label: Support bundle
+      description: Attach the `wormswmd-support-*.tar.gz` file from your Desktop. If you cannot attach it, explain why.
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra_context
+    attributes:
+      label: Anything else?
+      description: Include anything unusual, such as a custom game location, Steam file verification, or previous manual fixes.
+    validations:
+      required: false
