@@ -191,7 +191,7 @@ User-controllable environment variables are validated:
 |----------|------------|
 | `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D`; writable bundle subpaths must not be symlinks or resolve outside `Contents` |
 | `INSTALL_DIR` | Refuses system paths, home directory, non-empty non-repo directories, and Git repositories with a different remote |
-| `INSTALL_REF` | Defaults to pinned release `v1.6.6`; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
+| `INSTALL_REF` | Defaults to pinned release `v1.6.6` and exact commit verification; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
 | `LOG_FILE` | Must be a regular `.log` path under `~/Library/Logs` |
 | `QT_PREFIX` | Verified to contain expected Qt frameworks; direct custom Homebrew prefixes require explicit opt-in |
 

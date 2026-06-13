@@ -126,7 +126,7 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6
 
 With no command-line flags and an interactive Terminal, this opens the same
 launcher menu as the release zip. The bootstrap is pinned to release `v1.6.6`
-before running downloaded code.
+and verifies the expected commit before running downloaded code.
 
 ## Pre-Flight Check
 
