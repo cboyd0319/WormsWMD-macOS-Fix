@@ -7,70 +7,81 @@
 [![Security documented](https://img.shields.io/badge/security-documented-brightgreen.svg)](SECURITY.md)
 [![Unofficial community fix](https://img.shields.io/badge/Team17-unofficial%20community%20fix-lightgrey.svg)](ATTRIBUTIONS.md)
 
-Community compatibility fix for Worms W.M.D on newer macOS versions. It is
-intended for players who see a black screen, broken window sizing, keyboard lag,
-or related launch issues caused by the older runtime shipped with the game.
+Community compatibility fix for Worms W.M.D on newer macOS versions. It helps
+with black screens, broken window sizing, keyboard lag, and related launch
+issues caused by the older runtime shipped with the game.
 
 This is an unofficial community project. It does not include Worms W.M.D game
 files or official Team17/Worms artwork.
 
-## Current Release: v1.7.0
+## Start Here
 
-The v1.7.0 release is the issue #10 bug-hunt and supply-chain hardening release.
-It updates the bundled Qt runtime to 5.15.19, makes backup creation visibly
-progress instead of appearing stuck, improves restore selection, and keeps
-support bundles sanitized for public GitHub issues by default.
-
-Notable changes:
-
-- Faster, clearer game-bundle backups with manifest progress.
-- Sanitized support bundles that exclude raw logs, crash logs, save data, game
-  binaries, and private config contents.
-- Launcher option `7` and a post-fix launch prompt to reduce first-run friction.
-- Preflight checks now use the public Team17 Worms W.M.D page and Steam store
-  page.
-- Qt 5.15.19 packaging is checksum-locked with source provenance and documented
-  rebuild steps.
-
-## Quick Start
-
-For most players, this is the only section you need.
+For most players:
 
 1. Download the [latest release zip](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest).
 2. Unzip it.
 3. Double-click `Worms W.M.D Fix.command`.
-4. Press `1` to apply the recommended fix.
-5. Launch when prompted, or press `7` in the launcher later.
+4. Press `1`.
+
+| Goal | What to do |
+| --- | --- |
+| Install | Press `1` in the launcher. |
+| Preview first | Open `Worms W.M.D Fix.command` and press `2`. |
+| Check an existing install | Open `Worms W.M.D Fix.command` and press `3`. |
+| Undo the fix | Open `Worms W.M.D Fix.command` and press `4`. |
+| Ask for help | Open `Worms W.M.D Fix.command` and press `5` to create a sanitized support bundle. |
+| Launch the game | Launch when prompted after applying the fix, or press `7` later. |
 
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
 
-If the fix fails, run `Worms W.M.D Fix.command` again and press `5`. This
-creates a sanitized support bundle on your Desktop that can be attached to a
-GitHub issue.
+## v1.7.0 At A Glance
+
+| Area | What changed |
+| --- | --- |
+| Backup friction | Backup creation now shows progress and batches checksum work. |
+| Privacy | Support bundles exclude raw logs, crash logs, save data, game binaries, and private config contents. |
+| Runtime | Bundled Qt was refreshed from 5.15.18 to 5.15.19. |
+| Supply chain | Qt packaging now includes source provenance and documented rebuild steps. |
+| First run | The launcher can start Worms W.M.D directly after applying the fix. |
+| Preflight | Network checks now use the public Team17 Worms W.M.D page and Steam store page. |
+
+## Requirements
+
+| Requirement | Notes |
+| --- | --- |
+| macOS | macOS 26 Tahoe or later for the black-screen AGL fix. |
+| Game install | Worms W.M.D installed through Steam or GOG. |
+| Apple Silicon | Rosetta 2 is required and can be installed by macOS when prompted. |
+| Developer tools | `git`, usually provided by the Xcode Command Line Tools. |
+| Internet | Needed for the one-line installer, updates, and optional checks. |
+
+Earlier macOS versions usually do not need the AGL fix, but macOS 15.x players
+with keyboard buffering or lag may still benefit from the Qt 5.15 runtime
+refresh.
 
 ## Verify The Download
 
-The release page includes a `.zip.sha256` checksum next to the zip file. To
-verify the `v1.7.0` release before unzipping it:
+The release page includes a `.zip.sha256` checksum next to the zip file.
 
 ```bash
 cd ~/Downloads
 shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.0.zip.sha256
 ```
 
-Terminal should print `WormsWMD-macOS-Fix-v1.7.0.zip: OK`.
+Expected output:
 
-For stronger provenance checking, GitHub CLI users can also verify the release
-attestation:
+```text
+WormsWMD-macOS-Fix-v1.7.0.zip: OK
+```
+
+GitHub CLI users can also verify the release attestation:
 
 ```bash
 gh attestation verify WormsWMD-macOS-Fix-v1.7.0.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
-## Launcher Options
-
-The launcher is a simple numbered menu:
+## Launcher Menu
 
 | Option | Purpose |
 | --- | --- |
@@ -82,62 +93,39 @@ The launcher is a simple numbered menu:
 | `6` | Open the help file. |
 | `7` | Launch Worms W.M.D. |
 
-## Requirements
-
-- macOS 26 (Tahoe) or later for the black-screen AGL fix.
-- Worms W.M.D installed through Steam or GOG.
-- Internet connection.
-- `git`, usually installed by the Xcode Command Line Tools.
-
-Earlier macOS versions usually do not need the AGL fix, but macOS 15.x players
-with keyboard buffering or lag may still benefit from the Qt 5.15 runtime
-refresh.
-
-The launcher can prompt for these system components when needed:
-
-- Rosetta 2 on Apple Silicon Macs.
-- Xcode Command Line Tools.
-- Qt frameworks bundled with the release package or loaded from the pinned
-  repository `dist/` source, with a Homebrew fallback.
-
 ## What The Fix Changes
 
-- Adds an AGL stub framework so the game can launch on macOS 26+.
-- Replaces the bundled Qt 5.3.2 runtime with Qt 5.15.
-- Verifies pre-built Qt package checksums, metadata, archive/generated
-  manifests, and x86_64 slices before use.
-- Bundles required dependencies and fixes install names.
-- Updates Info.plist values for bundle identity, HiDPI support, and minimum
-  macOS version.
-- Fixes known HTTP URLs in `DataOSX/CommonData` config files.
-- Comments out internal or staging URLs in `DataOSX` config files.
-- Clears quarantine flags and applies ad-hoc signing.
-- Resets incompatible Qt window geometry that can cause small-window issues.
-- Creates restorable backups with manifests for integrity checks.
+| Component | Change |
+| --- | --- |
+| AGL | Adds a compatibility stub framework so the game can launch on macOS 26+. |
+| Qt | Replaces the bundled Qt 5.3.2 runtime with Qt 5.15.x. |
+| Dependencies | Bundles required dylibs and fixes install names. |
+| App metadata | Updates Info.plist bundle identity, HiDPI, and minimum macOS values. |
+| Config URLs | Converts known HTTP URLs to HTTPS and comments out internal/staging URLs. |
+| Signing | Clears quarantine flags and applies ad-hoc signing. |
+| Window state | Resets incompatible Qt window geometry that can cause small windows. |
+| Backups | Creates restorable game-bundle backups with manifests for integrity checks. |
 
-## Safety And Verification
+## Safety Model
 
-This project is designed so players can inspect what it does before running it:
+| Safety feature | What it means |
+| --- | --- |
+| No `sudo` | The launcher does not require administrator privileges. |
+| Preview mode | Option `2` shows planned changes without modifying game files. |
+| Restore path | Option `4` restores original game files from backup. |
+| Verified releases | Release zips include SHA-256 checksums and GitHub artifact attestations. |
+| Sanitized support | Support bundles avoid game binaries, save archives, raw logs, and private config contents. |
+| Documented security | See [SECURITY.md](SECURITY.md) and [docs/TRUST.md](docs/TRUST.md). |
 
-- The launcher does not require `sudo` or administrator privileges.
-- Option `2` previews planned changes without modifying game files.
-- Option `4` restores original files from backup.
-- Release zips include SHA-256 checksums and GitHub artifact attestations.
-- Support bundles are designed to collect diagnostics without game binaries,
-  save archives, or private account tokens.
-- The security model, review checklist, and source-audit commands are documented
-  in [SECURITY.md](SECURITY.md).
-- A plain-English trust guide is available in [docs/TRUST.md](docs/TRUST.md).
-
-You can also review the installer script directly:
+Review the installer script directly:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh
 ```
 
-## Terminal Install Option
+## Terminal Install
 
-Use the release zip above unless you specifically prefer Terminal.
+Use the release zip unless you specifically prefer Terminal.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh | bash
@@ -149,66 +137,62 @@ and verifies the expected commit before running downloaded code.
 
 ## Pre-Flight Check
 
-Before launching the game, you can verify that your system is ready:
-
 ```bash
 ./tools/preflight_check.sh
 ```
 
-This checks:
-
-- macOS version and architecture.
-- Rosetta 2 status on Apple Silicon.
-- Game installation and fix status.
-- Runtime dependencies.
-- Network connectivity to Team17 and Steam endpoints.
+| Check | Covers |
+| --- | --- |
+| System | macOS version, architecture, Rosetta 2, Xcode Command Line Tools. |
+| Game | App location and executable presence. |
+| Fix status | AGL stub, Qt version, QtGui references, signing state. |
+| Runtime | FMOD, Steam API, and libcurl. |
+| Network | Team17 and Steam public endpoints. |
 
 Use `--quick` to skip network checks, or `--verbose` for detailed output.
 
-## Troubleshooting
+## Troubleshooting Fast Paths
 
-- If macOS says the launcher cannot be opened, right-click it and choose
-  **Open**.
-- If the game was updated or reinstalled, run option `1` again.
-- If you want to undo the fix, run option `4`.
-- If you need help, run option `5` and attach the generated support bundle to a
-  GitHub issue.
+| Symptom | First action |
+| --- | --- |
+| macOS blocks the launcher | Right-click `Worms W.M.D Fix.command`, choose **Open**, then choose **Open** again. |
+| Steam updated or verified the game | Run option `1` again. |
+| You want to undo the fix | Run option `4`. |
+| The fix failed | Run option `5` and attach the sanitized support bundle to a GitHub issue. |
+| You want a deeper check | Run `./tools/preflight_check.sh`. |
 
-## Documentation
+## Documentation Map
 
-- [Documentation index](docs/README.md) - Complete docs map.
-- [Installation](docs/INSTALL.md) - Manual install and restore options.
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Solutions for common problems.
-- [FAQ](docs/FAQ.md) - Frequently asked questions.
-- [Security](SECURITY.md) - Threat model, review checklist, and audit commands.
-- [Trust and safety](docs/TRUST.md) - How to verify the download before running
-  it.
-- [Support](SUPPORT.md) - Issue reporting and support bundles.
-- [Tools](docs/TOOLS.md) - Helper utilities reference.
-- [Technical details](docs/TECHNICAL.md) - How the fix works.
-- [What this fix improves](docs/IMPROVEMENTS.md) - Fixes and enhancements.
-- [Attributions](ATTRIBUTIONS.md) - Asset and unofficial-project policy.
-- [Contributing](CONTRIBUTING.md) - How to contribute.
-- [Changelog](CHANGELOG.md) - Version history.
-- [Team17 Developer Report](TEAM17_DEVELOPER_REPORT.md) - Technical report for
-  Team17.
-- [Steam post template](STEAM_POST.md) - Copy/paste community support text.
+| Need | Link |
+| --- | --- |
+| Full docs index | [docs/README.md](docs/README.md) |
+| Manual install and restore | [docs/INSTALL.md](docs/INSTALL.md) |
+| Common failures | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
+| Frequently asked questions | [docs/FAQ.md](docs/FAQ.md) |
+| Security model | [SECURITY.md](SECURITY.md) |
+| Trust and verification | [docs/TRUST.md](docs/TRUST.md) |
+| Support flow | [SUPPORT.md](SUPPORT.md) |
+| Helper tools | [docs/TOOLS.md](docs/TOOLS.md) |
+| Technical details | [docs/TECHNICAL.md](docs/TECHNICAL.md) |
+| Version history | [CHANGELOG.md](CHANGELOG.md) |
+| Vendor-facing report | [TEAM17_DEVELOPER_REPORT.md](TEAM17_DEVELOPER_REPORT.md) |
+| Community post template | [STEAM_POST.md](STEAM_POST.md) |
 
 ## Support
 
-- Issues: https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
-- If a player is stuck, ask them to run `Worms W.M.D Fix.command` and choose
-  option `5` to create a sanitized support bundle on the Desktop.
+| Channel | Use |
+| --- | --- |
+| GitHub issues | https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues |
+| Support bundle | Launcher option `5`; attach the generated `.tar.gz` to the issue. |
 
-## Credits
+Do not upload raw `.log` or `.trace` files, save archives, game binaries, or
+private config files. Use the support bundle unless a maintainer asks for
+something more specific.
+
+## Credits And Links
 
 - Steam community members who reported the macOS issue and tested fixes.
 - Qt Project for Qt 5.15.
-- This repository uses original project files only; no official Team17/Worms
-  art is bundled.
-
-## Links
-
 - [Worms W.M.D on Steam](https://store.steampowered.com/app/327030/Worms_WMD/)
 
 Steam discussion threads about this issue:
