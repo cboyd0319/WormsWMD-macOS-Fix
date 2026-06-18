@@ -4,6 +4,9 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
+### Security
+- Pinned mainline bootstrap commit verification to the `v1.7.0` tag target.
+
 ## 1.7.0 (2026-06-18)
 
 ### Added
