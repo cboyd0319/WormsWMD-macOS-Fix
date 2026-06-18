@@ -14,6 +14,24 @@ or related launch issues caused by the older runtime shipped with the game.
 This is an unofficial community project. It does not include Worms W.M.D game
 files or official Team17/Worms artwork.
 
+## Current Release: v1.7.0
+
+The v1.7.0 release is the issue #10 bug-hunt and supply-chain hardening release.
+It updates the bundled Qt runtime to 5.15.19, makes backup creation visibly
+progress instead of appearing stuck, improves restore selection, and keeps
+support bundles sanitized for public GitHub issues by default.
+
+Notable changes:
+
+- Faster, clearer game-bundle backups with manifest progress.
+- Sanitized support bundles that exclude raw logs, crash logs, save data, game
+  binaries, and private config contents.
+- Launcher option `7` and a post-fix launch prompt to reduce first-run friction.
+- Preflight checks now use the public Team17 Worms W.M.D page and Steam store
+  page.
+- Qt 5.15.19 packaging is checksum-locked with source provenance and documented
+  rebuild steps.
+
 ## Quick Start
 
 For most players, this is the only section you need.

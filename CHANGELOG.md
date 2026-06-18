@@ -10,26 +10,32 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 ## 1.7.0 (2026-06-18)
 
 ### Added
-- Added issue #10 regression coverage for backup progress, restore selection,
-  diagnostics, launcher friction, preflight URLs, support-bundle sanitization,
+- Added a v1.7.0 regression suite for issue #10 and the adjacent bug hunt,
+  covering backup progress, restore selection, diagnostics, launcher friction,
+  preflight URLs, manifest hashing, support-bundle sanitization, save backups,
   and Qt package version pinning.
 - Added `tools/fetch_qt_homebrew_bottles.rb` to rebuild an isolated, checksum-
   locked Homebrew x86_64 bottle prefix for Qt runtime packaging.
 - Added `SOURCE_PROVENANCE.tsv` support for Qt archives and committed the
   Homebrew bottle lock used to build the bundled Qt package.
+- Added CI coverage for the new regression scripts.
+- Added launcher option `7` to start Worms W.M.D directly from the friendly
+  menu, plus a post-fix launch prompt after a successful apply.
 
 ### Changed
-- Updated the bundled Qt runtime archive from 5.15.18 to Qt 5.15.19, the final
-  Qt 5.15.x patch level currently exposed by Homebrew `qt@5`.
-- Reduced backup friction by showing backup manifest progress and batching
-  manifest hashing work.
+- Updated the bundled Qt runtime archive from 5.15.18 to Qt 5.15.19, the Qt
+  5.15.x patch level verified from Homebrew `qt@5` on 2026-06-18.
+- Reduced backup friction from issue #10 by showing backup manifest progress
+  and batching manifest hashing work.
 - Updated preflight network checks to use the public Team17 Worms W.M.D page
   and Steam Worms W.M.D store page.
-- Added launcher option 7 and post-fix launch prompting to reduce first-run
-  friction.
 - Qt package creation now rejects non-5.15.x inputs, embeds source provenance
   when provided, supports isolated dependency prefixes, and prunes framework
   headers from runtime archives.
+- Support bundles now write unique archive names instead of overwriting a bundle
+  created in the same second.
+- Release documentation, support guidance, install examples, issue templates,
+  runbooks, and technical docs now reflect v1.7.0 behavior and verification.
 
 ### Fixed
 - Fixed the apparent hang during backup creation reported in issue #10.
@@ -41,10 +47,17 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   5.15.19, instead of the compatibility version.
 - Fixed launcher behavior when input is piped and when force mode should avoid
   watcher prompts.
+- Fixed restore and backup manifest verification performance by hashing file
+  batches instead of invoking one checksum process per file.
+- Fixed preflight architecture and current-Qt-version checks used by local
+  verification.
 
 ### Security
 - Sanitized support bundles by default and stopped including raw logs, traces,
   crash logs, save data, game binaries, and private config contents.
+- Sanitized diagnostics written to stdout, files, and clipboard by redacting
+  home-account paths, external volume paths, temporary paths, email addresses,
+  and common secret-like key/value strings.
 - Added source-provenance documentation and lockfile-based rebuild steps for
   the bundled Qt runtime closure.
 - Updated v1.7.0 bootstrap refs for the release tag and documented the
