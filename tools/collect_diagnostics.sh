@@ -46,6 +46,50 @@ cleanup() {
 }
 trap cleanup EXIT
 
+verify_qt_package_checksum() {
+    local package="$1"
+    local package_dir
+    local checksum_name
+
+    [[ -f "${package}.sha256" ]] || return 1
+
+    package_dir="$(dirname "$package")"
+    checksum_name="$(basename "${package}.sha256")"
+    (cd "$package_dir" && shasum -a 256 -c "$checksum_name" >/dev/null 2>&1)
+}
+
+sanitize_report() {
+    local input="$1"
+    local output="$2"
+
+    awk -v home="$HOME" '
+        {
+            gsub(home, "~")
+            gsub(/\/Users\/[^\/[:space:]]+/, "/Users/[redacted-user]")
+            gsub(/\/Volumes\/[^"<>]*/, "[redacted-path]")
+            gsub(/\/private\/var\/[^"<>]*/, "[redacted-path]")
+            gsub(/\/var\/folders\/[^"<>]*/, "[redacted-path]")
+            gsub(/\/tmp\/[^"<>]*/, "[redacted-path]")
+            gsub(/[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}/, "[redacted-email]")
+            gsub(/([Tt]oken|[Ss]ecret|[Pp]assword|[Aa][Pp][Ii][_-]?[Kk]ey)[[:space:]]*[:=][[:space:]]*[^[:space:]]+/, "\\1=[redacted-secret]")
+            print
+        }
+    ' "$input" > "$output"
+}
+
+emit_sanitized_diagnostics() {
+    local raw_report
+    local sanitized_report
+
+    raw_report=$(mktemp "${TMPDIR:-/tmp}/wormswmd-diagnostics-raw.XXXXXX")
+    sanitized_report=$(mktemp "${TMPDIR:-/tmp}/wormswmd-diagnostics.XXXXXX")
+
+    collect_diagnostics > "$raw_report"
+    sanitize_report "$raw_report" "$sanitized_report"
+    cat "$sanitized_report"
+    rm -f "$raw_report" "$sanitized_report"
+}
+
 # Colors (disabled for file output)
 setup_colors() {
     if [[ -t 1 ]] && [[ -z "$OUTPUT_FILE" ]] && ! $SUPPORT_BUNDLE; then
@@ -203,10 +247,10 @@ collect_diagnostics() {
 
     subsection "macOS Version"
     local macos_version macos_build
-    macos_version=$(sw_vers -productVersion)
-    macos_build=$(sw_vers -buildVersion)
+    macos_version=$(sw_vers -productVersion 2>/dev/null || echo "unknown")
+    macos_build=$(sw_vers -buildVersion 2>/dev/null || echo "unknown")
     info "Version: $macos_version ($macos_build)"
-    info "Product: $(sw_vers -productName)"
+    info "Product: $(sw_vers -productName 2>/dev/null || echo "macOS")"
 
     subsection "Hardware"
     local cpu_brand chip_type
@@ -326,12 +370,10 @@ collect_diagnostics() {
     fi
 
     subsection "Quarantine Status"
-    local quarantine
-    quarantine=$(xattr -l "$GAME_APP" 2>/dev/null | grep -c "quarantine" || echo "0")
-    if [[ "$quarantine" == "0" ]]; then
-        ok "No quarantine flags"
-    else
+    if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
         warn "Quarantine flag present (may cause launch issues)"
+    else
+        ok "No quarantine flags"
     fi
 
     # ================================================================
@@ -357,7 +399,7 @@ collect_diagnostics() {
     if [[ -n "$local_qt_package" ]]; then
         info "Local package: $(basename "$local_qt_package")"
         if [[ -f "${local_qt_package}.sha256" ]]; then
-            if shasum -a 256 -c "${local_qt_package}.sha256" >/dev/null 2>&1; then
+            if verify_qt_package_checksum "$local_qt_package"; then
                 ok "Local package checksum verified"
             else
                 fail "Local package checksum mismatch"
@@ -469,7 +511,16 @@ collect_diagnostics() {
         subsection "All Frameworks"
         if [[ -d "$GAME_APP/Contents/Frameworks" ]]; then
             while IFS= read -r -d '' entry; do
-                info "$(ls -la -d "$entry" 2>/dev/null || true)"
+                local entry_rel entry_type entry_size
+                entry_rel=${entry#"$GAME_APP/Contents/Frameworks/"}
+                if [[ -d "$entry" ]]; then
+                    entry_type="directory"
+                    entry_size="-"
+                else
+                    entry_type="file"
+                    entry_size=$(worms_file_size "$entry" 2>/dev/null || echo "?")
+                fi
+                info "$entry_type $entry_size Frameworks/$entry_rel"
             done < <(find "$GAME_APP/Contents/Frameworks" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
         fi
 
@@ -556,23 +607,6 @@ collect_diagnostics() {
     echo "Issues: https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues"
 }
 
-sanitize_report() {
-    local input="$1"
-    local output="$2"
-
-    awk -v home="$HOME" '
-        {
-            gsub(home, "~")
-            gsub(/\/Volumes\/[^[:space:]]+([\/][^[:space:]]+)*/, "[redacted-path]")
-            gsub(/\/private\/var\/[^[:space:]]+([\/][^[:space:]]+)*/, "[redacted-path]")
-            gsub(/\/var\/folders\/[^[:space:]]+([\/][^[:space:]]+)*/, "[redacted-path]")
-            gsub(/\/tmp\/[^[:space:]]+([\/][^[:space:]]+)*/, "[redacted-path]")
-            gsub(/[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}/, "[redacted-email]")
-            print
-        }
-    ' "$input" > "$output"
-}
-
 write_qt_package_bundle_info() {
     local bundle_dir="$1"
     local info_file="$bundle_dir/qt-package.txt"
@@ -592,7 +626,7 @@ write_qt_package_bundle_info() {
         local_qt_package=$(worms_latest_qt_package_by_version "$REPO_DIR/dist" true || true)
         if [[ -n "$local_qt_package" ]]; then
             echo "Local package: $(basename "$local_qt_package")"
-            if shasum -a 256 -c "${local_qt_package}.sha256" >/dev/null 2>&1; then
+            if verify_qt_package_checksum "$local_qt_package"; then
                 echo "Checksum: verified"
             else
                 echo "Checksum: mismatch"
@@ -635,7 +669,7 @@ collect_support_bundle() {
 
     mkdir -p "$output_dir" 2>/dev/null || output_dir="$PWD"
     timestamp=$(date '+%Y%m%d-%H%M%S')
-    bundle_path="$output_dir/wormswmd-support-$timestamp.tar.gz"
+    bundle_path=$(worms_unique_path "$output_dir/wormswmd-support-$timestamp" ".tar.gz")
     BUNDLE_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-support.XXXXXX")
 
     {
@@ -666,16 +700,16 @@ collect_support_bundle() {
 if $SUPPORT_BUNDLE; then
     collect_support_bundle
 elif [[ -n "$OUTPUT_FILE" ]]; then
-    collect_diagnostics > "$OUTPUT_FILE"
+    emit_sanitized_diagnostics > "$OUTPUT_FILE"
     echo "Diagnostics saved to: $OUTPUT_FILE"
 elif $COPY_TO_CLIPBOARD; then
     if command -v pbcopy >/dev/null 2>&1; then
-        collect_diagnostics | pbcopy
+        emit_sanitized_diagnostics | pbcopy
         echo "Diagnostics copied to clipboard!"
     else
         echo "pbcopy not available; printing diagnostics to stdout."
-        collect_diagnostics
+        emit_sanitized_diagnostics
     fi
 else
-    collect_diagnostics
+    emit_sanitized_diagnostics
 fi

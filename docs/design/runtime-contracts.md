@@ -97,11 +97,9 @@ When replacing the Qt archive:
 - Update user docs if the version, source, or fallback behavior changes.
 
 When multiple local Qt packages are present, scripts should choose the highest
-verified semantic version rather than the newest file by modification time. Qt
-5.15.19 can be packaged from a supplied compatible x86_64 Qt prefix with
-`tools/package_qt_frameworks.sh --qt-prefix ... --version 5.15.19`; do not
-document a shipped 5.15.19 artifact unless the archive and checksum are present
-in `dist/`.
+verified supported Qt 5.15.x version rather than the newest file by modification
+time. The current `dist/` package is Qt 5.15.19 and must include a matching
+checksum plus `SOURCE_PROVENANCE.tsv` lock before being documented as shipped.
 
 Maintainer packages should be reproducible where possible: deterministic file
 ordering, normalized timestamps from `SOURCE_DATE_EPOCH`, stable ownership in
@@ -148,9 +146,12 @@ Diagnostics intended for bug reports should be collected with:
 ```
 
 Diagnostics and reports must not expose secrets, private account data, or
-unredacted sensitive config values. Support bundles should sanitize the
-diagnostics report, include Qt package verification details, and include backup
-manifests when available instead of copying full game or save contents.
+unredacted sensitive config values. Diagnostics output should be sanitized by
+default for issue reporting. Support bundles should sanitize the diagnostics
+report, include Qt package verification details, and include backup manifests
+when available instead of copying full game or save contents. Support bundles
+must not include raw `.log`, `.trace`, crash-log, save, game-binary, or private
+config-file contents.
 The friendly launcher's support option should delegate to
 `tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop`.
 
@@ -161,6 +162,12 @@ For source-only changes, use the checks that match the blast radius:
 ```bash
 ./tools/validate_harness.sh
 ./tools/test_dependency_parsing.sh
+./tools/test_issue_10_regression.sh
+./tools/test_support_bundle_sanitization.sh
+./tools/test_backup_saves_regression.sh
+./tools/test_launcher_friction.sh
+./tools/test_preflight_regression.sh
+./tools/test_manifest_regression.sh
 shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
 for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help

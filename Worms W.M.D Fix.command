@@ -14,7 +14,7 @@ done
 LAUNCHER_DIR="$(cd -P "$(dirname "$LAUNCHER_PATH")" && pwd)"
 TTY_DEVICE=""
 
-if [[ -r /dev/tty ]] && [[ -w /dev/tty ]]; then
+if [[ -t 0 ]] && [[ -r /dev/tty ]] && [[ -w /dev/tty ]]; then
     TTY_DEVICE="/dev/tty"
 fi
 
@@ -34,7 +34,7 @@ read_answer() {
         printf '%b' "$prompt" > "$TTY_DEVICE"
         IFS= read -r answer < "$TTY_DEVICE" || answer=""
     else
-        printf '%b' "$prompt"
+        printf '%b' "$prompt" >&2
         IFS= read -r answer || answer=""
     fi
 
@@ -130,6 +130,48 @@ offer_support_bundle() {
     esac
 }
 
+launch_game() {
+    local game_app="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+
+    print_line ""
+    worms_print_step "Launching Worms W.M.D"
+
+    if ! command -v open >/dev/null 2>&1; then
+        worms_print_warning "Automatic launch is unavailable here."
+        print_line "Open Worms W.M.D from Steam or GOG."
+        return 1
+    fi
+
+    if open "steam://run/327030" >/dev/null 2>&1; then
+        worms_print_success "Steam was asked to launch Worms W.M.D."
+        return 0
+    fi
+
+    if [[ -d "$game_app" ]] && open "$game_app" >/dev/null 2>&1; then
+        worms_print_success "Worms W.M.D was opened."
+        return 0
+    fi
+
+    worms_print_warning "Could not launch the game automatically."
+    print_line "Open Worms W.M.D from Steam or GOG."
+    return 1
+}
+
+offer_launch_game() {
+    local answer
+
+    print_line ""
+    answer=$(read_answer "Launch Worms W.M.D now? [Y/n] ")
+    case "$answer" in
+        n|N|no|No|NO)
+            return 0
+            ;;
+        *)
+            launch_game || true
+            ;;
+    esac
+}
+
 run_fix_engine() {
     local title="$1"
     local status
@@ -173,6 +215,7 @@ print_menu() {
     print_line "  ${BOLD}4${NC}) Restore original game files from backup"
     print_line "  ${BOLD}5${NC}) Create a support bundle on the Desktop"
     print_line "  ${BOLD}6${NC}) Open the simple help file"
+    print_line "  ${BOLD}7${NC}) Launch Worms W.M.D"
     print_line "  ${BOLD}q${NC}) Quit"
     print_line ""
 }
@@ -189,7 +232,9 @@ main() {
 
         case "$choice" in
             1)
-                run_fix_engine "Applying the recommended fix" || true
+                if run_fix_engine "Applying the recommended fix"; then
+                    offer_launch_game
+                fi
                 pause_for_user
                 ;;
             2)
@@ -212,6 +257,10 @@ main() {
                 open_help
                 pause_for_user
                 ;;
+            7)
+                launch_game || true
+                pause_for_user
+                ;;
             q|Q|quit|Quit|QUIT)
                 print_line ""
                 print_line "Okay. No changes were made from this menu choice."
@@ -219,7 +268,7 @@ main() {
                 ;;
             *)
                 print_line ""
-                worms_print_warning "Please choose 1, 2, 3, 4, 5, 6, or q."
+                worms_print_warning "Please choose 1, 2, 3, 4, 5, 6, 7, or q."
                 pause_for_user
                 ;;
         esac

@@ -31,6 +31,14 @@ the plan before continuing.
 
 ## Current Plans
 
+- [v1.7.0 pre-release prep](2026-06-18-v1.7.0-pre-release.md) - active
+  release-tag and post-release bootstrap pinning.
+- [Cheat sheet supply-chain hardening](2026-06-18-cheatsheet-supply-chain-hardening.md) - completed
+  follow-up pass for Qt 5.15.x pinning, security cheat-sheet findings, and
+  pre-release supply-chain readiness.
+- [Issue 10 backup stall](2026-06-18-issue-10-backup-stall.md) - completed
+  fix for silent backup manifest work, diagnostics privacy, and adjacent backup
+  edge cases.
 - [Deep repository audit](2026-06-10-deep-repo-audit.md) - completed
   repository-wide defect pass for installer, restore, verification, docs, and
   harness behavior.

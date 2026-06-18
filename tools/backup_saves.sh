@@ -44,6 +44,10 @@ BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/WormsWMD-SaveBackups}"
 SAVE_MANIFEST_NAME="MANIFEST.tsv"
 worms_reject_control_chars "$BACKUP_DIR" "BACKUP_DIR"
 
+macos_product_version() {
+    sw_vers -productVersion 2>/dev/null || echo "unknown"
+}
+
 print_help() {
     cat << 'EOF'
 Worms W.M.D - Save Game Backup Tool
@@ -194,7 +198,8 @@ do_backup() {
 
     local timestamp
     timestamp=$(date '+%Y%m%d-%H%M%S')
-    local backup_file="$BACKUP_DIR/saves-$timestamp.tar.gz"
+    local backup_file
+    backup_file=$(worms_unique_path "$BACKUP_DIR/saves-$timestamp" ".tar.gz")
     TEMP_DIR=$(mktemp -d)
 
     local items_backed_up=0
@@ -203,7 +208,7 @@ do_backup() {
     if [[ -d "$TEAM17_SAVES" ]]; then
         echo "Backing up Team17 saves..."
         mkdir -p "$TEMP_DIR/Team17"
-        cp -R "$TEAM17_SAVES"/* "$TEMP_DIR/Team17/" 2>/dev/null || true
+        cp -R "$TEAM17_SAVES/." "$TEMP_DIR/Team17/"
         ((items_backed_up++))
     fi
 
@@ -219,7 +224,7 @@ do_backup() {
                 user_id=$(basename "$(dirname "$save_dir")")
                 echo "Backing up Steam saves for user $user_id..."
                 mkdir -p "$TEMP_DIR/Steam/$user_id"
-                cp -R "$save_dir"/* "$TEMP_DIR/Steam/$user_id/" 2>/dev/null || true
+                cp -R "$save_dir/." "$TEMP_DIR/Steam/$user_id/"
                 ((items_backed_up++))
             fi
         done <<< "$steam_save_dirs"
@@ -234,7 +239,7 @@ do_backup() {
     cat > "$TEMP_DIR/BACKUP_INFO.txt" << EOF
 Worms W.M.D Save Game Backup
 Created: $(date)
-macOS: $(sw_vers -productVersion)
+macOS: $(macos_product_version)
 Items: $items_backed_up save locations
 EOF
 
@@ -316,7 +321,7 @@ do_restore() {
     if [[ -d "$TEMP_DIR/Team17" ]]; then
         echo "Restoring Team17 saves..."
         mkdir -p "$TEAM17_SAVES"
-        cp -R "$TEMP_DIR/Team17"/* "$TEAM17_SAVES/" 2>/dev/null || true
+        cp -R "$TEMP_DIR/Team17/." "$TEAM17_SAVES/"
     fi
 
     # Restore Steam saves
@@ -329,7 +334,7 @@ do_restore() {
 
                 echo "Restoring Steam saves for user $user_id..."
                 mkdir -p "$target_dir"
-                cp -R "$user_dir"/* "$target_dir/" 2>/dev/null || true
+                cp -R "$user_dir/." "$target_dir/"
             fi
         done
     fi

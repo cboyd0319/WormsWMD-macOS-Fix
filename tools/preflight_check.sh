@@ -87,6 +87,28 @@ check_info() {
     fi
 }
 
+binary_archs() {
+    local bin="$1"
+    local archs
+
+    archs=$(lipo -archs "$bin" 2>/dev/null || true)
+    if [[ -n "$archs" ]]; then
+        printf '%s\n' "$archs"
+        return 0
+    fi
+
+    archs=$(file "$bin" 2>/dev/null | grep -o 'x86_64\|arm64' | sort -u | tr '\n' ' ' | sed 's/[[:space:]]*$//' || true)
+    printf '%s\n' "${archs:-unknown}"
+}
+
+http_status() {
+    local url="$1"
+    local status
+
+    status=$(curl "${CURL_BASE[@]}" -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)
+    printf '%s\n' "${status:-000}"
+}
+
 section() {
     echo ""
     printf '%b\n' "${BOLD}=== $1 ===${RESET}"
@@ -113,13 +135,13 @@ if ! $QUICK; then
 fi
 
 # Check macOS version
-macos_version=$(sw_vers -productVersion)
+macos_version=$(sw_vers -productVersion 2>/dev/null || echo "unknown")
 macos_major=$(echo "$macos_version" | cut -d. -f1)
 echo "macOS version: $macos_version"
 
-if [[ "$macos_major" -ge 26 ]]; then
+if [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 26 ]]; then
     check_warn "macOS 26 (Tahoe) detected - fix is REQUIRED"
-elif [[ "$macos_major" -ge 15 ]]; then
+elif [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 15 ]]; then
     check_info "macOS 15 (Sequoia) - fix may be needed"
 else
     check_pass "macOS version should work without fix"
@@ -186,7 +208,7 @@ if [[ -x "$GAME_EXEC" ]]; then
     check_pass "Main executable found and executable"
 
     # Check architecture
-    exec_arch=$(file "$GAME_EXEC" | grep -o 'x86_64\|arm64' | head -1)
+    exec_arch=$(binary_archs "$GAME_EXEC")
     check_info "Executable architecture: $exec_arch"
 else
     check_fail "Main executable not found or not executable"
@@ -206,10 +228,10 @@ FRAMEWORKS_DIR="$GAME_APP/Contents/Frameworks"
 
 # Check AGL stub
 if [[ -d "$FRAMEWORKS_DIR/AGL.framework" ]]; then
-    agl_arch=$(file "$FRAMEWORKS_DIR/AGL.framework/Versions/A/AGL" 2>/dev/null | grep -o 'x86_64\|arm64' | tr '\n' '+' | sed 's/+$//')
+    agl_arch=$(binary_archs "$FRAMEWORKS_DIR/AGL.framework/Versions/A/AGL")
     check_pass "AGL stub installed (arch: $agl_arch)"
 else
-    if [[ "$macos_major" -ge 26 ]]; then
+    if [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 26 ]]; then
         check_fail "AGL stub NOT installed - game will not launch on macOS 26+"
     else
         check_info "AGL stub not installed (may not be needed)"
@@ -219,7 +241,14 @@ fi
 # Check Qt version
 if [[ -f "$FRAMEWORKS_DIR/QtCore.framework/Versions/5/QtCore" ]]; then
     if $HAVE_OTOOL; then
-        qt_version=$(otool -L "$FRAMEWORKS_DIR/QtCore.framework/Versions/5/QtCore" 2>/dev/null | grep "QtCore" | grep -o "5\.[0-9]*\.[0-9]*" | head -1 || echo "unknown")
+        qt_version=$(otool -L "$FRAMEWORKS_DIR/QtCore.framework/Versions/5/QtCore" 2>/dev/null \
+            | sed -n '/QtCore.*current version/ {
+                s/.*current version \([0-9][0-9.]*\)).*/\1/p
+                q
+            }' || true)
+        if [[ -z "$qt_version" ]]; then
+            qt_version=$(otool -L "$FRAMEWORKS_DIR/QtCore.framework/Versions/5/QtCore" 2>/dev/null | grep "QtCore" | grep -o "5\.[0-9]*\.[0-9]*" | head -1 || echo "unknown")
+        fi
 
         if [[ "$qt_version" == "5.15"* ]]; then
             check_pass "Qt version: $qt_version (updated)"
@@ -299,18 +328,18 @@ fi
 if ! $QUICK; then
     section "Network Connectivity"
 
-    # Check Team17 services
-    if curl "${CURL_BASE[@]}" -o /dev/null -w "%{http_code}" "https://ads.t17service.com" 2>/dev/null | grep -q "^[23]"; then
-        check_pass "Team17 directory service reachable"
+    team17_status=$(http_status "https://www.team17.com/games/worms-w-m-d")
+    if [[ "$team17_status" == 2* || "$team17_status" == 3* ]]; then
+        check_pass "Team17 Worms W.M.D page reachable"
     else
-        check_warn "Team17 directory service not reachable (multiplayer may not work)"
+        check_warn "Team17 Worms W.M.D page not reachable (HTTP $team17_status)"
     fi
 
-    # Check Steam
-    if curl "${CURL_BASE[@]}" -o /dev/null "https://steamcommunity.com" 2>/dev/null; then
-        check_pass "Steam community reachable"
+    steam_status=$(http_status "https://store.steampowered.com/app/327030/Worms_WMD/")
+    if [[ "$steam_status" == 2* || "$steam_status" == 3* ]]; then
+        check_pass "Steam Worms W.M.D store page reachable"
     else
-        check_warn "Steam community not reachable"
+        check_warn "Steam Worms W.M.D store page not reachable (HTTP $steam_status)"
     fi
 else
     check_info "Network checks skipped (--quick mode)"

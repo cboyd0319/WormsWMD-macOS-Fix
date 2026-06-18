@@ -54,6 +54,12 @@ worms_version_ge() {
     return 0
 }
 
+worms_supported_qt5_version() {
+    local version="${1:-}"
+
+    [[ "$version" =~ ^5[.]15[.][0-9]+$ ]]
+}
+
 worms_qt_package_version() {
     local package="$1"
     local name version
@@ -69,7 +75,7 @@ worms_qt_package_version() {
             ;;
     esac
 
-    if [[ "$version" =~ ^[0-9]+([.][0-9]+)*$ ]]; then
+    if worms_supported_qt5_version "$version"; then
         echo "$version"
         return 0
     fi
@@ -102,6 +108,21 @@ worms_latest_qt_package_by_version() {
     echo "$best_path"
 }
 
+worms_unique_path() {
+    local base="$1"
+    local suffix="${2:-}"
+    local candidate
+    local counter=1
+
+    candidate="${base}${suffix}"
+    while [[ -e "$candidate" ]]; do
+        candidate="${base}-${counter}${suffix}"
+        counter=$((counter + 1))
+    done
+
+    printf '%s\n' "$candidate"
+}
+
 worms_file_size() {
     local path="$1"
 
@@ -112,6 +133,21 @@ worms_file_sha256() {
     local path="$1"
 
     shasum -a 256 "$path" | awk '{print $1}'
+}
+
+worms_manifest_hashes() {
+    local root_dir="$1"
+    local paths_file="$2"
+
+    [[ -s "$paths_file" ]] || return 0
+
+    (
+        cd "$root_dir" || exit 1
+        while IFS= read -r rel_path; do
+            [[ -n "$rel_path" ]] || continue
+            printf '%s\0' "$rel_path"
+        done < "$paths_file" | xargs -0 shasum -a 256 --
+    )
 }
 
 worms_otool_dependencies_from_stdin() {
@@ -359,38 +395,55 @@ worms_validate_tar_entry_metadata() {
 worms_write_manifest() {
     local root_dir="$1"
     local manifest_file="$2"
+    local paths_file hash rel_path
     shift 2
+
+    paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-paths.XXXXXX")
+
+    (
+        cd "$root_dir" || exit 1
+        for rel in "$@"; do
+            [[ -e "$rel" ]] || continue
+            if [[ -d "$rel" ]]; then
+                find "$rel" -type f -print
+            elif [[ -f "$rel" ]]; then
+                printf '%s\n' "$rel"
+            fi
+        done | LC_ALL=C sort | while IFS= read -r rel_path; do
+            [[ -n "$rel_path" ]] || continue
+            if [[ "$rel_path" == *$'\t'* ]]; then
+                echo "Skipping manifest path with tab: $rel_path" >&2
+                continue
+            fi
+            printf '%s\n' "$rel_path"
+        done
+    ) > "$paths_file"
 
     {
         echo "# WormsWMD manifest v1"
         echo "# sha256	size	path"
-        (
-            cd "$root_dir" || exit 1
-            for rel in "$@"; do
-                [[ -e "$rel" ]] || continue
-                if [[ -d "$rel" ]]; then
-                    find "$rel" -type f -print
-                elif [[ -f "$rel" ]]; then
-                    printf '%s\n' "$rel"
-                fi
-            done | LC_ALL=C sort | while IFS= read -r rel_path; do
-                [[ -n "$rel_path" ]] || continue
-                if [[ "$rel_path" == *$'\t'* ]]; then
-                    echo "Skipping manifest path with tab: $rel_path" >&2
-                    continue
-                fi
-                printf '%s\t%s\t%s\n' "$(worms_file_sha256 "$rel_path")" "$(worms_file_size "$rel_path")" "$rel_path"
-            done
-        )
+        worms_manifest_hashes "$root_dir" "$paths_file" | while IFS= read -r hash_line; do
+            [[ -n "$hash_line" ]] || continue
+            hash=${hash_line%% *}
+            rel_path=${hash_line#*  }
+            printf '%s\t%s\t%s\n' "$hash" "$(worms_file_size "$root_dir/$rel_path")" "$rel_path"
+        done
     } > "$manifest_file"
+
+    rm -f "$paths_file"
 }
 
 worms_verify_manifest() {
     local root_dir="$1"
     local manifest_file="$2"
-    local expected_hash expected_size rel_path actual_hash actual_size status=0
+    local expected_hash expected_size rel_path actual_size status=0
+    local paths_file expected_file actual_file hash_line actual_hash actual_path actual_extra
 
     [[ -f "$manifest_file" ]] || return 1
+
+    paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-paths.XXXXXX")
+    expected_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-expected.XXXXXX")
+    actual_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-actual.XXXXXX")
 
     while IFS=$'\t' read -r expected_hash expected_size rel_path extra; do
         [[ -n "${expected_hash:-}" ]] || continue
@@ -417,13 +470,44 @@ worms_verify_manifest() {
             continue
         fi
 
-        actual_hash=$(worms_file_sha256 "$root_dir/$rel_path")
         actual_size=$(worms_file_size "$root_dir/$rel_path")
-        if [[ "$actual_hash" != "$expected_hash" ]] || [[ "$actual_size" != "$expected_size" ]]; then
+        if [[ "$actual_size" != "$expected_size" ]]; then
+            echo "Manifest mismatch: $rel_path" >&2
+            status=1
+            continue
+        fi
+
+        printf '%s\n' "$rel_path" >> "$paths_file"
+        printf '%s\t%s\n' "$expected_hash" "$rel_path" >> "$expected_file"
+    done < "$manifest_file"
+
+    worms_manifest_hashes "$root_dir" "$paths_file" | while IFS= read -r hash_line; do
+        [[ -n "$hash_line" ]] || continue
+        actual_hash=${hash_line%% *}
+        actual_path=${hash_line#*  }
+        printf '%s\t%s\n' "$actual_hash" "$actual_path"
+    done > "$actual_file"
+
+    exec 3< "$actual_file"
+    while IFS=$'\t' read -r expected_hash rel_path; do
+        if ! IFS=$'\t' read -r actual_hash actual_path actual_extra <&3; then
+            echo "Manifest hash missing: $rel_path" >&2
+            status=1
+            continue
+        fi
+        if [[ -n "${actual_extra:-}" ]] || [[ "$actual_path" != "$rel_path" ]] || [[ "$actual_hash" != "$expected_hash" ]]; then
             echo "Manifest mismatch: $rel_path" >&2
             status=1
         fi
-    done < "$manifest_file"
+    done < "$expected_file"
+
+    if IFS=$'\t' read -r actual_hash actual_path actual_extra <&3; then
+        echo "Manifest contains unexpected hash output: $actual_path" >&2
+        status=1
+    fi
+    exec 3<&-
+
+    rm -f "$paths_file" "$expected_file" "$actual_file"
 
     return "$status"
 }

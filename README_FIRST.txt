@@ -8,19 +8,21 @@ What to do
 
 1. Double-click "Worms W.M.D Fix.command".
 2. Choose option 1: "Apply the recommended fix".
-3. When it finishes, open Worms W.M.D from Steam or GOG like normal.
+3. When it finishes, press Return to launch when prompted, or choose option 7
+   later.
 
 Want to verify the zip first?
 -----------------------------
 
-If you downloaded "WormsWMD-macOS-Fix-v1.6.4.zip.sha256" next to this zip,
-open Terminal in your Downloads folder and run:
+If you downloaded the matching ".zip.sha256" file next to this zip, open
+Terminal in your Downloads folder and run this with the release version from
+the filename:
 
-    shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.4.zip.sha256
+    shasum -a 256 -c WormsWMD-macOS-Fix-VERSION.zip.sha256
 
 It should print:
 
-    WormsWMD-macOS-Fix-v1.6.4.zip: OK
+    WormsWMD-macOS-Fix-VERSION.zip: OK
 
 If macOS blocks the file
 ------------------------
@@ -32,7 +34,8 @@ If something fails
 ------------------
 
 Run "Worms W.M.D Fix.command" again and choose option 5. It creates a support
-bundle on your Desktop. Attach that file to a GitHub issue:
+bundle on your Desktop without raw logs, save files, or game config files.
+Attach that file to a GitHub issue:
 
 https://github.com/cboyd0319/WormsWMD-macOS-Fix/issues
 

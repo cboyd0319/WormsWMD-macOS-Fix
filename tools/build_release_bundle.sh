@@ -100,7 +100,8 @@ Repository: https://github.com/cboyd0319/WormsWMD-macOS-Fix
 Start here:
 1. Open README_FIRST.txt.
 2. Double-click "Worms W.M.D Fix.command".
-3. Use option 5 in the launcher if you need a support bundle.
+3. Choose option 1, then launch when prompted.
+4. Use option 5 in the launcher if you need a support bundle.
 
 Verify before unzipping:
 Download the matching .zip.sha256 file from the same GitHub release, then run:

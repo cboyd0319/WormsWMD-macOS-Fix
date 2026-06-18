@@ -57,7 +57,7 @@ Gatekeeper blocks `.command` files downloaded from the internet. Try these optio
 
 5. **Use the one-liner instead:**
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh | bash
    ```
    Requires `git` (installed by Xcode Command Line Tools).
 
@@ -196,4 +196,6 @@ To gather system information for a bug report:
 
 Use `--bundle` when opening a community issue. It creates a sanitized support
 archive on your Desktop with diagnostics, Qt package verification details, and
-backup manifests when available.
+backup manifests when available. Do not upload raw `.log` or `.trace` files
+unless you have reviewed and redacted account names, private paths, tokens, and
+private config values.

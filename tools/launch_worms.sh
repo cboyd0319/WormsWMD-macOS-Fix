@@ -252,7 +252,7 @@ if [[ "$ENABLE_LOGGING" == true ]]; then
     fi
     log_message "=== Worms W.M.D Diagnostic Launch ==="
     log_message "Game: $GAME_APP"
-    log_message "macOS: $(sw_vers -productVersion)"
+    log_message "macOS: $(sw_vers -productVersion 2>/dev/null || echo "unknown")"
     log_message "Architecture: $(uname -m)"
     log_message "Safe Mode: $SAFE_MODE"
     echo -e "${BLUE}Logging to: $LOG_FILE${NC}"
@@ -337,7 +337,7 @@ generate_crash_report() {
         echo "Exit Code: $exit_code"
         echo ""
         echo "=== System Info ==="
-        echo "macOS: $(sw_vers -productVersion)"
+        echo "macOS: $(sw_vers -productVersion 2>/dev/null || echo "unknown")"
         echo "Architecture: $(uname -m)"
         echo ""
         echo "=== Environment ==="

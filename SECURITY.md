@@ -72,7 +72,8 @@ This fix is designed to be safe against:
 | Repository clone/update | `github.com` | HTTPS via git |
 | Terminal bootstrap script (optional) | `raw.githubusercontent.com` pinned release tag | HTTPS |
 | Update check (optional) | `api.github.com`, `github.com` release assets | HTTPS + SHA256 checksum for downloads |
-| Pre-flight network check (optional) | `ads.t17service.com`, `steamcommunity.com` | HTTPS |
+| Pre-flight network check (optional) | `www.team17.com/games/worms-w-m-d`, `store.steampowered.com/app/327030/Worms_WMD/` | HTTPS |
+| Maintainer Qt provenance rebuild | `formulae.brew.sh`, `ghcr.io` Homebrew bottle blobs | HTTPS + pinned bottle SHA256 |
 | Rosetta 2 install | Apple servers | System-managed |
 | Xcode CLT install | Apple servers | System-managed |
 
@@ -98,24 +99,24 @@ matching `.sha256` file, then verifies the checksum before leaving the zip in
 ## Download verification
 
 Release bundles publish both a zip and a matching SHA-256 checksum file. For
-the `v1.6.6` release:
+the `v1.7.0` release:
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.6.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.0.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.6.6.zip: OK
+WormsWMD-macOS-Fix-v1.7.0.zip: OK
 ```
 
 Release bundles also receive GitHub artifact attestations from the release
 workflow:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.6.6.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.0.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 The checksum verifies the file content. The attestation verifies that GitHub
@@ -133,6 +134,7 @@ Pre-built Qt framework packages undergo multiple verification steps:
    - `PlugIns/` and contents
    - `METADATA.txt`
    - `MANIFEST.txt`
+   - `SOURCE_PROVENANCE.tsv`
 5. **Path traversal and link protection**: Archives containing `../`, `/..`,
    absolute paths, unsafe symlink targets, hardlinks, or special files are
    rejected
@@ -191,7 +193,7 @@ User-controllable environment variables are validated:
 |----------|------------|
 | `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D`; writable bundle subpaths must not be symlinks or resolve outside `Contents` |
 | `INSTALL_DIR` | Refuses system paths, home directory, non-empty non-repo directories, and Git repositories with a different remote |
-| `INSTALL_REF` | Defaults to pinned release `v1.6.6` and exact commit verification; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
+| `INSTALL_REF` | Defaults to pinned release `v1.7.0` and exact commit verification; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
 | `LOG_FILE` | Must be a regular `.log` path under `~/Library/Logs` |
 | `QT_PREFIX` | Verified to contain expected Qt frameworks; direct custom Homebrew prefixes require explicit opt-in |
 
@@ -325,14 +327,38 @@ The fix automatically creates a backup before making changes:
 
 | Component | Source | Verification |
 |-----------|--------|--------------|
-| Qt 5.15 | Pre-built in repo `dist/`, or Homebrew | SHA256 checksum, metadata, archive/generated manifest, x86_64 slices |
+| Qt 5.15.x | Pre-built in repo `dist/`, or Intel Homebrew/custom prefix fallback | SHA256 checksum, metadata, archive/generated manifest, x86_64 slices, supported-series check |
 | GLib, PCRE2, etc. | Bundled with Qt or from Homebrew | Transitive from Qt |
 
 Pre-built Qt packages:
-- Built from Homebrew Qt 5.15 on Intel macOS
+- Built from a checksum-locked Homebrew Qt 5.15.19 x86_64 bottle closure
 - Packaged with `tools/package_qt_frameworks.sh`
-- Stored in repo `dist/` with SHA256 checksums
+- Stored in repo `dist/` with SHA256 checksums and source provenance
 - Architecture: x86_64 (runs under Rosetta 2 on Apple Silicon)
+
+As of 2026-06-18, the current Homebrew `qt@5` stable formula is Qt 5.15.19.
+This repository ships `dist/qt-frameworks-x86_64-5.15.19.tar.gz` with
+`dist/qt-frameworks-x86_64-5.15.19.tar.gz.sha256` and
+`dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv`.
+
+Qt package supply-chain process:
+
+1. `dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv` locks every
+   Homebrew bottle in the Qt runtime closure by formula name, version, bottle
+   tag, GHCR blob URL, bottle SHA256, upstream source SHA256, Homebrew formula
+   SHA256, and Homebrew tap commit.
+2. `tools/fetch_qt_homebrew_bottles.rb --lock ... --output ...` fetches those
+   exact blobs, verifies every bottle SHA256 before extraction, builds an
+   isolated Homebrew-like prefix, rewrites Homebrew bottle placeholders to that
+   prefix, verifies no placeholders remain, and confirms QtCore has an x86_64
+   Mach-O slice.
+3. `tools/package_qt_frameworks.sh` packages only Qt 5.15.x inputs, copies the
+   runtime frameworks, plugins, and dylib closure, prunes non-runtime framework
+   headers, embeds `SOURCE_PROVENANCE.tsv`, writes `MANIFEST.txt`, and creates
+   the archive plus checksum.
+4. `scripts/download_qt_frameworks.sh --check` validates the committed archive
+   checksum, metadata, whitelisted layout, tar metadata, manifest, required
+   runtime files, and x86_64 Mach-O slices before installer use.
 
 ## Known limitations
 

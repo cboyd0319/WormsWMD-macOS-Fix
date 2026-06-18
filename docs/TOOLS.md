@@ -95,11 +95,12 @@ Gather system information for bug reports:
 ./tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop
 ```
 
-The support bundle mode writes a sanitized archive containing diagnostics,
-pre-built Qt package verification details, and available backup manifests. It
-is intended for community issue reports where users should not have to paste
-long terminal output by hand. Bundle sanitization redacts home paths, external
-volume paths, temporary paths, and email addresses.
+Diagnostics output and support bundles are sanitized for issue reporting. The
+collector redacts home-account paths, external volume paths, temporary paths,
+email addresses, and common secret-like key/value strings. Support bundles
+contain diagnostics, pre-built Qt package verification details, and available
+backup manifests; they do not include raw logs, crash logs, save files, game
+binaries, or private config file contents.
 
 ## Enhanced launcher
 
@@ -124,6 +125,14 @@ or docs-topology changes:
 
 ```bash
 ./tools/validate_harness.sh
+./tools/test_dependency_parsing.sh
+./tools/test_issue_10_regression.sh
+./tools/test_support_bundle_sanitization.sh
+./tools/test_backup_saves_regression.sh
+./tools/test_launcher_friction.sh
+./tools/test_preflight_regression.sh
+./tools/test_manifest_regression.sh
+./tools/test_qt_version_pinning.sh
 ```
 
 Check or refresh the pre-built Qt package used by the installer:
@@ -131,8 +140,6 @@ Check or refresh the pre-built Qt package used by the installer:
 ```bash
 ./scripts/download_qt_frameworks.sh --check
 ./scripts/download_qt_frameworks.sh --force
-./tools/package_qt_frameworks.sh --output dist
-./tools/package_qt_frameworks.sh --output dist --qt-prefix /path/to/qt-5.15.19 --version 5.15.19
 ```
 
 `scripts/download_qt_frameworks.sh --check` validates local package checksums,
@@ -144,11 +151,44 @@ pinned release commit for `dist/` contents.
 
 `tools/package_qt_frameworks.sh` accepts either Intel Homebrew `qt@5` or an
 explicit Qt prefix. It writes deterministic gzip archives using
-`SOURCE_DATE_EPOCH`, emits `METADATA.txt` and `MANIFEST.txt`, and is intended
-for maintainers replacing the distribution archive in `dist/`. Qt 5.15.19 can
-be packaged from a supplied compatible x86_64 Qt prefix, but this repository
-does not claim to ship a 5.15.19 artifact unless that artifact and checksum are
-present in `dist/`.
+`SOURCE_DATE_EPOCH`, emits `METADATA.txt` and `MANIFEST.txt`, prunes framework
+headers from the runtime package, and is intended for maintainers replacing the
+distribution archive in `dist/`. The packager and installer fallback reject Qt
+versions outside the supported 5.15.x series. `QT_DEP_PREFIX` may be set when
+packaging from an isolated Homebrew-like prefix whose transitive dylib
+dependencies are outside `QT_PREFIX`. `QT_SOURCE_PROVENANCE_FILE` embeds the
+Homebrew bottle lock as `SOURCE_PROVENANCE.tsv` in the archive.
+
+Rebuild the committed Qt 5.15.19 runtime package from the pinned Homebrew
+bottle lock:
+
+```bash
+./tools/fetch_qt_homebrew_bottles.rb \
+  --lock dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv \
+  --output /tmp/wormswmd-qt51519-prefix
+
+SOURCE_DATE_EPOCH=1781740800 \
+QT_PREFIX=/tmp/wormswmd-qt51519-prefix/opt/qt@5 \
+QT_DEP_PREFIX=/tmp/wormswmd-qt51519-prefix \
+QT_PACKAGE_VERSION=5.15.19 \
+QT_SOURCE_PROVENANCE_FILE=dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv \
+./tools/package_qt_frameworks.sh --output dist --version 5.15.19
+
+(cd dist && shasum -a 256 -c qt-frameworks-x86_64-5.15.19.tar.gz.sha256)
+./scripts/download_qt_frameworks.sh --check
+```
+
+To intentionally refresh the bottle lock for a newer Qt 5.15.x artifact, write
+a new lock from current Homebrew metadata, inspect the diff, then rebuild:
+
+```bash
+./tools/fetch_qt_homebrew_bottles.rb \
+  --formula qt@5 \
+  --version 5.15.19 \
+  --tag sonoma \
+  --output /tmp/wormswmd-qt51519-prefix \
+  --write-lock dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv
+```
 
 Build the player-facing release folder and zip:
 

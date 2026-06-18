@@ -4,8 +4,48 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
+## 1.7.0 (2026-06-18)
+
+### Added
+- Added issue #10 regression coverage for backup progress, restore selection,
+  diagnostics, launcher friction, preflight URLs, support-bundle sanitization,
+  and Qt package version pinning.
+- Added `tools/fetch_qt_homebrew_bottles.rb` to rebuild an isolated, checksum-
+  locked Homebrew x86_64 bottle prefix for Qt runtime packaging.
+- Added `SOURCE_PROVENANCE.tsv` support for Qt archives and committed the
+  Homebrew bottle lock used to build the bundled Qt package.
+
+### Changed
+- Updated the bundled Qt runtime archive from 5.15.18 to Qt 5.15.19, the final
+  Qt 5.15.x patch level currently exposed by Homebrew `qt@5`.
+- Reduced backup friction by showing backup manifest progress and batching
+  manifest hashing work.
+- Updated preflight network checks to use the public Team17 Worms W.M.D page
+  and Steam Worms W.M.D store page.
+- Added launcher option 7 and post-fix launch prompting to reduce first-run
+  friction.
+- Qt package creation now rejects non-5.15.x inputs, embeds source provenance
+  when provided, supports isolated dependency prefixes, and prunes framework
+  headers from runtime archives.
+
+### Fixed
+- Fixed the apparent hang during backup creation reported in issue #10.
+- Fixed restore selection so restore prefers the newest original-looking backup
+  instead of a backup that already contains the fix.
+- Fixed diagnostics false positives for local Qt checksum and quarantine status.
+- Fixed save backup handling for hidden files and copy failures.
+- Fixed preflight Qt reporting so it shows the QtCore current version, such as
+  5.15.19, instead of the compatibility version.
+- Fixed launcher behavior when input is piped and when force mode should avoid
+  watcher prompts.
+
 ### Security
-- Pinned mainline bootstrap commit verification to the `v1.6.6` tag target.
+- Sanitized support bundles by default and stopped including raw logs, traces,
+  crash logs, save data, game binaries, and private config contents.
+- Added source-provenance documentation and lockfile-based rebuild steps for
+  the bundled Qt runtime closure.
+- Updated v1.7.0 bootstrap refs for the release tag and documented the
+  follow-up mainline exact-commit pinning step.
 
 ## 1.6.6 (2026-06-13)
 

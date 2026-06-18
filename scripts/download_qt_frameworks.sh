@@ -118,7 +118,7 @@ validate_tar_layout() {
         fi
 
         case "$entry" in
-            Frameworks|Frameworks/*|PlugIns|PlugIns/*|METADATA.txt|MANIFEST.txt)
+            Frameworks|Frameworks/*|PlugIns|PlugIns/*|METADATA.txt|MANIFEST.txt|SOURCE_PROVENANCE.tsv)
                 ;;
             *)
                 echo -e "${RED}ERROR:${NC} Unexpected entry in archive: $entry"
@@ -242,9 +242,14 @@ validate_extracted_package() {
 
 ensure_extracted_manifest() {
     local extract_dir="$1"
+    local manifest_inputs=(Frameworks PlugIns METADATA.txt)
+
+    if [[ -f "$extract_dir/SOURCE_PROVENANCE.tsv" ]]; then
+        manifest_inputs+=(SOURCE_PROVENANCE.tsv)
+    fi
 
     if [[ ! -f "$extract_dir/MANIFEST.txt" ]]; then
-        worms_write_manifest "$extract_dir" "$extract_dir/MANIFEST.txt" Frameworks PlugIns METADATA.txt
+        worms_write_manifest "$extract_dir" "$extract_dir/MANIFEST.txt" "${manifest_inputs[@]}"
     fi
 
     worms_verify_manifest "$extract_dir" "$extract_dir/MANIFEST.txt" || {

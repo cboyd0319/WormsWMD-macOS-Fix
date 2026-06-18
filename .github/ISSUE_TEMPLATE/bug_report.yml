@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this for game behavior after a successful install, launcher bugs, diagnostics bugs, or documentation problems.
+        Use this for game behavior after a successful install, launcher bugs, diagnostics bugs, or documentation problems. Prefer the sanitized support bundle from launcher option 5 over raw logs.
 
   - type: checkboxes
     id: checklist
@@ -24,7 +24,7 @@ body:
     attributes:
       label: Fix version
       description: Run `./fix_worms_wmd.sh --help` or check the release zip name.
-      placeholder: "v1.6.6"
+      placeholder: "v1.7.0"
     validations:
       required: false
 
@@ -90,6 +90,6 @@ body:
     id: support_bundle
     attributes:
       label: Support bundle or logs
-      description: If this is not documentation-only, attach a support bundle from launcher option 5 or paste sanitized output.
+      description: If this is not documentation-only, attach a sanitized support bundle from launcher option 5 or paste reviewed, redacted output. Do not upload raw `.log` or `.trace` files.
     validations:
       required: false

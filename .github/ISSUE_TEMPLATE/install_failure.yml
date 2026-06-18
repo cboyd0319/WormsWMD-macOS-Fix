@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this when the launcher or installer says the fix failed. The fastest path is to attach the support bundle from launcher option 5.
+        Use this when the launcher or installer says the fix failed. The fastest path is to attach the sanitized support bundle from launcher option 5. Do not upload raw `.log` or `.trace` files unless you have reviewed and redacted them.
 
   - type: checkboxes
     id: checklist
@@ -66,7 +66,7 @@ body:
     id: failure_output
     attributes:
       label: What failed?
-      description: Paste the visible error text, or summarize what happened.
+      description: Paste the visible error text, or summarize what happened. Remove any account names, tokens, private paths, or config values from pasted text.
       render: shell
     validations:
       required: true
@@ -75,7 +75,7 @@ body:
     id: support_bundle
     attributes:
       label: Support bundle
-      description: Attach the `wormswmd-support-*.tar.gz` file from your Desktop. If you cannot attach it, explain why.
+      description: Attach the sanitized `wormswmd-support-*.tar.gz` file from your Desktop. If you cannot attach it, explain why.
     validations:
       required: true
 

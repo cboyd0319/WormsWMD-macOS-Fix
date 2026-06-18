@@ -3,17 +3,17 @@
 # install.sh - One-liner installer for Worms W.M.D macOS Fix
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh | bash
 #
 # Or with options:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh | bash -s -- --dry-run
 #
 
 set -euo pipefail
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
-DEFAULT_INSTALL_REF="v1.6.6"
-DEFAULT_INSTALL_COMMIT="920bd8ee7eec718d470dad0b5d998e6e913ac2de"
+DEFAULT_INSTALL_REF="v1.7.0"
+DEFAULT_INSTALL_COMMIT=""
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
 INSTALL_REF="${INSTALL_REF:-$DEFAULT_INSTALL_REF}"
 
@@ -148,6 +148,11 @@ verify_default_install_commit() {
     fi
     if [[ -z "$DEFAULT_INSTALL_COMMIT" ]]; then
         return 0
+    fi
+    if [[ "$DEFAULT_INSTALL_COMMIT" == PENDING_* ]]; then
+        print_error "Release commit pin is not finalized for $DEFAULT_INSTALL_REF."
+        print_info "Replace DEFAULT_INSTALL_COMMIT with the final release commit before publishing."
+        exit 1
     fi
 
     actual_commit=$(git -C "$dir" rev-parse HEAD 2>/dev/null || true)

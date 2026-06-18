@@ -48,6 +48,15 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Execution plan template](exec-plans/TEMPLATE.md) - reusable plan scaffold.
 - [Deep repository audit plan](exec-plans/2026-06-10-deep-repo-audit.md) -
   completed audit trail for the repository-wide defect pass.
+- [Issue 10 backup stall plan](exec-plans/2026-06-18-issue-10-backup-stall.md)
+  - completed fix for silent backup manifest work, diagnostics privacy, and
+    adjacent backup edge cases.
+- [Cheat sheet supply-chain hardening plan](exec-plans/2026-06-18-cheatsheet-supply-chain-hardening.md)
+  - completed follow-up for Qt 5.15.x pinning, security cheat-sheet findings,
+    and pre-release supply-chain readiness.
+- [v1.7.0 pre-release prep plan](exec-plans/2026-06-18-v1.7.0-pre-release.md)
+  - completed deterministic version, changelog, documentation, and validation
+    prep before final release commit pinning.
 - [Security hardening plan](exec-plans/2026-06-10-security-hardening.md) -
   completed audit trail for repository-wide security hardening.
 - [Agent harness application plan](exec-plans/2026-04-29-agent-harness-application.md)

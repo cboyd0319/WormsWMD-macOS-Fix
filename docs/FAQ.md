@@ -35,9 +35,8 @@ No. The fix downloads pre-built Qt frameworks automatically. Homebrew is a fallb
 
 **Q: Does this ship Qt 5.15.19?**
 
-The scripts can package and consume a supplied compatible Qt 5.15.19 x86_64
-prefix, but this repository only ships the Qt archive that is present in
-`dist/` with its matching checksum.
+Yes. As of 2026-06-18, `dist/` ships Qt 5.15.19 as an x86_64 runtime archive
+with a matching checksum and Homebrew bottle provenance lock.
 
 **Q: Why Qt 5.15 instead of Qt 6?**
 

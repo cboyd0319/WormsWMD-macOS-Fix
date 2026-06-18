@@ -22,7 +22,7 @@ For most players, this is the only section you need.
 2. Unzip it.
 3. Double-click `Worms W.M.D Fix.command`.
 4. Press `1` to apply the recommended fix.
-5. Launch Worms W.M.D normally from Steam or GOG.
+5. Launch when prompted, or press `7` in the launcher later.
 
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
@@ -34,20 +34,20 @@ GitHub issue.
 ## Verify The Download
 
 The release page includes a `.zip.sha256` checksum next to the zip file. To
-verify the `v1.6.6` release before unzipping it:
+verify the `v1.7.0` release before unzipping it:
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.6.6.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.0.zip.sha256
 ```
 
-Terminal should print `WormsWMD-macOS-Fix-v1.6.6.zip: OK`.
+Terminal should print `WormsWMD-macOS-Fix-v1.7.0.zip: OK`.
 
 For stronger provenance checking, GitHub CLI users can also verify the release
 attestation:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.6.6.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.0.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 ## Launcher Options
@@ -62,6 +62,7 @@ The launcher is a simple numbered menu:
 | `4` | Restore original game files from a backup. |
 | `5` | Create a sanitized support bundle on your Desktop. |
 | `6` | Open the help file. |
+| `7` | Launch Worms W.M.D. |
 
 ## Requirements
 
@@ -113,7 +114,7 @@ This project is designed so players can inspect what it does before running it:
 You can also review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh
 ```
 
 ## Terminal Install Option
@@ -121,11 +122,11 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6
 Use the release zip above unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.6.6/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The bootstrap is pinned to release `v1.6.6`
+launcher menu as the release zip. The bootstrap is pinned to release `v1.7.0`
 and verifies the expected commit before running downloaded code.
 
 ## Pre-Flight Check
@@ -187,7 +188,6 @@ Use `--quick` to skip network checks, or `--verbose` for detailed output.
 - Qt Project for Qt 5.15.
 - This repository uses original project files only; no official Team17/Worms
   art is bundled.
-- Fix developed with AI assistance.
 
 ## Links
 

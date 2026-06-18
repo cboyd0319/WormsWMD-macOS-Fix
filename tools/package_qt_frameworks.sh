@@ -27,6 +27,9 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/../dist}"
 QT_PREFIX="${QT_PREFIX:-/usr/local/opt/qt@5}"
 QT_PACKAGE_VERSION="${QT_PACKAGE_VERSION:-}"
+QT_DEP_PREFIX="${QT_DEP_PREFIX:-}"
+QT_PACKAGE_SOURCE_LABEL="${QT_PACKAGE_SOURCE_LABEL:-}"
+QT_SOURCE_PROVENANCE_FILE="${QT_SOURCE_PROVENANCE_FILE:-}"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1704067200}"
 PACKAGE_NAME="qt-frameworks-x86_64"
 
@@ -58,11 +61,16 @@ Options:
 Environment:
   QT_PREFIX           Default Qt installation prefix
   QT_PACKAGE_VERSION  Same as --version
+  QT_DEP_PREFIX       Additional Homebrew-like dependency prefix
+  QT_PACKAGE_SOURCE_LABEL
+                      Override source label written to metadata
+  QT_SOURCE_PROVENANCE_FILE
+                      TSV lock/provenance file to include in the archive
   SOURCE_DATE_EPOCH   Reproducible timestamp seed (default: $SOURCE_DATE_EPOCH)
 
 Examples:
   $0 --output dist
-  $0 --qt-prefix /usr/local/opt/qt@5 --version 5.15.18
+  $0 --qt-prefix /usr/local/opt/qt@5 --version 5.15.19
   $0 --qt-prefix /path/to/qt-5.15.19 --version 5.15.19
 EOF
 }
@@ -149,11 +157,36 @@ determine_qt_version() {
 }
 
 qt_source_label() {
+    if [[ -n "$QT_PACKAGE_SOURCE_LABEL" ]]; then
+        echo "$QT_PACKAGE_SOURCE_LABEL"
+        return 0
+    fi
+
     if [[ "$QT_PREFIX" == "/usr/local/opt/qt@5" ]]; then
         echo "Intel Homebrew ($QT_PREFIX)"
     else
         echo "Qt prefix ($QT_PREFIX)"
     fi
+}
+
+dependency_path_allowed() {
+    local path="$1"
+
+    case "$path" in
+        /usr/local/*)
+            return 0
+            ;;
+    esac
+
+    if [[ "$path" == "$QT_PREFIX"/* ]]; then
+        return 0
+    fi
+
+    if [[ -n "$QT_DEP_PREFIX" ]] && [[ "$path" == "$QT_DEP_PREFIX"/* ]]; then
+        return 0
+    fi
+
+    return 1
 }
 
 validate_packaged_binary() {
@@ -171,6 +204,13 @@ validate_packaged_binary() {
     fi
 }
 
+prune_framework_for_runtime() {
+    local framework_dir="$1"
+
+    rm -rf "$framework_dir/Headers"
+    rm -rf "$framework_dir/Versions/5/Headers"
+}
+
 normalize_archive_inputs() {
     local touch_time="$1"
 
@@ -186,6 +226,9 @@ create_reproducible_archive() {
         {
             find Frameworks PlugIns -print
             printf '%s\n' METADATA.txt MANIFEST.txt
+            if [[ -f SOURCE_PROVENANCE.tsv ]]; then
+                printf '%s\n' SOURCE_PROVENANCE.tsv
+            fi
         } | LC_ALL=C sort > "$tar_list"
 
         COPYFILE_DISABLE=1 tar \
@@ -214,6 +257,15 @@ if [[ -z "$QT_VERSION" ]] || [[ ! "$QT_VERSION" =~ ^[0-9]+([.][0-9]+)*$ ]]; then
     echo "Pass --version 5.15.x when packaging from a custom Qt prefix."
     exit 1
 fi
+if ! worms_supported_qt5_version "$QT_VERSION"; then
+    worms_print_error "Unsupported Qt version: $QT_VERSION"
+    echo "This project packages only Qt 5.15.x for Worms W.M.D compatibility."
+    exit 1
+fi
+worms_reject_control_chars "$QT_PREFIX" "QT_PREFIX"
+worms_reject_control_chars "$QT_DEP_PREFIX" "QT_DEP_PREFIX"
+worms_reject_control_chars "$QT_PACKAGE_SOURCE_LABEL" "QT_PACKAGE_SOURCE_LABEL"
+worms_reject_control_chars "$QT_SOURCE_PROVENANCE_FILE" "QT_SOURCE_PROVENANCE_FILE"
 CREATED_AT=$(format_epoch_utc "$SOURCE_DATE_EPOCH")
 TOUCH_TIME=$(format_epoch_touch "$SOURCE_DATE_EPOCH")
 SOURCE_LABEL=$(qt_source_label)
@@ -224,6 +276,9 @@ echo ""
 echo -e "${BLUE}Qt Framework Packager${NC}"
 echo "Qt Version: $QT_VERSION"
 echo "Qt Prefix: $QT_PREFIX"
+if [[ -n "$QT_DEP_PREFIX" ]]; then
+    echo "Dependency Prefix: $QT_DEP_PREFIX"
+fi
 echo "Output: $OUTPUT_DIR"
 echo "Source Date Epoch: $SOURCE_DATE_EPOCH"
 echo ""
@@ -260,6 +315,7 @@ for fw in "${FRAMEWORKS[@]}"; do
             exit 1
         fi
         validate_packaged_binary "$binary"
+        prune_framework_for_runtime "$FRAMEWORKS_DIR/${fw}.framework"
         echo "  Copied ${fw}.framework"
     else
         worms_print_error "${fw}.framework not found at $QT_PREFIX/lib"
@@ -303,7 +359,7 @@ copy_deps() {
 
     while IFS= read -r dep; do
         # Only package external dylib dependencies that can travel with the app.
-        if [[ "$dep" == /usr/local/* ]] || [[ "$dep" == "$QT_PREFIX"/* ]]; then
+        if dependency_path_allowed "$dep"; then
             [[ "$dep" == *.dylib ]] || continue
             local dep_name
             dep_name=$(basename "$dep")
@@ -326,7 +382,7 @@ copy_deps() {
     done < <(
         worms_otool_dependencies "$binary" \
             | while IFS= read -r candidate; do
-                if [[ "$candidate" == /usr/local/* ]] || [[ "$candidate" == "$QT_PREFIX"/* ]]; then
+                if dependency_path_allowed "$candidate"; then
                     printf '%s\n' "$candidate"
                 fi
             done
@@ -364,6 +420,14 @@ plugin_count=$(find "$PLUGINS_DIR" -name "*.dylib" -type f | wc -l | tr -d ' ')
 echo ""
 echo "Packaged: $fw_count frameworks, $dylib_count dylibs, $plugin_count plugins"
 
+if [[ -n "$QT_SOURCE_PROVENANCE_FILE" ]]; then
+    if [[ ! -f "$QT_SOURCE_PROVENANCE_FILE" ]]; then
+        worms_print_error "Source provenance file not found: $QT_SOURCE_PROVENANCE_FILE"
+        exit 1
+    fi
+    cp "$QT_SOURCE_PROVENANCE_FILE" "$WORK_DIR/SOURCE_PROVENANCE.tsv"
+fi
+
 # Create metadata file
 worms_print_step "Creating metadata..."
 cat > "$WORK_DIR/METADATA.txt" << EOF
@@ -387,7 +451,11 @@ EOF
 
 # Create package manifest before archiving
 worms_print_step "Creating manifest..."
-worms_write_manifest "$WORK_DIR" "$WORK_DIR/MANIFEST.txt" Frameworks PlugIns METADATA.txt
+manifest_inputs=(Frameworks PlugIns METADATA.txt)
+if [[ -f "$WORK_DIR/SOURCE_PROVENANCE.tsv" ]]; then
+    manifest_inputs+=(SOURCE_PROVENANCE.tsv)
+fi
+worms_write_manifest "$WORK_DIR" "$WORK_DIR/MANIFEST.txt" "${manifest_inputs[@]}"
 worms_verify_manifest "$WORK_DIR" "$WORK_DIR/MANIFEST.txt"
 
 # Normalize timestamps for reproducible archives.

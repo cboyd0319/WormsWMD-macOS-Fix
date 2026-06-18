@@ -31,7 +31,7 @@ while [[ -L "$SCRIPT_PATH" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.6.6"
+VERSION="1.7.0"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -376,6 +376,10 @@ offer_steam_watcher() {
         return 0  # Already installed
     fi
 
+    if $FORCE; then
+        return 0  # Don't prompt or print an offer in force mode
+    fi
+
     echo ""
     print_info "Would you like to be notified when Steam updates overwrite this fix?"
     echo ""
@@ -385,10 +389,6 @@ offer_steam_watcher() {
     echo "    The update watcher runs in the background and notifies you"
     echo "    if the fix needs to be re-applied."
     echo ""
-
-    if $FORCE; then
-        return 0  # Don't auto-install in force mode
-    fi
 
     read -p "Install the Steam update watcher? [y/N] " -n 1 -r < /dev/tty
     echo ""
@@ -435,6 +435,49 @@ verify_game_backup_manifest() {
     [[ -f "$backup_dir/$BACKUP_MANIFEST_NAME" ]] || return 2
     worms_validate_tree_symlinks "$backup_dir" || return 1
     worms_verify_manifest "$backup_dir" "$backup_dir/$BACKUP_MANIFEST_NAME"
+}
+
+backup_qtcore_version() {
+    local backup_dir="$1"
+    local qt_core="$backup_dir/Frameworks/QtCore.framework/Versions/5/QtCore"
+
+    [[ -f "$qt_core" ]] || return 1
+    command -v otool >/dev/null 2>&1 || return 1
+    otool -L "$qt_core" 2>/dev/null | grep "QtCore" | grep -o "5\.[0-9]*\.[0-9]*" | head -1
+}
+
+backup_appears_already_fixed() {
+    local backup_dir="$1"
+    local qt_version
+
+    if [[ -d "$backup_dir/Frameworks/AGL.framework" ]]; then
+        return 0
+    fi
+
+    qt_version=$(backup_qtcore_version "$backup_dir" || true)
+    [[ "$qt_version" == 5.15* ]]
+}
+
+latest_original_game_backup() {
+    local backup
+
+    while IFS= read -r backup; do
+        [[ -n "$backup" ]] || continue
+        if ! backup_appears_already_fixed "$backup"; then
+            echo "$backup"
+            return 0
+        fi
+    done < <(
+        find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null \
+            | while IFS= read -r -d '' backup; do
+                mtime=$(stat -f "%m" "$backup" 2>/dev/null || stat -c "%Y" "$backup" 2>/dev/null || echo 0)
+                printf '%s\t%s\n' "$mtime" "$backup"
+            done \
+            | sort -nr \
+            | cut -f2-
+    )
+
+    return 1
 }
 
 restore_game_backup_files() {
@@ -493,9 +536,14 @@ game_path_for_backup_relpath() {
 verify_restored_game_backup() {
     local backup_dir="$1"
     local manifest="$backup_dir/$BACKUP_MANIFEST_NAME"
-    local expected_hash expected_size rel_path target actual_hash actual_size status=0
+    local expected_hash expected_size rel_path target actual_size status=0
+    local paths_file expected_file actual_file hash_line actual_hash actual_path actual_extra expected_target
 
     [[ -f "$manifest" ]] || return 0
+
+    paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-restore-paths.XXXXXX")
+    expected_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-restore-expected.XXXXXX")
+    actual_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-restore-actual.XXXXXX")
 
     while IFS=$'\t' read -r expected_hash expected_size rel_path extra; do
         [[ -n "${expected_hash:-}" ]] || continue
@@ -510,13 +558,43 @@ verify_restored_game_backup() {
             status=1
             continue
         fi
-        actual_hash=$(worms_file_sha256 "$target")
         actual_size=$(worms_file_size "$target")
-        if [[ "$actual_hash" != "$expected_hash" ]] || [[ "$actual_size" != "$expected_size" ]]; then
+        if [[ "$actual_size" != "$expected_size" ]]; then
+            print_warning "Restored file did not match backup manifest: $rel_path"
+            status=1
+            continue
+        fi
+        printf '%s\n' "$target" >> "$paths_file"
+        printf '%s\t%s\t%s\n' "$expected_hash" "$rel_path" "$target" >> "$expected_file"
+    done < "$manifest"
+
+    worms_manifest_hashes "/" "$paths_file" | while IFS= read -r hash_line; do
+        [[ -n "$hash_line" ]] || continue
+        actual_hash=${hash_line%% *}
+        actual_path=${hash_line#*  }
+        printf '%s\t%s\n' "$actual_hash" "$actual_path"
+    done > "$actual_file"
+
+    exec 3< "$actual_file"
+    while IFS=$'\t' read -r expected_hash rel_path expected_target; do
+        if ! IFS=$'\t' read -r actual_hash actual_path actual_extra <&3; then
+            print_warning "Restored file hash missing: $rel_path"
+            status=1
+            continue
+        fi
+        if [[ -n "${actual_extra:-}" ]] || [[ "$actual_path" != "$expected_target" ]] || [[ "$actual_hash" != "$expected_hash" ]]; then
             print_warning "Restored file did not match backup manifest: $rel_path"
             status=1
         fi
-    done < "$manifest"
+    done < "$expected_file"
+
+    if IFS=$'\t' read -r actual_hash actual_path actual_extra <&3; then
+        print_warning "Unexpected restored-file hash output: $actual_path"
+        status=1
+    fi
+    exec 3<&-
+
+    rm -f "$paths_file" "$expected_file" "$actual_file"
 
     return "$status"
 }
@@ -531,20 +609,29 @@ rollback() {
         echo ""
         print_step "Rolling back changes from backup..."
 
-        if verify_game_backup_manifest "$BACKUP_DIR"; then
-            print_substep "Backup manifest verified"
-        elif [[ -f "$BACKUP_DIR/$BACKUP_MANIFEST_NAME" ]]; then
-            print_warning "Backup manifest verification failed; rollback skipped to avoid copying unverified files."
-            print_info "Backup preserved at: $BACKUP_DIR"
-            cleanup
-            return 0
+        if [[ -f "$BACKUP_DIR/$BACKUP_MANIFEST_NAME" ]]; then
+            start_spinner "Verifying backup manifest (this can take a few minutes)..."
+            if verify_game_backup_manifest "$BACKUP_DIR"; then
+                stop_spinner
+                print_substep "Backup manifest verified"
+            else
+                stop_spinner
+                print_warning "Backup manifest verification failed; rollback skipped to avoid copying unverified files."
+                print_info "Backup preserved at: $BACKUP_DIR"
+                cleanup
+                return 0
+            fi
         else
             print_warning "Backup has no manifest; restoring as a legacy backup."
         fi
 
         restore_game_backup_files "$BACKUP_DIR"
+        start_spinner "Verifying restored files..."
         if ! verify_restored_game_backup "$BACKUP_DIR"; then
+            stop_spinner
             print_warning "Rollback completed, but restored files could not be fully verified."
+        else
+            stop_spinner
         fi
 
         print_success "Rolled back to original state."
@@ -666,7 +753,17 @@ homebrew_qt_available() {
 }
 
 homebrew_qt_version() {
-    local qt_version_path
+    local qt_version_path qmake header
+
+    qmake="/usr/local/opt/qt@5/bin/qmake"
+    if [[ -x "$qmake" ]]; then
+        "$qmake" -query QT_VERSION 2>/dev/null && return 0
+    fi
+
+    header="/usr/local/opt/qt@5/lib/QtCore.framework/Headers/qglobal.h"
+    if [[ -f "$header" ]]; then
+        awk '/QT_VERSION_STR/ {gsub(/"/, "", $3); print $3; exit}' "$header" 2>/dev/null && return 0
+    fi
 
     qt_version_path=$(worms_latest_path_by_mtime "/usr/local/Cellar/qt@5" "*" "d" || true)
     if [[ -n "$qt_version_path" ]]; then
@@ -690,9 +787,15 @@ detect_qt_source() {
     fi
 
     if homebrew_qt_available; then
+        local homebrew_version
+        homebrew_version=$(homebrew_qt_version)
+        if ! worms_supported_qt5_version "$homebrew_version"; then
+            return 1
+        fi
+
         QT_SOURCE="homebrew"
         QT_PREFIX="/usr/local/opt/qt@5"
-        QT_VERSION_DISPLAY=$(homebrew_qt_version)
+        QT_VERSION_DISPLAY="$homebrew_version"
         QT_SOURCE_DISPLAY="Homebrew Qt $QT_VERSION_DISPLAY (/usr/local/opt/qt@5)"
         return 0
     fi
@@ -834,8 +937,13 @@ do_restore() {
     echo ""
 
     # Use the most recent backup
-    latest=$(worms_latest_path_by_mtime "$HOME/Documents" "WormsWMD-Backup-*" "d")
-    echo "Most recent backup: $latest"
+    latest=$(latest_original_game_backup || true)
+    if [[ -z "$latest" ]]; then
+        latest=$(worms_latest_path_by_mtime "$HOME/Documents" "WormsWMD-Backup-*" "d")
+        print_warning "Every backup found appears to already include the fix."
+        print_warning "Restoring the most recent backup may not undo the fix."
+    fi
+    echo "Selected backup: $latest"
     echo ""
 
     if ! $FORCE; then
@@ -849,26 +957,36 @@ do_restore() {
 
     validate_game_app
 
-    if verify_game_backup_manifest "$latest"; then
-        print_step "Backup manifest verified"
-    elif [[ -f "$latest/$BACKUP_MANIFEST_NAME" ]]; then
-        print_error "Backup manifest verification failed; restore cancelled."
-        echo ""
-        echo "The backup was not copied because its recorded file checksums do not match."
-        exit 1
+    if [[ -f "$latest/$BACKUP_MANIFEST_NAME" ]]; then
+        print_step "Verifying backup manifest (this can take a few minutes)..."
+        start_spinner "Verifying backup manifest..."
+        if verify_game_backup_manifest "$latest"; then
+            stop_spinner
+            print_step "Backup manifest verified"
+        else
+            stop_spinner
+            print_error "Backup manifest verification failed; restore cancelled."
+            echo ""
+            echo "The backup was not copied because its recorded file checksums do not match."
+            exit 1
+        fi
     else
         print_warning "Backup has no manifest; restoring as a legacy backup."
     fi
 
     print_step "Restoring game files..."
     restore_game_backup_files "$latest"
+    print_step "Verifying restored files..."
+    start_spinner "Verifying restored files..."
     if ! verify_restored_game_backup "$latest"; then
+        stop_spinner
         print_error "Restore verification failed after copying files."
         echo ""
         echo "The backup was copied, but at least one restored file did not match its recorded checksum."
         echo "Use Steam's file verification if you need to repair the game bundle."
         exit 1
     fi
+    stop_spinner
 
     echo ""
     print_success "Game restored to original state."
@@ -911,11 +1029,11 @@ do_dry_run() {
 
     # Check macOS version
     local macos_version major_version
-    macos_version=$(sw_vers -productVersion)
+    macos_version=$(sw_vers -productVersion 2>/dev/null || echo "unknown")
     major_version=$(echo "$macos_version" | cut -d. -f1)
     print_dry_run "macOS version: $macos_version"
 
-    if [[ "$major_version" -lt 26 ]]; then
+    if [[ "$major_version" =~ ^[0-9]+$ ]] && [[ "$major_version" -lt 26 ]]; then
         print_dry_run "Note: This fix is designed for macOS 26+, your version may not need it"
     fi
 
@@ -1036,11 +1154,11 @@ do_fix() {
 
     # Check macOS version first
     local macos_version major_version
-    macos_version=$(sw_vers -productVersion)
+    macos_version=$(sw_vers -productVersion 2>/dev/null || echo "unknown")
     major_version=$(echo "$macos_version" | cut -d. -f1)
     print_substep "macOS version: $macos_version"
 
-    if [[ "$major_version" -lt 26 ]]; then
+    if [[ "$major_version" =~ ^[0-9]+$ ]] && [[ "$major_version" -lt 26 ]]; then
         echo ""
         print_warning "This fix is designed for macOS 26 (Tahoe) and later."
         echo "         Your version ($macos_version) may not need this fix."
@@ -1107,7 +1225,7 @@ do_fix() {
     echo ""
     print_step "Creating backup..."
 
-    BACKUP_DIR="$HOME/Documents/WormsWMD-Backup-$(date +%Y%m%d-%H%M%S)"
+    BACKUP_DIR=$(worms_unique_path "$HOME/Documents/WormsWMD-Backup-$(date +%Y%m%d-%H%M%S)")
     mkdir -p "$BACKUP_DIR"
 
     start_spinner "Backing up Frameworks..."
@@ -1142,8 +1260,10 @@ do_fix() {
         done
     fi
 
+    print_substep "Creating backup manifest (this can take a few minutes)..."
+    start_spinner "Creating backup manifest (this can take a few minutes)..."
     write_game_backup_manifest "$BACKUP_DIR"
-    verify_game_backup_manifest "$BACKUP_DIR"
+    stop_spinner
     print_substep "Backup manifest created: $BACKUP_MANIFEST_NAME"
     print_substep "Backup created: $BACKUP_DIR"
     CLEANUP_NEEDED=true
@@ -1174,10 +1294,17 @@ do_fix() {
             print_substep "Using pre-built Qt $QT_VERSION_DISPLAY"
         else
             if homebrew_qt_available; then
+                local homebrew_version
+                homebrew_version=$(homebrew_qt_version)
+                if ! worms_supported_qt5_version "$homebrew_version"; then
+                    print_error "Installed Homebrew Qt is $homebrew_version; this fix requires Qt 5.15.x."
+                    exit 1
+                fi
+
                 print_warning "Pre-built Qt prep failed, falling back to Homebrew"
                 QT_SOURCE="homebrew"
                 QT_PREFIX="/usr/local/opt/qt@5"
-                QT_VERSION_DISPLAY=$(homebrew_qt_version)
+                QT_VERSION_DISPLAY="$homebrew_version"
             else
                 print_error "Pre-built Qt frameworks could not be prepared and Homebrew Qt is unavailable."
                 echo ""
@@ -1195,9 +1322,9 @@ do_fix() {
     stop_spinner
 
     if [[ "$QT_SOURCE" == "prebuild" ]]; then
-        print_substep "Qt frameworks replaced (5.3.2 → $QT_VERSION_DISPLAY pre-built)"
+        print_substep "Qt frameworks installed ($QT_VERSION_DISPLAY pre-built)"
     else
-        print_substep "Qt frameworks replaced (5.3.2 → $QT_VERSION_DISPLAY Homebrew)"
+        print_substep "Qt frameworks installed ($QT_VERSION_DISPLAY Homebrew)"
     fi
 
     echo ""

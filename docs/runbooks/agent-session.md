@@ -51,6 +51,14 @@ Release publication:
 
 ```bash
 ./tools/validate_harness.sh
+./tools/test_dependency_parsing.sh
+./tools/test_issue_10_regression.sh
+./tools/test_support_bundle_sanitization.sh
+./tools/test_backup_saves_regression.sh
+./tools/test_launcher_friction.sh
+./tools/test_preflight_regression.sh
+./tools/test_manifest_regression.sh
+./tools/test_qt_version_pinning.sh
 shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
 for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --dry-run
