@@ -6,6 +6,13 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No user-facing changes yet.
 
+## Mainline maintenance after 1.7.1 (2026-06-22)
+
+### Security
+- Pinned mainline bootstrap commit verification to the `v1.7.1` tag target.
+  This follow-up commit lives on `main` after the `v1.7.1` release tag so
+  one-line installers can verify the exact release commit.
+
 ## 1.7.1 (2026-06-22)
 
 ### Fixed
