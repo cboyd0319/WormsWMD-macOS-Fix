@@ -76,6 +76,11 @@ isolated fake app bundles.
   trust, security, troubleshooting, FAQ, tools, and runtime-contract docs.
 - 2026-06-22: Ran release-grade validation and built a local v1.7.1 release
   zip with a verified checksum.
+- 2026-06-22: After maintainer approval, tagged and published v1.7.1, verified
+  the release workflow, downloaded release checksum, and attestation check.
+- 2026-06-22: Removed support-bundle attachment links from issue bodies #6,
+  #7, #8, #9, #10, and #11 because older archives could expose local account
+  metadata through tar owner/group listings.
 
 ## Surprises & Discoveries
 
@@ -118,5 +123,6 @@ Issue #11 is fixed and covered. GOG-aware game discovery is shared by the
 installer, diagnostics, preflight, friendly launch option, enhanced launcher,
 and watcher status check. Support bundles no longer expose local owner/group
 metadata through tar listings. Documentation and release metadata are prepared
-for v1.7.1. A local v1.7.1 release zip builds and verifies, but no tag or
-GitHub release has been published from this plan.
+for v1.7.1. The v1.7.1 tag and GitHub release were published after maintainer
+approval, release assets and checksum were verified, and the post-release
+mainline bootstrap commit now pins the exact v1.7.1 tag target.
