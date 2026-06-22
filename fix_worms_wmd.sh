@@ -31,7 +31,7 @@ while [[ -L "$SCRIPT_PATH" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.7.0"
+VERSION="1.7.1"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -43,7 +43,7 @@ source "$SCRIPTS_DIR/logging.sh"
 source "$SCRIPTS_DIR/common.sh"
 
 # Default game location (uses $HOME instead of ~ for reliability)
-DEFAULT_GAME_PATH="$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+DEFAULT_GAME_PATH="$(worms_default_game_app)"
 GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
 
 # Global state
@@ -177,50 +177,12 @@ stop_spinner() {
 
 # Search for game in common locations
 auto_detect_game() {
-    local found_games=()
-    local search_paths=(
-        "$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
-        "/Applications/Worms W.M.D.app"
-        "$HOME/Applications/Worms W.M.D.app"
-        "$HOME/Games/Worms W.M.D.app"
-        "$HOME/Library/Application Support/GOG.com/Games/Worms W.M.D/Worms W.M.D.app"
-    )
-
-    # Also check for custom Steam library locations
-    local steam_config="$HOME/Library/Application Support/Steam/steamapps/libraryfolders.vdf"
-    if [[ -f "$steam_config" ]]; then
-        while IFS= read -r line; do
-            if [[ "$line" =~ \"path\"[[:space:]]*\"([^\"]+)\" ]]; then
-                local lib_path="${BASH_REMATCH[1]}"
-                if [[ -d "$lib_path" ]]; then
-                    search_paths+=("$lib_path/steamapps/common/WormsWMD/Worms W.M.D.app")
-                fi
-            fi
-        done < "$steam_config"
-    fi
-
-    # Search all paths
-    for path in "${search_paths[@]}"; do
-        if [[ -d "$path" ]] && [[ -f "$path/Contents/MacOS/Worms W.M.D" ]]; then
-            found_games+=("$path")
-        fi
-    done
-
-    # Remove duplicates without associative arrays so macOS Bash 3.2 can run it.
     local unique_games=()
-    local already_seen existing
-    for game in "${found_games[@]}"; do
-        already_seen=false
-        for existing in "${unique_games[@]}"; do
-            if [[ "$existing" == "$game" ]]; then
-                already_seen=true
-                break
-            fi
-        done
-        if ! $already_seen; then
-            unique_games+=("$game")
-        fi
-    done
+    local game
+
+    while IFS= read -r -d '' game; do
+        unique_games+=("$game")
+    done < <(worms_find_game_apps)
 
     if [[ ${#unique_games[@]} -eq 0 ]]; then
         echo ""
@@ -886,7 +848,7 @@ ${BOLD}ENVIRONMENT VARIABLES:${NC}
     WORMSWMD_VERBOSE Enable verbose output (1/true/yes)
 
 ${BOLD}EXAMPLES:${NC}
-    # Apply the fix (default Steam location)
+    # Apply the fix (auto-detects common Steam and GOG locations)
     ./fix_worms_wmd.sh
 
     # Preview what will happen without making changes
@@ -1474,7 +1436,7 @@ do_fix() {
     echo ""
     echo "The fix has been applied successfully!"
     echo ""
-    echo "You can now launch Worms W.M.D from Steam or your Applications folder."
+    echo "You can now launch Worms W.M.D from Steam, GOG, or your Applications folder."
     echo ""
     echo -e "${DIM}Backup location: $BACKUP_DIR${NC}"
     echo -e "${DIM}To undo the fix: ./fix_worms_wmd.sh --restore${NC}"

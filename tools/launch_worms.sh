@@ -39,8 +39,21 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/common.sh"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/ui.sh"
+worms_color_init
+
 # Configuration
-GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+DEFAULT_GAME_PATH="$(worms_default_game_app)"
+GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
+if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]] && [[ ! -f "$GAME_APP/Contents/MacOS/Worms W.M.D" ]]; then
+    detected_game=$(worms_first_detected_game_app || true)
+    if [[ -n "$detected_game" ]]; then
+        GAME_APP="$detected_game"
+    fi
+fi
 GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
 LOG_DIR="${LOG_DIR:-$HOME/Library/Logs/WormsWMD}"
 CRASH_DIR="$LOG_DIR/crashes"
@@ -53,12 +66,6 @@ ENABLE_LOGGING=false
 CHECK_FIX=false
 CRASH_REPORT=true
 STEAM_MODE=false
-
-# shellcheck disable=SC1091
-source "$REPO_DIR/scripts/common.sh"
-# shellcheck disable=SC1091
-source "$REPO_DIR/scripts/ui.sh"
-worms_color_init
 
 print_help() {
     cat << 'EOF'
@@ -305,7 +312,7 @@ if [[ "$CHECK_FIX" == true ]]; then
     echo -e "${BLUE}Checking fix status...${NC}"
 
     if [[ -x "$SCRIPT_DIR/watch_for_updates.sh" ]]; then
-        if ! "$SCRIPT_DIR/watch_for_updates.sh" --check >/dev/null 2>&1; then
+        if ! GAME_APP="$GAME_APP" "$SCRIPT_DIR/watch_for_updates.sh" --check >/dev/null 2>&1; then
             echo -e "${YELLOW}Fix needs to be reapplied!${NC}"
             read -p "Reapply now? [Y/n] " -n 1 -r < /dev/tty
             echo ""

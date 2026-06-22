@@ -31,7 +31,8 @@ source "$REPO_DIR/scripts/common.sh"
 # shellcheck disable=SC1091
 source "$REPO_DIR/scripts/ui.sh"
 
-GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+DEFAULT_GAME_PATH="$(worms_default_game_app)"
+GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
 OUTPUT_FILE=""
 FULL_MODE=false
 COPY_TO_CLIPBOARD=false
@@ -207,6 +208,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]] && [[ ! -d "$GAME_APP" ]]; then
+    detected_game=$(worms_first_detected_game_app || true)
+    if [[ -n "$detected_game" ]]; then
+        GAME_APP="$detected_game"
+    fi
+fi
+
 # Setup output
 setup_colors
 
@@ -298,6 +306,9 @@ collect_diagnostics() {
         fi
     else
         fail "Game not found at: $GAME_APP"
+        if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]]; then
+            warn "Searched common Steam, GOG, Applications, and Games folders"
+        fi
         warn "Set GAME_APP environment variable if installed elsewhere"
     fi
 
@@ -692,7 +703,14 @@ collect_support_bundle() {
     write_qt_package_bundle_info "$BUNDLE_TEMP_DIR"
     copy_backup_manifests "$BUNDLE_TEMP_DIR"
 
-    COPYFILE_DISABLE=1 tar -czf "$bundle_path" -C "$BUNDLE_TEMP_DIR" .
+    COPYFILE_DISABLE=1 tar \
+        --format ustar \
+        --uid 0 \
+        --gid 0 \
+        --uname root \
+        --gname wheel \
+        -czf "$bundle_path" \
+        -C "$BUNDLE_TEMP_DIR" .
     echo "Support bundle created: $bundle_path"
 }
 

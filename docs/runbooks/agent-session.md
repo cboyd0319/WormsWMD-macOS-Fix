@@ -53,6 +53,7 @@ Release publication:
 ./tools/validate_harness.sh
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
+./tools/test_issue_11_game_detection.sh
 ./tools/test_support_bundle_sanitization.sh
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh

@@ -71,7 +71,7 @@ The fix includes utilities to help manage the game.
 
 | Tool | What it does |
 |------|--------------|
-| Pre-flight check | Verifies system requirements, Rosetta 2, and network connectivity |
+| Pre-flight check | Verifies system requirements, Rosetta 2, fix status, and optional public Team17, Steam, and GOG page reachability |
 | Save game backup | Back up and restore saves, settings, and replays with manifest verification |
 | Steam update watcher | Detects when Steam overwrites the fix and alerts you |
 | Enhanced launcher | Launch with logging, safe mode, and debug options |

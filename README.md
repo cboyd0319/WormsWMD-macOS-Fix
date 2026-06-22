@@ -35,16 +35,20 @@ For most players:
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
 
-## v1.7.0 At A Glance
+## v1.7.1 At A Glance
 
 | Area | What changed |
 | --- | --- |
+| GOG installs | Common GOG paths, including `$HOME/GOG Games`, are auto-detected by the installer, diagnostics, and preflight checks. |
+| Bash 3.2 compatibility | Fixed an empty-array crash during game discovery on macOS `/bin/bash`. |
+| Support privacy | Support-bundle archive metadata is normalized so tar listings do not expose the local account name. |
+| Save backups | Team17-only save backups work even when Steam Cloud save folders are absent. |
+| Preflight | Optional public reachability checks use Team17, Steam, and GOG Worms W.M.D pages. |
 | Backup friction | Backup creation now shows progress and batches checksum work. |
 | Privacy | Support bundles exclude raw logs, crash logs, save data, game binaries, and private config contents. |
 | Runtime | Bundled Qt was refreshed from 5.15.18 to 5.15.19. |
 | Supply chain | Qt packaging now includes source provenance and documented rebuild steps. |
 | First run | The launcher can start Worms W.M.D directly after applying the fix. |
-| Preflight | Network checks now use the public Team17 Worms W.M.D page and Steam store page. |
 
 ## Requirements
 
@@ -66,19 +70,19 @@ The release page includes a `.zip.sha256` checksum next to the zip file.
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.0.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.1.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.0.zip: OK
+WormsWMD-macOS-Fix-v1.7.1.zip: OK
 ```
 
 GitHub CLI users can also verify the release attestation:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.0.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.1.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 ## Launcher Menu
@@ -120,7 +124,7 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.0.zip --repo cboyd0319/WormsWMD-ma
 Review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh
 ```
 
 ## Terminal Install
@@ -128,12 +132,13 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0
 Use the release zip unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The bootstrap is pinned to release `v1.7.0`
-and verifies the expected commit before running downloaded code.
+launcher menu as the release zip. The bootstrap is pinned to release `v1.7.1`
+by default. The post-release mainline bootstrap pins the exact release commit
+after the tag exists.
 
 ## Pre-Flight Check
 
@@ -147,9 +152,11 @@ and verifies the expected commit before running downloaded code.
 | Game | App location and executable presence. |
 | Fix status | AGL stub, Qt version, QtGui references, signing state. |
 | Runtime | FMOD, Steam API, and libcurl. |
-| Network | Team17 and Steam public endpoints. |
+| Public endpoints | Team17, Steam, and GOG Worms W.M.D pages for optional reachability checks. |
 
-Use `--quick` to skip network checks, or `--verbose` for detailed output.
+Use `--quick` to skip public endpoint checks, or `--verbose` for detailed
+output. These checks are diagnostic only; they are not required to apply the fix
+and do not prove multiplayer service health.
 
 ## Troubleshooting Fast Paths
 

@@ -93,7 +93,9 @@ find_steam_saves() {
         fi
     done
 
-    printf '%s\n' "${found[@]}"
+    if (( ${#found[@]} > 0 )); then
+        printf '%s\n' "${found[@]}"
+    fi
 }
 
 validate_backup_archive_layout() {

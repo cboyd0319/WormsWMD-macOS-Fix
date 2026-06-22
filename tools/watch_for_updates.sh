@@ -24,7 +24,6 @@ while [[ -L "$SCRIPT_PATH" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
 LAUNCH_AGENT_ID="com.wormswmd.fix.watcher"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_ID}.plist"
 CHECK_INTERVAL=300  # 5 minutes
@@ -34,6 +33,15 @@ source "$REPO_DIR/scripts/common.sh"
 # shellcheck disable=SC1091
 source "$REPO_DIR/scripts/ui.sh"
 worms_color_init
+
+DEFAULT_GAME_PATH="$(worms_default_game_app)"
+GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
+if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]] && [[ ! -d "$GAME_APP" ]]; then
+    detected_game=$(worms_first_detected_game_app || true)
+    if [[ -n "$detected_game" ]]; then
+        GAME_APP="$detected_game"
+    fi
+fi
 worms_reject_control_chars "$GAME_APP" "GAME_APP"
 
 print_help() {

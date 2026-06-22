@@ -3,6 +3,94 @@
 # common.sh - shared helpers for Worms W.M.D fix scripts and tools
 #
 
+worms_default_game_app() {
+    printf '%s\n' "$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+}
+
+worms_game_search_paths() {
+    local steam_config line lib_path root found_path
+
+    printf '%s\0' "$(worms_default_game_app)"
+    printf '%s\0' "/Applications/Worms W.M.D.app"
+    printf '%s\0' "/Applications/Worms WMD.app"
+    printf '%s\0' "$HOME/Applications/Worms W.M.D.app"
+    printf '%s\0' "$HOME/Applications/Worms WMD.app"
+    printf '%s\0' "$HOME/Games/Worms W.M.D.app"
+    printf '%s\0' "$HOME/Games/Worms WMD.app"
+    printf '%s\0' "$HOME/GOG Games/Worms W.M.D/Worms W.M.D.app"
+    printf '%s\0' "$HOME/GOG Games/Worms W.M.D.app"
+    printf '%s\0' "$HOME/Library/Application Support/GOG.com/Games/Worms W.M.D/Worms W.M.D.app"
+
+    for root in \
+        "/Applications" \
+        "$HOME/Applications" \
+        "$HOME/Games" \
+        "$HOME/GOG Games" \
+        "$HOME/Library/Application Support/GOG.com/Games"; do
+        [[ -d "$root" ]] || continue
+        while IFS= read -r -d '' found_path; do
+            printf '%s\0' "$found_path"
+        done < <(find "$root" -mindepth 1 -maxdepth 2 -type d \( -name "Worms W.M.D.app" -o -name "Worms WMD.app" \) -print0 2>/dev/null)
+    done
+
+    steam_config="$HOME/Library/Application Support/Steam/steamapps/libraryfolders.vdf"
+    if [[ -f "$steam_config" ]]; then
+        while IFS= read -r line; do
+            if [[ "$line" =~ \"path\"[[:space:]]*\"([^\"]+)\" ]]; then
+                lib_path="${BASH_REMATCH[1]}"
+                if [[ -d "$lib_path" ]]; then
+                    printf '%s\0' "$lib_path/steamapps/common/WormsWMD/Worms W.M.D.app"
+                fi
+            fi
+        done < "$steam_config"
+    fi
+}
+
+worms_find_game_apps() {
+    local path game existing
+    local already_seen
+    local found_games=()
+    local unique_games=()
+
+    while IFS= read -r -d '' path; do
+        if [[ -d "$path" ]] && [[ -f "$path/Contents/MacOS/Worms W.M.D" ]]; then
+            found_games+=("$path")
+        fi
+    done < <(worms_game_search_paths)
+
+    if (( ${#found_games[@]} > 0 )); then
+        for game in "${found_games[@]}"; do
+            already_seen=false
+            if (( ${#unique_games[@]} > 0 )); then
+                for existing in "${unique_games[@]}"; do
+                    if [[ "$existing" == "$game" ]]; then
+                        already_seen=true
+                        break
+                    fi
+                done
+            fi
+            if ! $already_seen; then
+                unique_games+=("$game")
+            fi
+        done
+    fi
+
+    if (( ${#unique_games[@]} > 0 )); then
+        printf '%s\0' "${unique_games[@]}"
+    fi
+}
+
+worms_first_detected_game_app() {
+    local game
+
+    while IFS= read -r -d '' game; do
+        printf '%s\n' "$game"
+        return 0
+    done < <(worms_find_game_apps)
+
+    return 1
+}
+
 worms_latest_path_by_mtime() {
     local search_dir="$1"
     local name_glob="$2"

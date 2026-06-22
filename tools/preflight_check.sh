@@ -3,14 +3,14 @@
 # preflight_check.sh - Pre-flight verification for Worms W.M.D
 #
 # Comprehensive check of system requirements, game installation,
-# fix status, and network connectivity before launching the game.
+# fix status, and optional public endpoint reachability before launching the game.
 #
 # Usage:
 #   ./preflight_check.sh [--verbose] [--quick]
 #
 # Options:
 #   --verbose    Show detailed diagnostic information
-#   --quick      Skip network checks for faster results
+#   --quick      Skip public endpoint checks for faster results
 #
 
 set -euo pipefail
@@ -26,10 +26,13 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
 # shellcheck disable=SC1091
 source "$REPO_DIR/scripts/ui.sh"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/common.sh"
 worms_color_init auto
 
 # Default game location
-GAME_APP="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+DEFAULT_GAME_PATH="$(worms_default_game_app)"
+GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
 
 VERBOSE=false
 QUICK=false
@@ -55,7 +58,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --verbose, -v    Show detailed diagnostic information"
-            echo "  --quick, -q      Skip network checks for faster results"
+            echo "  --quick, -q      Skip public endpoint checks for faster results"
             echo "  --help, -h       Show this help message"
             exit 0
             ;;
@@ -65,6 +68,13 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]] && [[ ! -d "$GAME_APP" ]]; then
+    detected_game=$(worms_first_detected_game_app || true)
+    if [[ -n "$detected_game" ]]; then
+        GAME_APP="$detected_game"
+    fi
+fi
 
 # Helper functions
 check_pass() {
@@ -129,7 +139,7 @@ fi
 
 if ! $QUICK; then
     if ! command -v curl >/dev/null 2>&1; then
-        check_warn "curl not available - skipping network checks"
+        check_warn "curl not available - skipping public endpoint checks"
         QUICK=true
     fi
 fi
@@ -195,6 +205,9 @@ if [[ -d "$GAME_APP" ]]; then
     check_pass "Game found at: $GAME_APP"
 else
     check_fail "Game not found at: $GAME_APP"
+    if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]]; then
+        echo "       Searched common Steam, GOG, Applications, and Games folders"
+    fi
     echo "       Install via Steam or set GAME_APP environment variable"
     # Can't continue without game
     section "Summary"
@@ -322,11 +335,11 @@ else
 fi
 
 # ============================================================================
-# Network Connectivity (optional)
+# Public Endpoint Reachability (optional)
 # ============================================================================
 
 if ! $QUICK; then
-    section "Network Connectivity"
+    section "Public Endpoint Reachability"
 
     team17_status=$(http_status "https://www.team17.com/games/worms-w-m-d")
     if [[ "$team17_status" == 2* || "$team17_status" == 3* ]]; then
@@ -341,8 +354,15 @@ if ! $QUICK; then
     else
         check_warn "Steam Worms W.M.D store page not reachable (HTTP $steam_status)"
     fi
+
+    gog_status=$(http_status "https://www.gog.com/en/game/worms_wmd")
+    if [[ "$gog_status" == 2* || "$gog_status" == 3* ]]; then
+        check_pass "GOG Worms W.M.D store page reachable"
+    else
+        check_warn "GOG Worms W.M.D store page not reachable (HTTP $gog_status)"
+    fi
 else
-    check_info "Network checks skipped (--quick mode)"
+    check_info "Public endpoint checks skipped (--quick mode)"
 fi
 
 # ============================================================================

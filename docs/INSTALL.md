@@ -10,7 +10,7 @@ Use the release bundle:
 1. Download the latest release zip from:
    https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest
 2. Optionally download the matching `.zip.sha256` file and verify it:
-   `shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.0.zip.sha256`
+   `shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.1.zip.sha256`
 3. Unzip it.
 4. Open `README_FIRST.txt`.
 5. Double-click `Worms W.M.D Fix.command`.
@@ -42,13 +42,14 @@ and they refuse Git repositories with a different remote.
 Terminal users can use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, `install.sh` opens the
 same friendly launcher menu. When flags are provided, it forwards them directly
 to `fix_worms_wmd.sh`. By default, the bootstrap pins the cloned repository to
-release `v1.7.0` and verifies the expected commit before execution.
+release `v1.7.1`. The release-tag bootstrap pins the tag and the next mainline
+maintenance commit pins the exact release commit after the tag exists.
 Non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1`.
 
 ## Preview changes
@@ -64,7 +65,7 @@ To see what the fix does without applying it, run:
 Run these scripts in order:
 
 ```bash
-git clone --branch v1.7.0 --depth 1 https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
+git clone --branch v1.7.1 --depth 1 https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
 
 # Use an isolated build directory for the AGL stub.
@@ -112,10 +113,19 @@ export QT_PREFIX=/usr/local/opt/qt@5
 
 ## Set a custom game location
 
-If your game is in a non-standard location, set the `GAME_APP` variable:
+The installer auto-detects common Steam, GOG, Applications, and Games-folder
+locations. If your game is still in a non-standard location, set the `GAME_APP`
+variable:
 
 ```bash
 GAME_APP="/path/to/Worms W.M.D.app" ./fix_worms_wmd.sh
+```
+
+Common GOG locations include:
+
+```bash
+GAME_APP="$HOME/GOG Games/Worms W.M.D/Worms W.M.D.app" ./fix_worms_wmd.sh
+GAME_APP="$HOME/GOG Games/Worms WMD/Worms W.M.D.app" ./fix_worms_wmd.sh
 ```
 
 ## Verify only

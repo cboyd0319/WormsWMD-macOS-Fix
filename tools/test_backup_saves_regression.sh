@@ -17,14 +17,21 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 test_home="$tmp_dir/home"
 backup_dir="$tmp_dir/backups"
+team17_only_home="$tmp_dir/team17-only-home"
+team17_only_backup_dir="$tmp_dir/team17-only-backups"
 team17_dir="$test_home/Library/Application Support/Team17"
 steam_dir="$test_home/Library/Application Support/Steam/userdata/123456/327030"
+team17_only_dir="$team17_only_home/Library/Application Support/Team17"
 
-mkdir -p "$team17_dir" "$steam_dir"
+mkdir -p "$team17_dir" "$steam_dir" "$team17_only_dir"
 printf 'team17 hidden\n' > "$team17_dir/.hidden-team17"
 printf 'team17 visible\n' > "$team17_dir/visible-team17"
 printf 'steam hidden\n' > "$steam_dir/.hidden-steam"
 printf 'steam visible\n' > "$steam_dir/visible-steam"
+printf 'team17 only\n' > "$team17_only_dir/visible-team17"
+
+HOME="$team17_only_home" BACKUP_DIR="$team17_only_backup_dir" "$ROOT_DIR/tools/backup_saves.sh" --backup >/dev/null \
+    || fail "Team17-only save backup failed when Steam saves were absent"
 
 HOME="$test_home" BACKUP_DIR="$backup_dir" "$ROOT_DIR/tools/backup_saves.sh" --backup >/dev/null
 

@@ -23,9 +23,11 @@ This will identify common problems with:
 - macOS version and Rosetta 2 status
 - Game installation and fix status
 - Runtime dependencies
-- Network connectivity
+- Optional public Team17, Steam, and GOG page reachability
 
-Use `--verbose` for detailed output or `--quick` to skip network checks.
+Use `--verbose` for detailed output or `--quick` to skip public endpoint
+checks. These checks are diagnostic only; they are not required to apply the
+fix and do not prove multiplayer service health.
 
 ## Install Fix.command won't run
 
@@ -57,7 +59,7 @@ Gatekeeper blocks `.command` files downloaded from the internet. Try these optio
 
 5. **Use the one-liner instead:**
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.0/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh | bash
    ```
    Requires `git` (installed by Xcode Command Line Tools).
 
@@ -81,8 +83,10 @@ The game window may appear very small after applying the fix. This happens becau
 
 ## Game still shows a black screen
 
-1. Verify game files in Steam (note: this does not remove extra files from prior fixes):
+1. Repair or verify the game files in your store client:
    - Right-click **Worms W.M.D** → **Properties** → **Local Files** → **Verify integrity of game files**
+   - For GOG Galaxy, use **Manage installation** → **Verify / Repair**
+   - Store repair does not remove extra files from prior fixes
    - Re-run the fix script after verification
 2. Check that the fix was applied:
    ```bash
@@ -93,7 +97,7 @@ The game window may appear very small after applying the fix. This happens becau
    - Look for entries related to "Worms" in **Crash Reports**
 4. Try a clean install:
    - Restore original files: `./fix_worms_wmd.sh --restore`
-   - Uninstall the game in Steam
+   - Uninstall the game in Steam or GOG Galaxy
    - Reinstall the game
    - Re-run the fix
 

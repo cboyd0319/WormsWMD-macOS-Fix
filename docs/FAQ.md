@@ -10,7 +10,10 @@ There is also a confirmed report that applying the Qt 5.15 refresh resolved keyb
 
 **Q: Does this fix work for the GOG version?**
 
-The fix operates on the macOS app bundle. If your GOG install uses the same app bundle layout, it should work. Set `GAME_APP` to your GOG installation path.
+The fix operates on the macOS app bundle. Common GOG locations, including
+`$HOME/GOG Games`, are auto-detected by the installer, diagnostics, and
+preflight checks. Set `GAME_APP` only if your GOG install is in a non-standard
+location.
 
 **Q: Is this fix safe?**
 
@@ -72,7 +75,8 @@ Right-click the app and select **Open**, then select **Open** again. The fix als
 
 **Q: Multiplayer and online features don't work. Is this related to the fix?**
 
-The fix doesn't modify networking. Check Team17 or Steam community status for server issues.
+The fix doesn't modify networking. Check Team17, Steam, or GOG community status
+for server issues, depending on where you bought the game.
 
 **Q: My controller doesn't work. Can the fix help?**
 
@@ -82,4 +86,5 @@ Run `./tools/controller_helper.sh` to check controller connectivity and get conf
 
 Use `Worms W.M.D Fix.command` option 3 for the quick fix-status check. For a
 deeper system check, run `./tools/preflight_check.sh` to check system
-requirements, Rosetta 2 status, fix status, and network connectivity.
+requirements, Rosetta 2 status, fix status, and optional public Team17, Steam,
+and GOG page reachability.

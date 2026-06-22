@@ -53,7 +53,9 @@ $HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.ap
 ```
 
 `GAME_APP` may point elsewhere. Always quote it because the bundle path contains
-spaces.
+spaces. When `GAME_APP` is not set and the default Steam path is absent, user
+entrypoints may auto-detect common Steam library, GOG, `/Applications`,
+`$HOME/Applications`, and `$HOME/Games` app-bundle locations.
 
 ## Backup And Restore Contract
 
@@ -113,6 +115,9 @@ installation prompts. Payloads that affect executable code must use HTTPS and
 checksum verification. Bootstrap installers default to the latest stable
 release tag; mainline bootstraps should also verify the exact release commit
 when that commit is known. Mutable refs require explicit developer opt-in.
+Preflight endpoint checks are diagnostic public page reachability probes for
+Team17, Steam, and GOG; they must not be described as proof of multiplayer,
+store authentication, or game-service health.
 
 The project does not collect telemetry.
 
@@ -151,7 +156,8 @@ default for issue reporting. Support bundles should sanitize the diagnostics
 report, include Qt package verification details, and include backup manifests
 when available instead of copying full game or save contents. Support bundles
 must not include raw `.log`, `.trace`, crash-log, save, game-binary, or private
-config-file contents.
+config-file contents. Support-bundle archives should normalize tar owner/group
+metadata so archive listings do not expose local account names.
 The friendly launcher's support option should delegate to
 `tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop`.
 
@@ -163,6 +169,7 @@ For source-only changes, use the checks that match the blast radius:
 ./tools/validate_harness.sh
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
+./tools/test_issue_11_game_detection.sh
 ./tools/test_support_bundle_sanitization.sh
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh

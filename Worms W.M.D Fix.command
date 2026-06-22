@@ -20,6 +20,8 @@ fi
 
 # shellcheck disable=SC1091
 source "$LAUNCHER_DIR/scripts/ui.sh"
+# shellcheck disable=SC1091
+source "$LAUNCHER_DIR/scripts/common.sh"
 worms_color_init auto
 
 print_line() {
@@ -131,7 +133,8 @@ offer_support_bundle() {
 }
 
 launch_game() {
-    local game_app="${GAME_APP:-$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app}"
+    local default_game_path detected_game
+    local game_app="${GAME_APP:-}"
 
     print_line ""
     worms_print_step "Launching Worms W.M.D"
@@ -142,13 +145,29 @@ launch_game() {
         return 1
     fi
 
-    if open "steam://run/327030" >/dev/null 2>&1; then
+    default_game_path="$(worms_default_game_app)"
+    if [[ -z "$game_app" ]]; then
+        game_app="$default_game_path"
+        if [[ ! -d "$game_app" ]]; then
+            detected_game=$(worms_first_detected_game_app || true)
+            if [[ -n "$detected_game" ]]; then
+                game_app="$detected_game"
+            fi
+        fi
+    fi
+
+    if [[ "$game_app" == *"/Steam/"* ]] && open "steam://run/327030" >/dev/null 2>&1; then
         worms_print_success "Steam was asked to launch Worms W.M.D."
         return 0
     fi
 
     if [[ -d "$game_app" ]] && open "$game_app" >/dev/null 2>&1; then
         worms_print_success "Worms W.M.D was opened."
+        return 0
+    fi
+
+    if open "steam://run/327030" >/dev/null 2>&1; then
+        worms_print_success "Steam was asked to launch Worms W.M.D."
         return 0
     fi
 

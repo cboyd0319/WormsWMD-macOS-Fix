@@ -49,6 +49,10 @@ mkdir -p "$extract_dir"
 tar -xzf "$bundle_path" -C "$extract_dir"
 assert_sanitized "$extract_dir/diagnostics.txt"
 
+if ! tar -tvzf "$bundle_path" | awk '{ if ($3 != "root" || $4 != "wheel") exit 1 }'; then
+    fail "support bundle archive leaks local owner or group metadata"
+fi
+
 if find "$extract_dir" -type f -print0 | xargs -0 grep -Eq 'privateperson|privateperson@example\.com|/Users/privateperson'; then
     fail "support bundle contains a sensitive synthetic value"
 fi

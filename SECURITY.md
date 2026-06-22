@@ -72,7 +72,7 @@ This fix is designed to be safe against:
 | Repository clone/update | `github.com` | HTTPS via git |
 | Terminal bootstrap script (optional) | `raw.githubusercontent.com` pinned release tag | HTTPS |
 | Update check (optional) | `api.github.com`, `github.com` release assets | HTTPS + SHA256 checksum for downloads |
-| Pre-flight network check (optional) | `www.team17.com/games/worms-w-m-d`, `store.steampowered.com/app/327030/Worms_WMD/` | HTTPS |
+| Pre-flight public endpoint check (optional) | `www.team17.com/games/worms-w-m-d`, `store.steampowered.com/app/327030/Worms_WMD/`, `www.gog.com/en/game/worms_wmd` | HTTPS |
 | Maintainer Qt provenance rebuild | `formulae.brew.sh`, `ghcr.io` Homebrew bottle blobs | HTTPS + pinned bottle SHA256 |
 | Rosetta 2 install | Apple servers | System-managed |
 | Xcode CLT install | Apple servers | System-managed |
@@ -99,24 +99,24 @@ matching `.sha256` file, then verifies the checksum before leaving the zip in
 ## Download verification
 
 Release bundles publish both a zip and a matching SHA-256 checksum file. For
-the `v1.7.0` release:
+the `v1.7.1` release:
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.0.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.1.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.0.zip: OK
+WormsWMD-macOS-Fix-v1.7.1.zip: OK
 ```
 
 Release bundles also receive GitHub artifact attestations from the release
 workflow:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.0.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.1.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 The checksum verifies the file content. The attestation verifies that GitHub
@@ -193,7 +193,7 @@ User-controllable environment variables are validated:
 |----------|------------|
 | `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D`; writable bundle subpaths must not be symlinks or resolve outside `Contents` |
 | `INSTALL_DIR` | Refuses system paths, home directory, non-empty non-repo directories, and Git repositories with a different remote |
-| `INSTALL_REF` | Defaults to pinned release `v1.7.0` and exact commit verification; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
+| `INSTALL_REF` | Defaults to pinned release `v1.7.1`; mainline maintenance bootstraps also verify the exact release commit when known; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
 | `LOG_FILE` | Must be a regular `.log` path under `~/Library/Logs` |
 | `QT_PREFIX` | Verified to contain expected Qt frameworks; direct custom Homebrew prefixes require explicit opt-in |
 
@@ -218,7 +218,7 @@ All interactive prompts:
 | Run `launchctl` | Install/remove update watcher | LaunchAgents |
 | Run `osascript` | Notifications (optional tools) | None |
 | Run `pbcopy` | Copy diagnostics (optional) | Clipboard |
-| Run `curl` (preflight) | Test network connectivity | None |
+| Run `curl` (preflight) | Test optional public Team17, Steam, and GOG page reachability | None |
 
 ## Security audit checklist
 
@@ -289,7 +289,7 @@ This verifies:
 - Rosetta 2 installation (Apple Silicon)
 - Game installation and fix status
 - Runtime dependencies (FMOD, Steam API, libcurl)
-- Network connectivity to Team17 services
+- Optional public Team17, Steam, and GOG page reachability
 
 ### Inspect the AGL stub
 

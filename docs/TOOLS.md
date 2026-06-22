@@ -18,9 +18,10 @@ This checks:
 - Rosetta 2 status (Apple Silicon)
 - Game installation and fix status
 - Runtime dependencies (FMOD, Steam API, libcurl)
-- Network connectivity to Team17 and Steam endpoints (skip with `--quick`)
+- Optional public reachability to Team17, Steam, and GOG Worms W.M.D pages
+  (skip with `--quick`)
 
-Note: Network checks require `curl`. Use `--quick` to skip them.
+Note: Public endpoint checks require `curl`. Use `--quick` to skip them.
 
 ## Save game backup
 
@@ -48,6 +49,10 @@ Steam's **Verify integrity of game files** overwrites the fix. Use the watcher t
 ./tools/watch_for_updates.sh --install
 ./tools/watch_for_updates.sh --uninstall
 ```
+
+The watcher uses the same common game discovery as the installer when
+`GAME_APP` is not set, so it can check common Steam, GOG, Applications, and
+Games-folder installs.
 
 ## Steam launch options integration
 
@@ -100,7 +105,9 @@ collector redacts home-account paths, external volume paths, temporary paths,
 email addresses, and common secret-like key/value strings. Support bundles
 contain diagnostics, pre-built Qt package verification details, and available
 backup manifests; they do not include raw logs, crash logs, save files, game
-binaries, or private config file contents.
+binaries, or private config file contents. The support-bundle archive also
+normalizes tar owner and group metadata so it does not expose the local macOS
+account name.
 
 ## Enhanced launcher
 
@@ -116,7 +123,9 @@ Launch the game with extra logging and debug options:
 ```
 
 Log files must be regular `.log` files under `~/Library/Logs/`. Crash reports
-are saved to `~/Library/Logs/WormsWMD/crashes/`.
+are saved to `~/Library/Logs/WormsWMD/crashes/`. When `GAME_APP` is not set,
+the launcher auto-detects common Steam, GOG, Applications, and Games-folder
+installs before launching.
 
 ## Maintainer utilities
 
@@ -127,6 +136,7 @@ or docs-topology changes:
 ./tools/validate_harness.sh
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
+./tools/test_issue_11_game_detection.sh
 ./tools/test_support_bundle_sanitization.sh
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh

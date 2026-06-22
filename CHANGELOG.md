@@ -6,6 +6,21 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No user-facing changes yet.
 
+## 1.7.1 (2026-06-22)
+
+### Fixed
+- Fixed issue #11 game discovery on macOS Bash 3.2 so the installer no longer
+  crashes with an empty detection result under `set -u`.
+- Shared Steam/GOG game discovery with diagnostics and preflight checks so GOG
+  installs under `$HOME/GOG Games` or the older GOG support path are detected
+  consistently when the default Steam path is absent.
+- Added the GOG Worms W.M.D product page to optional preflight reachability
+  checks and clarified that public endpoint checks are diagnostic only.
+- Normalized support-bundle archive ownership metadata so uploaded bundles do
+  not expose the local macOS account name through `tar` listings.
+- Fixed save backup creation when only local Team17 saves exist and Steam Cloud
+  save directories are absent.
+
 ## Mainline maintenance after 1.7.0 (2026-06-18)
 
 ### Security
