@@ -31,7 +31,7 @@ the plan before continuing.
 
 ## Current Plans
 
-- [macOS 27 Golden Gate compatibility](2026-06-22-macos-27-golden-gate.md) - active
+- [macOS 27 Golden Gate compatibility](2026-06-22-macos-27-golden-gate.md) - completed
   full-repo compatibility and release-gate pass for macOS 27.
 - [Issue 11 game detection](2026-06-22-issue-11-game-detection.md) - completed
   fix for Bash 3.2 strict-mode game discovery and GOG install detection.

@@ -1,6 +1,6 @@
 # macOS 27 Golden Gate Compatibility
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -217,6 +217,10 @@ game-test-tool status
 - 2026-06-22: Squashed the unpublished local stack into one release-prep commit
   on `main`; preserved the prior five-commit stack on local branch
   `backup/macos27-v172-stack-20260622`.
+- 2026-06-22: Tagged and pushed `v1.7.2`, watched release workflow
+  `27993278115` pass, verified the published release assets, checksum, and
+  artifact attestation, then pinned the mainline bootstrap installers to tag
+  target `541a1442c73a5f466e687897574a0263068aea87`.
 
 ## Surprises & Discoveries
 
@@ -260,4 +264,13 @@ game-test-tool status
 
 ## Outcomes & Retrospective
 
-Pending.
+macOS 27 Golden Gate support is released as v1.7.2 with Rosetta installed on
+Apple Silicon. The friendly launcher now gives players a simple launch-readiness
+path, the installer explains why Rosetta is needed, diagnostics and support
+bundles include the OS and Rosetta details needed for GitHub issues, and the
+repository validation harness blocks accidental local machine paths.
+
+The v1.7.2 release zip and checksum were published by the GitHub release
+workflow, the downloaded checksum verified, and the GitHub artifact attestation
+verified. Mainline bootstrap installers are pinned to the exact v1.7.2 tag
+target after the release tag, matching the prior release pattern.

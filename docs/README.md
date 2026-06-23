@@ -55,7 +55,7 @@ current when adding, moving, renaming, or deleting Markdown files.
   - completed fix for Bash 3.2 strict-mode game discovery and GOG install
     detection.
 - [macOS 27 Golden Gate compatibility plan](exec-plans/2026-06-22-macos-27-golden-gate.md)
-  - active full-repo compatibility and release-gate pass for macOS 27.
+  - completed full-repo compatibility and release-gate pass for macOS 27.
 - [Cheat sheet supply-chain hardening plan](exec-plans/2026-06-18-cheatsheet-supply-chain-hardening.md)
   - completed follow-up for Qt 5.15.x pinning, security cheat-sheet findings,
     and pre-release supply-chain readiness.
