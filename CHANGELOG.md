@@ -6,6 +6,30 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No user-facing changes yet.
 
+## 1.7.2 (2026-06-22)
+
+### Added
+- Added macOS 27 Golden Gate readiness guidance for Apple Silicon users,
+  including plain Rosetta instructions and launcher option 3 readiness checks.
+- Added diagnostics and support-bundle details for macOS version, Rosetta
+  package version, x86_64 execution, `oahd`, and macOS 27 game-support status
+  when available.
+- Added regression coverage that keeps macOS 26 Tahoe behavior separate from
+  macOS 27 Golden Gate behavior.
+
+### Changed
+- Updated installer, launcher, README, install, FAQ, troubleshooting, trust,
+  support, and issue-template release surfaces for v1.7.2.
+- Kept release-tag bootstrap commit pins empty for the v1.7.2 tag commit; the
+  follow-up mainline maintenance commit should pin the exact tag target.
+
+### Fixed
+- Made installer dry-run mode warn instead of fail when Rosetta is missing, so
+  players can preview the fix before installing Rosetta.
+- Made Rosetta installation verify actual x86_64 execution before continuing.
+- Added a harness guard that fails validation when tracked text contains
+  accidental workstation-local paths.
+
 ## Mainline maintenance after 1.7.1 (2026-06-22)
 
 ### Security

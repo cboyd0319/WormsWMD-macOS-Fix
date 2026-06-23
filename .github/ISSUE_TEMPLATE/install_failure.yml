@@ -25,8 +25,8 @@ body:
     id: macos_version
     attributes:
       label: macOS version
-      description: "Example: 26.5.1"
-      placeholder: "26.x"
+      description: "Example: 27.0 or 26.5.1"
+      placeholder: "27.0 or 26.x"
     validations:
       required: true
 
@@ -75,7 +75,7 @@ body:
     id: support_bundle
     attributes:
       label: Support bundle
-      description: Attach the sanitized `wormswmd-support-*.tar.gz` file from your Desktop. If you cannot attach it, explain why.
+      description: Attach the sanitized `wormswmd-support-*.tar.gz` file from your Desktop. It includes macOS and Rosetta details. If you cannot attach it, explain why.
     validations:
       required: true
 

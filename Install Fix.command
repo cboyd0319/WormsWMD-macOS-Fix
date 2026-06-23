@@ -32,8 +32,8 @@ echo -e "${BLUE}╔════════════════════�
 echo -e "${BLUE}║${NC}                                                                ${BLUE}║${NC}"
 echo -e "${BLUE}║${NC}     ${GREEN}${BOLD}Worms W.M.D - macOS Fix Installer${NC}                        ${BLUE}║${NC}"
 echo -e "${BLUE}║${NC}                                                                ${BLUE}║${NC}"
-echo -e "${BLUE}║${NC}     This will fix Worms W.M.D to work on macOS 26 (Tahoe)     ${BLUE}║${NC}"
-echo -e "${BLUE}║${NC}     and later. The process is fully automatic.                ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}     Supports macOS 26+ and macOS 27 Golden Gate.              ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}     The process is fully automatic.                           ${BLUE}║${NC}"
 echo -e "${BLUE}║${NC}                                                                ${BLUE}║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -55,8 +55,8 @@ fi
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 INSTALL_DIR="$HOME/.wormswmd-fix"
-INSTALL_REF="v1.7.1"
-INSTALL_COMMIT="06500a37024131f61357d670a3a638ec62b2c0ed"
+INSTALL_REF="v1.7.2"
+INSTALL_COMMIT=""
 
 directory_is_empty() {
     local dir="$1"

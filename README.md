@@ -27,7 +27,7 @@ For most players:
 | --- | --- |
 | Install | Press `1` in the launcher. |
 | Preview first | Open `Worms W.M.D Fix.command` and press `2`. |
-| Check an existing install | Open `Worms W.M.D Fix.command` and press `3`. |
+| Check launch readiness | Open `Worms W.M.D Fix.command` and press `3`. |
 | Undo the fix | Open `Worms W.M.D Fix.command` and press `4`. |
 | Ask for help | Open `Worms W.M.D Fix.command` and press `5` to create a sanitized support bundle. |
 | Launch the game | Launch when prompted after applying the fix, or press `7` later. |
@@ -35,26 +35,22 @@ For most players:
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
 
-## v1.7.1 At A Glance
+## v1.7.2 At A Glance
 
 | Area | What changed |
 | --- | --- |
-| GOG installs | Common GOG paths, including `$HOME/GOG Games`, are auto-detected by the installer, diagnostics, and preflight checks. |
-| Bash 3.2 compatibility | Fixed an empty-array crash during game discovery on macOS `/bin/bash`. |
-| Support privacy | Support-bundle archive metadata is normalized so tar listings do not expose the local account name. |
-| Save backups | Team17-only save backups work even when Steam Cloud save folders are absent. |
-| Preflight | Optional public reachability checks use Team17, Steam, and GOG Worms W.M.D pages. |
-| Backup friction | Backup creation now shows progress and batches checksum work. |
-| Privacy | Support bundles exclude raw logs, crash logs, save data, game binaries, and private config contents. |
-| Runtime | Bundled Qt was refreshed from 5.15.18 to 5.15.19. |
-| Supply chain | Qt packaging now includes source provenance and documented rebuild steps. |
-| First run | The launcher can start Worms W.M.D directly after applying the fix. |
+| macOS 27 | Golden Gate is validated with Rosetta installed on Apple Silicon. |
+| Rosetta guidance | The launcher and preflight checks explain that Worms is an older Intel Mac game and show the install command when Rosetta is missing. |
+| Launch readiness | Launcher option `3` now checks both system readiness and the fixed game bundle before launch. |
+| Support bundles | Diagnostics now include macOS version, Rosetta package version, x86_64 execution status, `oahd` status, and macOS 27 game-support status when available. |
+| macOS 26 | Tahoe behavior remains covered by regression tests and still uses the same AGL fix path. |
+| Release hygiene | The validation harness now fails if accidental workstation-local paths are added to tracked text files. |
 
 ## Requirements
 
 | Requirement | Notes |
 | --- | --- |
-| macOS | macOS 26 Tahoe or later for the black-screen AGL fix. |
+| macOS | macOS 26 Tahoe or later for the black-screen AGL fix. macOS 27 Golden Gate also needs Rosetta on Apple Silicon. |
 | Game install | Worms W.M.D installed through Steam or GOG. |
 | Apple Silicon | Rosetta 2 is required and can be installed by macOS when prompted. |
 | Developer tools | `git`, usually provided by the Xcode Command Line Tools. |
@@ -64,25 +60,29 @@ Earlier macOS versions usually do not need the AGL fix, but macOS 15.x players
 with keyboard buffering or lag may still benefit from the Qt 5.15 runtime
 refresh.
 
+On macOS 27 Golden Gate, Rosetta may need to be installed again after an
+upgrade. The preview command reports this without changing your Mac; the game
+needs Rosetta before it can launch on Apple Silicon.
+
 ## Verify The Download
 
 The release page includes a `.zip.sha256` checksum next to the zip file.
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.1.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.2.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.1.zip: OK
+WormsWMD-macOS-Fix-v1.7.2.zip: OK
 ```
 
 GitHub CLI users can also verify the release attestation:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.1.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.2.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 ## Launcher Menu
@@ -91,7 +91,7 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.1.zip --repo cboyd0319/WormsWMD-ma
 | --- | --- |
 | `1` | Apply the recommended fix. |
 | `2` | Preview what would change before changing anything. |
-| `3` | Check whether the fix is already installed. |
+| `3` | Check whether the game is ready to launch. |
 | `4` | Restore original game files from a backup. |
 | `5` | Create a sanitized support bundle on your Desktop. |
 | `6` | Open the help file. |
@@ -124,7 +124,7 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.1.zip --repo cboyd0319/WormsWMD-ma
 Review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.2/install.sh
 ```
 
 ## Terminal Install
@@ -132,11 +132,11 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1
 Use the release zip unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.2/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The bootstrap is pinned to release `v1.7.1`
+launcher menu as the release zip. The bootstrap is pinned to release `v1.7.2`
 by default. The post-release mainline bootstrap pins the exact release commit
 after the tag exists.
 
@@ -148,7 +148,7 @@ after the tag exists.
 
 | Check | Covers |
 | --- | --- |
-| System | macOS version, architecture, Rosetta 2, Xcode Command Line Tools. |
+| System | macOS version, architecture, Rosetta, Xcode Command Line Tools. |
 | Game | App location and executable presence. |
 | Fix status | AGL stub, Qt version, QtGui references, signing state. |
 | Runtime | FMOD, Steam API, and libcurl. |

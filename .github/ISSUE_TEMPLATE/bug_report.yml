@@ -24,7 +24,7 @@ body:
     attributes:
       label: Fix version
       description: Run `./fix_worms_wmd.sh --help` or check the release zip name.
-      placeholder: "v1.7.1"
+      placeholder: "v1.7.2"
     validations:
       required: false
 
@@ -32,7 +32,7 @@ body:
     id: macos_version
     attributes:
       label: macOS version
-      placeholder: "26.x"
+      placeholder: "27.0 or 26.x"
     validations:
       required: true
 
@@ -90,6 +90,6 @@ body:
     id: support_bundle
     attributes:
       label: Support bundle or logs
-      description: If this is not documentation-only, attach a sanitized support bundle from launcher option 5 or paste reviewed, redacted output. Do not upload raw `.log` or `.trace` files.
+      description: If this is not documentation-only, attach a sanitized support bundle from launcher option 5 or paste reviewed, redacted output. The bundle includes macOS and Rosetta details. Do not upload raw `.log` or `.trace` files.
     validations:
       required: false

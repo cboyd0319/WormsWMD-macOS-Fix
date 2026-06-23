@@ -5,7 +5,7 @@
 If you are not comfortable with Terminal:
 
 1. Double-click `Worms W.M.D Fix.command`.
-2. Choose option 3 to check whether the fix is installed.
+2. Choose option 3 to check whether the game is ready to launch.
 3. If something fails, choose option 5 to create a support bundle on the
    Desktop.
 4. Attach that support bundle to a GitHub issue:
@@ -59,7 +59,7 @@ Gatekeeper blocks `.command` files downloaded from the internet. Try these optio
 
 5. **Use the one-liner instead:**
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.2/install.sh | bash
    ```
    Requires `git` (installed by Xcode Command Line Tools).
 
@@ -170,6 +170,11 @@ To install or reinstall Rosetta:
 softwareupdate --install-rosetta --agree-to-license
 ```
 
+On macOS 27 Golden Gate, Rosetta may need to be installed again after
+upgrading. Run the install command above, then open `Worms W.M.D Fix.command`
+and choose option 3. If it still reports that Rosetta is unavailable, choose
+option 5 to create a support bundle.
+
 ## Pre-built Qt download failed (Homebrew fallback)
 
 If the automatic Qt download fails, install Intel Homebrew as a fallback:
@@ -199,7 +204,8 @@ To gather system information for a bug report:
 ```
 
 Use `--bundle` when opening a community issue. It creates a sanitized support
-archive on your Desktop with diagnostics, Qt package verification details, and
-backup manifests when available. Do not upload raw `.log` or `.trace` files
-unless you have reviewed and redacted account names, private paths, tokens, and
-private config values.
+archive on your Desktop with diagnostics, macOS version, Rosetta package
+version when available, x86_64 execution status, Qt package verification
+details, and backup manifests when available. Do not upload raw `.log` or
+`.trace` files unless you have reviewed and redacted account names, private
+paths, tokens, and private config values.

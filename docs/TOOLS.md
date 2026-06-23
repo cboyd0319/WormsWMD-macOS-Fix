@@ -15,7 +15,7 @@ Verify your system is ready before launching the game:
 
 This checks:
 - macOS version and architecture
-- Rosetta 2 status (Apple Silicon)
+- Rosetta 2 status and package version when available (Apple Silicon)
 - Game installation and fix status
 - Runtime dependencies (FMOD, Steam API, libcurl)
 - Optional public reachability to Team17, Steam, and GOG Worms W.M.D pages
@@ -103,11 +103,12 @@ Gather system information for bug reports:
 Diagnostics output and support bundles are sanitized for issue reporting. The
 collector redacts home-account paths, external volume paths, temporary paths,
 email addresses, and common secret-like key/value strings. Support bundles
-contain diagnostics, pre-built Qt package verification details, and available
-backup manifests; they do not include raw logs, crash logs, save files, game
-binaries, or private config file contents. The support-bundle archive also
-normalizes tar owner and group metadata so it does not expose the local macOS
-account name.
+contain diagnostics, macOS version, Rosetta package version when available,
+x86_64 execution status, pre-built Qt package verification details, and
+available backup manifests; they do not include raw logs, crash logs, save
+files, game binaries, or private config file contents. The support-bundle
+archive also normalizes tar owner and group metadata so it does not expose the
+local macOS account name.
 
 ## Enhanced launcher
 

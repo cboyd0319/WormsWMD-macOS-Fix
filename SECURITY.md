@@ -99,24 +99,24 @@ matching `.sha256` file, then verifies the checksum before leaving the zip in
 ## Download verification
 
 Release bundles publish both a zip and a matching SHA-256 checksum file. For
-the `v1.7.1` release:
+the `v1.7.2` release:
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.1.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.2.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.1.zip: OK
+WormsWMD-macOS-Fix-v1.7.2.zip: OK
 ```
 
 Release bundles also receive GitHub artifact attestations from the release
 workflow:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.1.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.2.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 The checksum verifies the file content. The attestation verifies that GitHub
@@ -193,7 +193,7 @@ User-controllable environment variables are validated:
 |----------|------------|
 | `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D`; writable bundle subpaths must not be symlinks or resolve outside `Contents` |
 | `INSTALL_DIR` | Refuses system paths, home directory, non-empty non-repo directories, and Git repositories with a different remote |
-| `INSTALL_REF` | Defaults to pinned release `v1.7.1`; mainline maintenance bootstraps also verify the exact release commit when known; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
+| `INSTALL_REF` | Defaults to pinned release `v1.7.2`; mainline maintenance bootstraps also verify the exact release commit when known; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
 | `LOG_FILE` | Must be a regular `.log` path under `~/Library/Logs` |
 | `QT_PREFIX` | Verified to contain expected Qt frameworks; direct custom Homebrew prefixes require explicit opt-in |
 
@@ -222,7 +222,7 @@ All interactive prompts:
 
 ## Security audit checklist
 
-Last audit: 2026-04-29
+Last audit: 2026-06-22
 
 | Category | Status | Notes |
 |----------|--------|-------|
@@ -233,6 +233,7 @@ Last audit: 2026-04-29
 | Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory, cleanup traps, bundle containment checks, and archive link rejection |
 | Race conditions | Pass | Atomic operations where possible |
 | Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
+| Support bundle privacy | Pass | Sanitized bundles include OS and Rosetta context without raw logs, saves, game binaries, or private config contents |
 | Dependency security | Pass | Checksums, metadata, manifests, and x86_64 slice checks for pre-built Qt |
 | Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
 | Input validation | Pass | Environment variables and user input validated |
@@ -286,7 +287,7 @@ shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.co
 
 This verifies:
 - macOS version and architecture
-- Rosetta 2 installation (Apple Silicon)
+- Rosetta 2 installation and package version when available (Apple Silicon)
 - Game installation and fix status
 - Runtime dependencies (FMOD, Steam API, libcurl)
 - Optional public Team17, Steam, and GOG page reachability

@@ -11,6 +11,18 @@ What to do
 3. When it finishes, press Return to launch when prompted, or choose option 7
    later.
 
+On macOS 27 Golden Gate
+-----------------------
+
+Rosetta may need to be installed again after upgrading to macOS 27. Worms needs
+Rosetta because it is an older Intel Mac game. If the launcher says Rosetta is
+unavailable, run:
+
+    softwareupdate --install-rosetta --agree-to-license
+
+Then run "Worms W.M.D Fix.command" again and choose option 3. If it still fails,
+choose option 5 to create a support bundle.
+
 Want to verify the zip first?
 -----------------------------
 
@@ -44,8 +56,7 @@ What this changes
 
 The fix updates files inside the Worms W.M.D app bundle so the game can launch
 on newer macOS versions. It creates backups before changing game-bundle files.
-It does not use admin privileges, system-wide installers, telemetry, or account
-collection.
+It does not use admin privileges, telemetry, or account collection.
 
 Need to undo it?
 ----------------

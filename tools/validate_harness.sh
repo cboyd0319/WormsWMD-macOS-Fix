@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# validate_harness.sh - verify repo-local agent harness docs and links
+# validate_harness.sh - verify repo-local agent harness docs, links, and path hygiene
 #
 
 set -euo pipefail
@@ -186,6 +186,47 @@ check_exec_plan_index_statuses() {
     done
 }
 
+collect_repo_text_files() {
+    (
+        cd "$ROOT_DIR"
+        if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git ls-files --cached --others --exclude-standard
+        else
+            find . \
+                \( -path ./.git -o -path ./build \) -prune -o \
+                -type f -print \
+                | sed 's#^\./##'
+        fi
+    ) | while IFS= read -r source; do
+        case "$source" in
+            build/*|dist/*.tar|dist/*.tar.gz|dist/*.tgz|dist/*.zip|*.bmp|*.dmg|*.gif|*.icns|*.ico|*.jpg|*.jpeg|*.pdf|*.png|*.tiff|*.webp)
+                continue
+                ;;
+        esac
+
+        if [[ -f "$ROOT_DIR/$source" ]] && LC_ALL=C grep -Iq . "$ROOT_DIR/$source"; then
+            printf '%s\n' "$source"
+        fi
+    done | sort -u
+}
+
+check_no_local_machine_paths() {
+    local source="$1"
+    local source_abs="$ROOT_DIR/$source"
+    local users_root="/Users"
+    local short_home="$users_root/c"
+    local var_root="/var"
+    local forbidden_var="$var_root/folders"
+    local forbidden_pattern
+    local line_number
+
+    forbidden_pattern="(${short_home}([^A-Za-z0-9._-]|$)|${users_root}/[A-Za-z0-9._-]+/(Downloads|Documents)([^A-Za-z0-9._-]|$)|${forbidden_var}([^A-Za-z0-9._-]|$))"
+
+    while IFS= read -r line_number; do
+        fail "$source:$line_number contains a local machine path; use a repo-relative path or HOME-based placeholder"
+    done < <(LC_ALL=C grep -nE "$forbidden_pattern" "$source_abs" | cut -d: -f1 || true)
+}
+
 require_file "AGENTS.md"
 require_file ".github/copilot-instructions.md"
 require_file "docs/README.md"
@@ -222,6 +263,7 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 markdown_files="$tmp_dir/markdown-files.txt"
 index_targets="$tmp_dir/index-targets.txt"
+repo_text_files="$tmp_dir/repo-text-files.txt"
 
 (
     cd "$ROOT_DIR"
@@ -235,6 +277,12 @@ index_targets="$tmp_dir/index-targets.txt"
             | sort
     fi
 ) > "$markdown_files"
+
+collect_repo_text_files > "$repo_text_files"
+
+while IFS= read -r source; do
+    check_no_local_machine_paths "$source"
+done < "$repo_text_files"
 
 while IFS= read -r source; do
     check_local_links "$source"

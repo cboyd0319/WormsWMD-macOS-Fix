@@ -93,9 +93,9 @@ clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework
   copy failures, brittle `sw_vers` usage on non-macOS hosts, and fragile
   preflight architecture/pipeline handling.
 - 2026-06-18: Ran the fix against the local Steam install. The installer
-  created backup `/Users/c/Documents/WormsWMD-Backup-20260618-160012`, replaced
-  the old Qt frameworks with the verified prebuilt Qt 5.15.18 package, installed
-  the AGL stub, bundled dependencies, removed quarantine, signed the bundle, and
+  created a timestamped backup under the user's Documents folder, replaced the
+  old Qt frameworks with the verified prebuilt Qt 5.15.18 package, installed the
+  AGL stub, bundled dependencies, removed quarantine, signed the bundle, and
   reset Qt geometry.
 - 2026-06-18: Generated a post-fix support bundle under `/tmp` and checked the
   archive contents for user paths, synthetic private data, email addresses, and

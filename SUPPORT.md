@@ -13,7 +13,7 @@ If the person wants to verify the download first, ask them to download the
 matching `.zip.sha256` file from the same release and run:
 
 ```bash
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.1.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.2.zip.sha256
 ```
 
 ## What to include in an issue
@@ -29,7 +29,8 @@ still behaves incorrectly.
 
 Do not paste Steam account tokens, private config files, save archives, or game
 binaries into a public issue. The support bundle is designed to include
-sanitized diagnostics, Qt package status, and backup manifests only. Avoid
+sanitized diagnostics, macOS version, Rosetta package version when available,
+x86_64 execution status, Qt package status, and backup manifests only. Avoid
 uploading raw `.log` or `.trace` files; use the support bundle unless a
 maintainer specifically asks for a reviewed, redacted excerpt.
 

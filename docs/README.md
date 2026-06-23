@@ -54,6 +54,8 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Issue 11 game detection plan](exec-plans/2026-06-22-issue-11-game-detection.md)
   - completed fix for Bash 3.2 strict-mode game discovery and GOG install
     detection.
+- [macOS 27 Golden Gate compatibility plan](exec-plans/2026-06-22-macos-27-golden-gate.md)
+  - active full-repo compatibility and release-gate pass for macOS 27.
 - [Cheat sheet supply-chain hardening plan](exec-plans/2026-06-18-cheatsheet-supply-chain-hardening.md)
   - completed follow-up for Qt 5.15.x pinning, security cheat-sheet findings,
     and pre-release supply-chain readiness.
@@ -81,4 +83,5 @@ Run the harness check after documentation topology changes:
 ```
 
 The check verifies that this index links every tracked Markdown file, that local
-Markdown links resolve, and that required harness entrypoints exist.
+Markdown links resolve, that accidental local machine paths stay out of tracked
+text, and that required harness entrypoints exist.

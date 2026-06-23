@@ -7,8 +7,8 @@ Use this guide to report issues or submit changes.
 Before you file an issue, do these steps:
 1. Check existing issues.
 2. Verify game files in Steam.
-3. Run `Worms W.M.D Fix.command` and choose option 3, or run
-   `./fix_worms_wmd.sh --verify`.
+3. Run `Worms W.M.D Fix.command` and choose option 3, or run both
+   `./tools/preflight_check.sh --quick` and `./fix_worms_wmd.sh --verify`.
 4. If you need help, choose option 5 in the launcher and attach the support
    bundle.
 
@@ -17,13 +17,14 @@ Include this information:
 - Mac model and chip (Intel or Apple Silicon)
 - Error output or logs
 - Log file path from `~/Library/Logs/WormsWMD-Fix/`
-- Support bundle from `Worms W.M.D Fix.command` option 5, when available
+- Support bundle from `Worms W.M.D Fix.command` option 5, when available. It
+  includes macOS and Rosetta details needed for macOS 27 reports.
 - Steps to reproduce
 - Whether you tried `--restore` and re-applied the fix
 
 Issue template:
 
-macOS version: 26.x
+macOS version: 27.0 or 26.x
 Mac model: MacBook Pro M4
 Architecture: arm64
 

@@ -23,6 +23,18 @@ assert_sanitized() {
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-sanitize.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
 
+diagnostics_script="$ROOT_DIR/tools/collect_diagnostics.sh"
+grep -Fq 'Rosetta package receipt' "$diagnostics_script" \
+    || fail "diagnostics do not report the Rosetta package receipt status"
+grep -Fq 'Rosetta package version' "$diagnostics_script" \
+    || fail "diagnostics do not report the installed Rosetta package version"
+grep -Fq 'x86_64 execution probe' "$diagnostics_script" \
+    || fail "diagnostics do not report x86_64 execution probe status"
+grep -Fq 'oahd process' "$diagnostics_script" \
+    || fail "diagnostics do not report oahd process status"
+grep -Fq 'game-test-tool status' "$diagnostics_script" \
+    || fail "diagnostics do not report macOS 27 game-test-tool status"
+
 fake_game="/Users/privateperson/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
 external_game="/Volumes/Private Drive/privateperson@example.com/Worms W.M.D.app"
 plain_report="$tmp_dir/diagnostics.txt"
@@ -30,18 +42,22 @@ external_report="$tmp_dir/external-diagnostics.txt"
 bundle_dir="$tmp_dir/bundles"
 extract_dir="$tmp_dir/extracted"
 
-GAME_APP="$fake_game" "$ROOT_DIR/tools/collect_diagnostics.sh" > "$plain_report"
+GAME_APP="$fake_game" "$diagnostics_script" > "$plain_report"
 assert_sanitized "$plain_report"
+grep -Fq 'Version:' "$plain_report" \
+    || fail "diagnostics report does not include macOS version"
+grep -Fq 'Product:' "$plain_report" \
+    || fail "diagnostics report does not include macOS product name"
 
-GAME_APP="$external_game" "$ROOT_DIR/tools/collect_diagnostics.sh" > "$external_report"
+GAME_APP="$external_game" "$diagnostics_script" > "$external_report"
 if grep -Eq 'Private Drive|privateperson@example\.com|/Volumes/Private' "$external_report"; then
     fail "external volume path with spaces was not redacted"
 fi
 
-GAME_APP="$fake_game" "$ROOT_DIR/tools/collect_diagnostics.sh" --output "$tmp_dir/output.txt" >/dev/null
+GAME_APP="$fake_game" "$diagnostics_script" --output "$tmp_dir/output.txt" >/dev/null
 assert_sanitized "$tmp_dir/output.txt"
 
-GAME_APP="$fake_game" "$ROOT_DIR/tools/collect_diagnostics.sh" --bundle --bundle-output "$bundle_dir" >/dev/null
+GAME_APP="$fake_game" "$diagnostics_script" --bundle --bundle-output "$bundle_dir" >/dev/null
 bundle_path=$(find "$bundle_dir" -mindepth 1 -maxdepth 1 -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
 [[ -n "$bundle_path" ]] || fail "support bundle was not created"
 

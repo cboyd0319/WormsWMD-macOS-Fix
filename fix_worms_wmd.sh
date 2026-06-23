@@ -31,7 +31,7 @@ while [[ -L "$SCRIPT_PATH" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.7.1"
+VERSION="1.7.2"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -86,7 +86,7 @@ fi
 print_header() {
     echo ""
     echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}     ${GREEN}Worms W.M.D - macOS Tahoe (26.x) Fix${NC}                   ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}     ${GREEN}Worms W.M.D - macOS 26+ Fix${NC}                            ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                    Version ${VERSION}                            ${BLUE}║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
     if $DRY_RUN; then
@@ -212,6 +212,13 @@ auto_detect_game() {
 }
 
 # Check and install Rosetta 2 if needed (Apple Silicon only)
+print_game_test_tool_status() {
+    if command -v game-test-tool >/dev/null 2>&1; then
+        print_info "macOS 27 beta game support status:"
+        game-test-tool status 2>&1 | sed 's/^/    /' || true
+    fi
+}
+
 ensure_rosetta() {
     local arch_name
     arch_name=$(uname -m)
@@ -226,10 +233,11 @@ ensure_rosetta() {
     fi
 
     echo ""
-    print_info "Rosetta 2 is required to run this game on Apple Silicon."
+    print_info "Rosetta is required to run Worms W.M.D on Apple Silicon."
     echo ""
-    echo "    Rosetta 2 is Apple's translation layer that allows Intel apps"
-    echo "    to run on M1/M2/M3/M4 Macs. It's safe, free, and made by Apple."
+    echo "    Worms W.M.D is an older Intel Mac game. Rosetta is Apple's"
+    echo "    compatibility layer that lets older Intel Mac games run on"
+    echo "    M-series Macs."
     echo ""
 
     if $FORCE; then
@@ -248,11 +256,21 @@ ensure_rosetta() {
 
     if softwareupdate --install-rosetta --agree-to-license 2>/dev/null; then
         stop_spinner
-        print_success "Rosetta 2 installed successfully!"
-        echo ""
+        if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+            print_success "Rosetta 2 installed successfully!"
+            echo ""
+        else
+            print_error "Rosetta 2 installed, but Worms still cannot use it."
+            print_game_test_tool_status
+            echo ""
+            echo "Please restart your Mac, then run this launcher again and choose option 3."
+            echo "If it still fails, choose option 5 to create a support bundle."
+            exit 1
+        fi
     else
         stop_spinner false
         print_error "Failed to install Rosetta 2."
+        print_game_test_tool_status
         echo ""
         echo "Please try installing manually:"
         echo "    softwareupdate --install-rosetta"
@@ -825,7 +843,7 @@ check_already_applied() {
 
 show_help() {
     cat << EOF
-${BOLD}Worms W.M.D - macOS Tahoe (26.x) Fix v${VERSION}${NC}
+${BOLD}Worms W.M.D - macOS 26+ Fix v${VERSION}${NC}
 
 ${BOLD}USAGE:${NC}
     ./fix_worms_wmd.sh [OPTIONS]
@@ -1008,11 +1026,14 @@ do_dry_run() {
         if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
             print_dry_run "Rosetta 2: available"
         else
-            print_error "Rosetta 2 is required but not installed"
-            echo ""
-            echo "Install Rosetta 2 with:"
-            echo "  softwareupdate --install-rosetta"
-            exit 1
+            print_warning "Rosetta is required but not currently available"
+            if [[ "$major_version" =~ ^[0-9]+$ ]] && [[ "$major_version" -ge 27 ]]; then
+                print_dry_run "macOS 27 may need Rosetta reinstalled after upgrade"
+                if command -v game-test-tool >/dev/null 2>&1; then
+                    print_dry_run "macOS 27 beta legacy game support tool detected"
+                fi
+            fi
+            print_dry_run "Applying the fix would require Rosetta first"
         fi
     fi
 
@@ -1122,7 +1143,7 @@ do_fix() {
 
     if [[ "$major_version" =~ ^[0-9]+$ ]] && [[ "$major_version" -lt 26 ]]; then
         echo ""
-        print_warning "This fix is designed for macOS 26 (Tahoe) and later."
+        print_warning "This fix is designed for macOS 26 and later."
         echo "         Your version ($macos_version) may not need this fix."
         echo ""
         if ! $FORCE; then

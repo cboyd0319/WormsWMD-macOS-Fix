@@ -279,10 +279,38 @@ collect_diagnostics() {
 
     subsection "Rosetta 2"
     if [[ "$chip_type" == "arm64" ]]; then
+        local rosetta_pkg_info rosetta_pkg_version
+        rosetta_pkg_info=$(pkgutil --pkg-info com.apple.pkg.RosettaUpdateAuto 2>/dev/null || true)
+        if [[ -n "$rosetta_pkg_info" ]]; then
+            ok "Rosetta package receipt: present"
+            rosetta_pkg_version=$(printf '%s\n' "$rosetta_pkg_info" | awk -F': *' '/^version:/ {print $2; exit}')
+            info "Rosetta package version: ${rosetta_pkg_version:-unknown}"
+        else
+            warn "Rosetta package receipt: missing"
+            info "Rosetta package version: unavailable"
+        fi
+
+        if /usr/bin/pgrep -q oahd 2>/dev/null; then
+            ok "oahd process: running"
+        else
+            warn "oahd process: not running"
+        fi
+
         if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+            ok "x86_64 execution probe: passed"
             ok "Rosetta 2 is installed and working"
         else
+            fail "x86_64 execution probe: failed"
             fail "Rosetta 2 is NOT installed"
+        fi
+
+        if command -v game-test-tool >/dev/null 2>&1; then
+            info "game-test-tool status:"
+            game-test-tool status 2>&1 | while IFS= read -r line; do
+                [[ -n "$line" ]] && info "  $line"
+            done
+        else
+            info "game-test-tool status: unavailable"
         fi
     else
         info "Not applicable (Intel Mac)"

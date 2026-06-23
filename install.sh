@@ -3,17 +3,17 @@
 # install.sh - One-liner installer for Worms W.M.D macOS Fix
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.2/install.sh | bash
 #
 # Or with options:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.1/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.2/install.sh | bash -s -- --dry-run
 #
 
 set -euo pipefail
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
-DEFAULT_INSTALL_REF="v1.7.1"
-DEFAULT_INSTALL_COMMIT="06500a37024131f61357d670a3a638ec62b2c0ed"
+DEFAULT_INSTALL_REF="v1.7.2"
+DEFAULT_INSTALL_COMMIT=""
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
 INSTALL_REF="${INSTALL_REF:-$DEFAULT_INSTALL_REF}"
 
@@ -165,7 +165,7 @@ verify_default_install_commit() {
 
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}     ${GREEN}Worms W.M.D - macOS Tahoe Fix Installer${NC}                 ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}     ${GREEN}Worms W.M.D - macOS 26+ Fix Installer${NC}                   ${BLUE}║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

@@ -4,7 +4,10 @@
 
 **Q: Does this fix work on macOS 15 (Sequoia) or earlier?**
 
-This fix targets macOS 26 (Tahoe) where Apple removed AGL. Earlier macOS versions typically don't need it unless you're seeing the same black-screen symptoms.
+This fix targets macOS 26 Tahoe and later, where Apple removed AGL. On macOS
+27 Golden Gate, Apple Silicon Macs also need Rosetta installed because Worms
+W.M.D is an older Intel Mac game. Earlier macOS versions typically don't need
+the AGL fix unless you're seeing the same black-screen symptoms.
 
 There is also a confirmed report that applying the Qt 5.15 refresh resolved keyboard input buffering/lag on macOS 15.7.3 (Sequoia). Use `Worms W.M.D Fix.command` option 2 first if you want to preview the changes, or run `./fix_worms_wmd.sh --dry-run` from Terminal.
 
@@ -53,6 +56,16 @@ It provides empty AGL functions so the game can launch. Qt 5.15 doesn't use AGL 
 
 Not without source code. Team17 would need to ship a universal binary.
 
+**Q: What changes on macOS 27 Golden Gate?**
+
+Apple says Rosetta remains available through macOS 27, then changes in macOS
+28. On this macOS 27 beta laptop, Rosetta had to be installed again after the
+upgrade. This fix can still update the game bundle, but Worms needs Rosetta
+before it can launch on Apple Silicon.
+
+Apple's current Rosetta support article is here:
+https://support.apple.com/102527
+
 ## Performance
 
 **Q: Is performance worse on Apple Silicon compared to Intel?**
@@ -84,7 +97,7 @@ Run `./tools/controller_helper.sh` to check controller connectivity and get conf
 
 **Q: How can I verify my system is ready before launching?**
 
-Use `Worms W.M.D Fix.command` option 3 for the quick fix-status check. For a
-deeper system check, run `./tools/preflight_check.sh` to check system
-requirements, Rosetta 2 status, fix status, and optional public Team17, Steam,
+Use `Worms W.M.D Fix.command` option 3 for the quick launch-readiness check.
+For a deeper system check, run `./tools/preflight_check.sh` to check system
+requirements, Rosetta status, fix status, and optional public Team17, Steam,
 and GOG page reachability.

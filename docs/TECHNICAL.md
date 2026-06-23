@@ -10,7 +10,7 @@ These limitations exist because the game is closed-source.
 |------------|--------|--------|
 | FMOD uses deprecated runtime | Audio may break in future macOS | FMOD libs link to removed libstdc++; Rosetta provides shims for now |
 | Steam API uses deprecated runtime | Networking may break in future macOS | Same as FMOD; needs Steamworks SDK update |
-| No native Apple Silicon | Performance overhead via Rosetta (varies by system) | Requires a universal binary |
+| No native Apple Silicon | Requires Rosetta on Apple Silicon; performance varies by system | Requires a universal binary |
 | OpenGL only (deprecated) | May break if Apple removes OpenGL | Needs a Metal renderer |
 | No code signing by Team17 | Gatekeeper warnings | Only Team17 can sign with their Developer ID |
 

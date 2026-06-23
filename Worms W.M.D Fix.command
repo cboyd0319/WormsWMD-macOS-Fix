@@ -214,6 +214,41 @@ run_fix_engine() {
     fi
 }
 
+run_launch_readiness_check() {
+    local status=0
+
+    print_banner
+    worms_print_step "Checking launch readiness"
+    print_line ""
+
+    if "$LAUNCHER_DIR/tools/preflight_check.sh" --quick; then
+        print_line ""
+        worms_print_success "System readiness check passed."
+    else
+        status=$?
+        print_line ""
+        worms_print_error "System readiness check failed."
+    fi
+
+    print_line ""
+    if "$LAUNCHER_DIR/fix_worms_wmd.sh" --verify; then
+        print_line ""
+        worms_print_success "Game bundle verification passed."
+    else
+        status=$?
+        print_line ""
+        worms_print_error "Game bundle verification failed."
+    fi
+
+    if [[ "$status" -ne 0 ]]; then
+        print_line ""
+        print_line "The game is not ready to launch yet. A support bundle is the easiest next step."
+        offer_support_bundle
+    fi
+
+    return "$status"
+}
+
 open_help() {
     local help_file="$LAUNCHER_DIR/README_FIRST.txt"
 
@@ -230,7 +265,7 @@ print_menu() {
     print_line ""
     print_line "  ${BOLD}1${NC}) Apply the recommended fix"
     print_line "  ${BOLD}2${NC}) Preview what will change"
-    print_line "  ${BOLD}3${NC}) Check whether the fix is installed"
+    print_line "  ${BOLD}3${NC}) Check whether the game is ready to launch"
     print_line "  ${BOLD}4${NC}) Restore original game files from backup"
     print_line "  ${BOLD}5${NC}) Create a support bundle on the Desktop"
     print_line "  ${BOLD}6${NC}) Open the simple help file"
@@ -252,7 +287,9 @@ main() {
         case "$choice" in
             1)
                 if run_fix_engine "Applying the recommended fix"; then
-                    offer_launch_game
+                    if run_launch_readiness_check; then
+                        offer_launch_game
+                    fi
                 fi
                 pause_for_user
                 ;;
@@ -261,7 +298,7 @@ main() {
                 pause_for_user
                 ;;
             3)
-                run_fix_engine "Checking fix status" --verify || true
+                run_launch_readiness_check || true
                 pause_for_user
                 ;;
             4)

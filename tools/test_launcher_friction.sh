@@ -21,6 +21,12 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 grep -Fq 'Launch Worms W.M.D now? [Y/n]' "$launcher" \
     || fail "launcher does not offer to launch after applying the fix"
+grep -Fq 'run_launch_readiness_check' "$launcher" \
+    || fail "launcher does not have a launch-readiness check"
+grep -Fq 'tools/preflight_check.sh" --quick' "$launcher" \
+    || fail "launcher readiness check does not run quick preflight"
+grep -Fq 'fix_worms_wmd.sh" --verify' "$launcher" \
+    || fail "launcher readiness check does not run fix verification"
 grep -Fq 'steam://run/327030' "$launcher" \
     || fail "launcher does not use the Steam app launch URL"
 grep -Fq "7\${NC}) Launch Worms W.M.D" "$launcher" \
@@ -40,6 +46,11 @@ grep -Fq "| \`7\` | Launch Worms W.M.D. |" "$readme" \
     || fail "README.md launcher options table is missing option 7"
 grep -Fq 'option 7 to launch Worms W.M.D' "$install_doc" \
     || fail "docs/INSTALL.md launcher option list is missing option 7"
+
+grep -Fq 'macOS 26+ Fix Installer' "$ROOT_DIR/install.sh" \
+    || fail "install.sh banner still uses stale macOS version wording"
+grep -Fq 'macOS 26+ and macOS 27 Golden Gate' "$ROOT_DIR/Install Fix.command" \
+    || fail "Install Fix.command banner does not mention macOS 27 Golden Gate"
 
 printf 'q\n' | bash "$launcher" > "$tmp_dir/menu.out" 2>&1 \
     || fail "launcher did not accept piped menu input"

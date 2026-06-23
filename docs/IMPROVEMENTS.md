@@ -4,7 +4,8 @@ This fix does more than just make the game launch. It addresses multiple issues 
 
 ## Core fixes
 
-These changes make the game playable on macOS 26 (Tahoe) and later.
+These changes make the game playable on macOS 26 Tahoe and later when the
+Rosetta compatibility layer for older Intel Mac games is available.
 
 | Issue | What was wrong | What the fix does |
 |-------|----------------|-------------------|
@@ -19,7 +20,7 @@ These changes make the project easier to use without Terminal knowledge.
 
 | Issue | What was confusing | What the fix does |
 |-------|--------------------|-------------------|
-| Too many technical commands | Players had to pick flags like `--dry-run`, `--verify`, and `--restore` | Adds `Worms W.M.D Fix.command`, a double-click menu for apply, preview, verify, restore, help, and support |
+| Too many technical commands | Players had to pick flags like `--dry-run`, `--verify`, and `--restore` | Adds `Worms W.M.D Fix.command`, a double-click menu for apply, preview, launch readiness, restore, help, support, and launch |
 | GitHub file layout | Non-technical users had to know which repo files to download | Adds release-bundle tooling for one ready-to-unzip package with `README_FIRST.txt` |
 | Bug reports were hard to write | Players had to find logs and system details manually | Adds a launcher option that creates a sanitized support bundle on the Desktop |
 | The project felt like a script bundle | Players had to infer which files mattered | Adds a ready-to-unzip release bundle, first-read instructions, and clear attribution rules without bundling official game art |
@@ -71,7 +72,7 @@ The fix includes utilities to help manage the game.
 
 | Tool | What it does |
 |------|--------------|
-| Pre-flight check | Verifies system requirements, Rosetta 2, fix status, and optional public Team17, Steam, and GOG page reachability |
+| Pre-flight check | Verifies system requirements, Rosetta status, fix status, and optional public Team17, Steam, and GOG page reachability |
 | Save game backup | Back up and restore saves, settings, and replays with manifest verification |
 | Steam update watcher | Detects when Steam overwrites the fix and alerts you |
 | Enhanced launcher | Launch with logging, safe mode, and debug options |
@@ -102,7 +103,7 @@ Some issues can't be fixed without access to the game's source code:
 
 | Limitation | Impact | Why it can't be fixed |
 |------------|--------|----------------------|
-| No native Apple Silicon | Performance overhead via Rosetta (varies by system) | Requires rebuilding the game binary |
+| No native Apple Silicon | Requires Rosetta on Apple Silicon; performance varies by system | Requires rebuilding the game binary |
 | FMOD uses deprecated runtime | Audio may break in future macOS | FMOD libs need updating by Team17 |
 | Steam API uses deprecated runtime | Networking may break in future macOS | Steamworks SDK needs updating |
 | OpenGL only | May break if Apple removes OpenGL | Requires a Metal renderer |

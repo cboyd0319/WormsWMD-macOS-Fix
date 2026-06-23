@@ -39,6 +39,7 @@ QUICK=false
 ERRORS=0
 WARNINGS=0
 CURL_BASE=(--proto '=https' --tlsv1.2 --max-time 5 --silent)
+INTEL_TRANSLATION_AVAILABLE=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -149,7 +150,9 @@ macos_version=$(sw_vers -productVersion 2>/dev/null || echo "unknown")
 macos_major=$(echo "$macos_version" | cut -d. -f1)
 echo "macOS version: $macos_version"
 
-if [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 26 ]]; then
+if [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 27 ]]; then
+    check_warn "macOS 27 (Golden Gate) detected - fix is REQUIRED and Intel game support is transitional"
+elif [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 26 ]]; then
     check_warn "macOS 26 (Tahoe) detected - fix is REQUIRED"
 elif [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 15 ]]; then
     check_info "macOS 15 (Sequoia) - fix may be needed"
@@ -162,17 +165,26 @@ arch=$(uname -m)
 echo "Architecture: $arch"
 
 if [[ "$arch" == "arm64" ]]; then
-    check_info "Apple Silicon detected - Rosetta 2 required"
+    check_info "Apple Silicon detected - Rosetta required"
 
     # Check Rosetta 2
     if /usr/bin/pgrep -q oahd 2>/dev/null; then
+        INTEL_TRANSLATION_AVAILABLE=true
         check_pass "Rosetta 2 is running"
     elif [[ -f "/Library/Apple/usr/libexec/oah/libRosettaRuntime" ]]; then
+        INTEL_TRANSLATION_AVAILABLE=true
         check_pass "Rosetta 2 is installed"
     else
         # Try to check via arch command
         if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            INTEL_TRANSLATION_AVAILABLE=true
             check_pass "Rosetta 2 is functional"
+        elif [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 27 ]]; then
+            check_fail "Rosetta is required but unavailable"
+            echo "       Worms W.M.D is an older Intel Mac game."
+            echo "       macOS 27 may need Rosetta reinstalled after upgrading."
+            echo "       Install Rosetta, then run the launcher again and choose option 3:"
+            echo "       softwareupdate --install-rosetta --agree-to-license"
         else
             check_fail "Rosetta 2 not installed - run: softwareupdate --install-rosetta"
         fi
@@ -366,16 +378,21 @@ else
 fi
 
 # ============================================================================
-# Rosetta 2 Performance Hints
+# Rosetta Notes
 # ============================================================================
 
 if [[ "$arch" == "arm64" ]]; then
-    section "Rosetta 2 Optimization"
+    section "Rosetta Notes"
 
-    check_info "For best performance on Apple Silicon:"
-    echo "       - Close unnecessary apps to free memory"
-    echo "       - First launch may be slower (Rosetta translation caching)"
-    echo "       - Subsequent launches will be faster"
+    if $INTEL_TRANSLATION_AVAILABLE; then
+        check_info "For best performance on Apple Silicon:"
+        echo "       - Close unnecessary apps to free memory"
+        echo "       - First launch may be slower (translation caching)"
+        echo "       - Subsequent launches will be faster"
+    else
+        echo "       - Install Rosetta, then run the launcher again and choose option 3"
+        echo "       - If it still fails, choose option 5 to create a support bundle"
+    fi
 
     # Check if ROSETTA_ADVERTISE_AVX is set
     if [[ -n "${ROSETTA_ADVERTISE_AVX:-}" ]]; then
