@@ -60,7 +60,7 @@ current when adding, moving, renaming, or deleting Markdown files.
   - completed repo-wide audit of installer, launcher, diagnostics, backup,
     release, CI, and documentation behavior.
 - [v1.7.3 release plan](exec-plans/2026-06-29-v1.7.3-release.md)
-  - active release prep, publication, asset verification, and post-release
+  - completed release prep, publication, asset verification, and post-release
     bootstrap pinning.
 - [macOS 27 Golden Gate compatibility plan](exec-plans/2026-06-22-macos-27-golden-gate.md)
   - completed full-repo compatibility and release-gate pass for macOS 27.
