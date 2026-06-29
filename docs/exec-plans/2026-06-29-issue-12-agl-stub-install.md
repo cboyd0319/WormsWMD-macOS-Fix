@@ -37,7 +37,9 @@ Out of scope:
   preserve macOS 26+ runtime behavior. macOS-specific runtime checks may be
   named if not live-run.
 - Treat `GAME_APP` and `BUILD_DIR` as untrusted input and keep all paths quoted.
-- Do not make a missing AGL stub look successful. A partial install must fail
+- Do not make a missing AGL stub look successful. The fixer is responsible for
+  supplying the AGL/Qt runtime assets; if a release artifact, cache, build
+  output, or selected Qt source cannot supply them, the install must fail
   clearly and allow rollback.
 
 ## Milestones
@@ -111,10 +113,11 @@ shellcheck scripts/02_replace_qt_frameworks.sh scripts/03_copy_dependencies.sh s
 ## Decision Log
 
 - Use a hard failure for a missing built AGL stub during library-path fixing.
-  This preserves the installer contract and lets the existing rollback trap
-  restore the pre-fix bundle instead of leaving a known black-screen state.
+  The build step is responsible for supplying it; absence means the installer
+  invariant is broken and rollback should restore the pre-fix bundle.
 - Use a hard failure for missing required Qt framework source during
-  replacement. A missing Qt runtime component is not optional for the current
+  replacement. The release artifact or selected Qt source is responsible for
+  supplying it; a missing Qt runtime component is not optional for the current
   fix contract.
 - Treat missing `libqcocoa.dylib`, missing `libqsvg.dylib`, missing required
   bundled dylibs, and AGL binaries without an x86_64 slice as install blockers.
@@ -132,11 +135,11 @@ with an error when required framework source such as `QtSvg.framework` or
 required plugin source such as `libqcocoa.dylib`/`libqsvg.dylib` is missing. The
 dependency copy step now verifies the required prebuilt dylib set, and
 verification/preflight treat non-x86_64 AGL stubs and missing required plugins
-as errors. The issue #12 regression check creates fake game bundles for these
-cases and verifies the scripts fail before claiming the install step is
-complete. It also checks repeated AGL framework replacement does not create
-nested framework symlinks. CI now runs that check with the other repository
-regression scripts.
+as installer invariant failures. The issue #12 regression check creates fake
+game bundles for these cases and verifies the scripts fail before claiming the
+install step is complete. It also checks repeated AGL framework replacement
+does not create nested framework symlinks. CI now runs that check with the
+other repository regression scripts.
 
 Verification passed on 2026-06-29:
 

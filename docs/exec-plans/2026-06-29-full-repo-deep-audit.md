@@ -125,8 +125,9 @@ Runtime checks to name if still unavailable:
 
 - `ERR` traps in Bash 3.2 do not fire inside functions unless errtrace is
   enabled. The installer did almost all mutating work inside `do_fix()`.
-- The original root-cause class was broader than missing AGL: any missing
-  required Qt framework, plugin, dependency, or AGL x86_64 slice could still
+- The original root-cause class was broader than missing AGL: required runtime
+  assets supplied by the fixer were not consistently enforced as invariants, so
+  an incomplete artifact, cache, build output, or selected Qt source could still
   produce misleading readiness or completion signals.
 - The documented manual helper-by-helper install path bypassed the canonical
   backup/rollback engine.
@@ -162,8 +163,9 @@ misleading success states after incomplete runtime installation or failed
 recovery paths. The installer now inherits `ERR` traps inside functions so
 post-backup failures roll back on Bash 3.2, required Qt framework/plugin source
 is validated before destructive replacement, prebuilt dependency copies require
-the expected dylib set, AGL readiness requires an x86_64 binary, and optional
-helper failures no longer print false success. Watcher reapply preserves custom
+the expected dylib set, AGL readiness requires an x86_64 binary, and incomplete
+fixer-supplied runtime assets are treated as installer invariant violations.
+Optional helper failures no longer print false success. Watcher reapply preserves custom
 `GAME_APP`, save restore replaces backed-up roots from a temporary copy and
 checks for stale files, and manual docs now route users through the canonical
 rollback-aware engine.

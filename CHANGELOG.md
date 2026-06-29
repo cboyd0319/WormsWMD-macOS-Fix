@@ -5,9 +5,10 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 ## Unreleased
 
 ### Fixed
-- Fixed issue #12 hardening so missing AGL binaries, non-x86_64 AGL stubs,
-  missing required Qt frameworks/plugins, or missing bundled Qt dependencies
-  fail clearly instead of continuing toward a partial black-screen state.
+- Fixed issue #12 hardening so required runtime assets supplied by the fixer are
+  enforced as installer invariants. If the release artifact, cache, build
+  output, or selected Qt source is incomplete, the installer now fails clearly
+  instead of continuing toward a partial black-screen state.
 - Fixed AGL stub building on macOS 27 Apple Silicon Command Line Tools by using
   native `clang -arch x86_64` cross-compilation instead of launching `clang`
   under Rosetta.
