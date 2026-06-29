@@ -42,8 +42,8 @@ Out of scope:
 - Treat `GAME_APP`, `INSTALL_DIR`, `INSTALL_REF`, `LOG_FILE`, and `QT_PREFIX`
   as untrusted input.
 - Keep paths quoted and compatible with `Worms W.M.D.app`.
-- Preserve macOS 26+ behavior and name Windows 11 or macOS runtime gaps when
-  not live-checked.
+- Preserve macOS 26+ runtime behavior and name unavailable macOS/game-source
+  validation gaps when not live-checked.
 - Do not overclaim live-game verification when a real Worms W.M.D installation
   is not available in this session.
 
@@ -220,5 +220,5 @@ LOG_FILE=/tmp/wormswmd-release-artifact-launch.log ./tools/launch_worms.sh --che
 ```
 
 The LaunchAgent was installed in the real user session for the test and then
-uninstalled. No real GOG install, Windows 11 host, macOS 26.0.1 M1 Air, or
-Intel Homebrew Qt fallback was available on this machine.
+uninstalled. No real GOG install, macOS 26.0.1 M1 Air, or Intel Homebrew Qt
+fallback was available on this machine.

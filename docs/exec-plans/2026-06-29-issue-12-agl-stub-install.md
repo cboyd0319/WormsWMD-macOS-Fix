@@ -33,8 +33,9 @@ Out of scope:
 ## Constraints and risks
 
 - Preserve user game data and the existing backup/rollback path.
-- Keep behavior portable across Windows 11 repository checks and macOS 26+
-  runtime behavior. macOS-specific runtime checks may be named if not live-run.
+- Keep behavior portable across the repo's shell/documentation checks and
+  preserve macOS 26+ runtime behavior. macOS-specific runtime checks may be
+  named if not live-run.
 - Treat `GAME_APP` and `BUILD_DIR` as untrusted input and keep all paths quoted.
 - Do not make a missing AGL stub look successful. A partial install must fail
   clearly and allow rollback.
