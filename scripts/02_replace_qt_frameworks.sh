@@ -162,11 +162,30 @@ append_unique "QtDBus"
 append_unique "QtSvg"
 
 for fw in "${FRAMEWORKS[@]}"; do
-    if [ ! -d "$NEW_QT/$fw.framework" ]; then
-        echo "WARNING: $fw.framework not found in $NEW_QT"
-        continue
+    source_fw="$NEW_QT/$fw.framework"
+    if [ ! -d "$source_fw" ]; then
+        echo "ERROR: Required Qt framework missing from source: $source_fw"
+        exit 1
     fi
 
+    source_fw_bin=$(worms_framework_binary "$source_fw" "$fw" || true)
+    if [ -z "$source_fw_bin" ] || [ ! -f "$source_fw_bin" ]; then
+        echo "ERROR: Required Qt framework binary missing from source: $source_fw"
+        exit 1
+    fi
+done
+
+if [ ! -f "$NEW_QT_PLUGINS/platforms/libqcocoa.dylib" ]; then
+    echo "ERROR: Required Qt platform plugin missing from source: $NEW_QT_PLUGINS/platforms/libqcocoa.dylib"
+    exit 1
+fi
+
+if [ ! -f "$NEW_QT_PLUGINS/imageformats/libqsvg.dylib" ]; then
+    echo "ERROR: Required Qt image plugin missing from source: $NEW_QT_PLUGINS/imageformats/libqsvg.dylib"
+    exit 1
+fi
+
+for fw in "${FRAMEWORKS[@]}"; do
     echo "Replacing $fw.framework..."
 
     # Remove old framework

@@ -9,6 +9,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
 # shellcheck disable=SC1091
 source "$ROOT_DIR/scripts/common.sh"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/logging.sh"
 
 fail() {
     printf 'issue #10 regression check failed: %s\n' "$*" >&2
@@ -97,5 +99,18 @@ unique_backup=$(worms_unique_path "$tmp_dir/backup")
 if [[ "$unique_backup" != "$tmp_dir/backup-1" ]]; then
     fail "unique directory path did not add a numeric suffix"
 fi
+
+(
+    HOME="$tmp_dir/home"
+    LOG_DIR=""
+    LOG_FILE=""
+    worms_prepare_log_file "fix_worms_wmd"
+    first_log="$LOG_FILE"
+    touch "$first_log"
+    LOG_FILE=""
+    worms_prepare_log_file "fix_worms_wmd"
+    second_log="$LOG_FILE"
+    [[ "$first_log" != "$second_log" ]]
+) || fail "default log path generation can reuse an existing log path"
 
 printf 'Issue #10 regression check passed.\n'

@@ -233,7 +233,7 @@ Last audit: 2026-06-22
 | Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory, cleanup traps, bundle containment checks, and archive link rejection |
 | Race conditions | Pass | Atomic operations where possible |
 | Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
-| Support bundle privacy | Pass | Sanitized bundles include OS and Rosetta context without raw logs, saves, game binaries, or private config contents |
+| Support bundle privacy | Pass | Sanitized bundles include OS, Rosetta, installer-history, runtime-invariant, Qt-package, and backup-integrity context without raw logs, saves, game binaries, or private config contents |
 | Dependency security | Pass | Checksums, metadata, manifests, and x86_64 slice checks for pre-built Qt |
 | Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
 | Input validation | Pass | Environment variables and user input validated |

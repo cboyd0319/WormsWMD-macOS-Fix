@@ -70,53 +70,28 @@ To see what the fix does without applying it, run:
 
 ## Install manually
 
-Run these scripts in order:
+Use the canonical fixer even when installing manually. It creates a backup,
+verifies the runtime, and rolls back automatically if a mutating step fails.
+The helper scripts under `scripts/` are internal building blocks and do not
+provide the same recovery path when run one by one.
 
 ```bash
 git clone --branch v1.7.2 --depth 1 https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
 
-# Use an isolated build directory for the AGL stub.
-export BUILD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/agl_stub_build.XXXXXX")"
-trap 'rm -rf "$BUILD_DIR"' EXIT
+# Optional: set this only when the game is outside the usual Steam/GOG paths.
+export GAME_APP="/path/to/Worms W.M.D.app"
 
-# Step 1: Build the AGL stub library
-./scripts/01_build_agl_stub.sh
-
-# Prepare the pre-built Qt framework package.
-QT_OUTPUT="$(./scripts/download_qt_frameworks.sh)"
-QT_EXTRACT_DIR="$(printf '%s\n' "$QT_OUTPUT" | tail -1)"
-if [[ ! -d "$QT_EXTRACT_DIR/Frameworks" ]]; then
-  echo "Pre-built Qt package is unavailable. Use the Homebrew fallback below."
-  exit 1
-fi
-export QT_SOURCE=prebuild
-export QT_PREFIX="$QT_EXTRACT_DIR"
-
-# Step 2: Replace Qt frameworks
-./scripts/02_replace_qt_frameworks.sh
-
-# Step 3: Copy required dependencies
-./scripts/03_copy_dependencies.sh
-
-# Step 4: Fix all library path references
-./scripts/04_fix_library_paths.sh
-
-# Step 5: Fix Info.plist metadata
-./scripts/06_fix_info_plist.sh
-
-# Step 6: Secure config URLs
-./scripts/07_fix_config_urls.sh
-
-# Step 7: Verify the installation
-./scripts/05_verify_installation.sh
+./fix_worms_wmd.sh --dry-run
+./fix_worms_wmd.sh
 ```
 
-If the pre-built Qt package is unavailable, install Intel Homebrew Qt and set:
+If the pre-built Qt package is unavailable, install Intel Homebrew Qt and let
+the fixer detect it:
 
 ```bash
-export QT_SOURCE=homebrew
-export QT_PREFIX=/usr/local/opt/qt@5
+arch -x86_64 /usr/local/bin/brew install qt@5
+./fix_worms_wmd.sh
 ```
 
 ## Set a custom game location

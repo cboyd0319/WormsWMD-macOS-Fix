@@ -42,7 +42,7 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 | macOS 27 | Golden Gate is validated with Rosetta installed on Apple Silicon. |
 | Rosetta guidance | The launcher and preflight checks explain that Worms is an older Intel Mac game and show the install command when Rosetta is missing. |
 | Launch readiness | Launcher option `3` now checks both system readiness and the fixed game bundle before launch. |
-| Support bundles | Diagnostics now include macOS version, Rosetta package version, x86_64 execution status, `oahd` status, and macOS 27 game-support status when available. |
+| Support bundles | Diagnostics include macOS and Rosetta status, installer history, runtime invariant status, Qt package checks, and backup integrity status when available. |
 | macOS 26 | Tahoe behavior remains covered by regression tests and still uses the same AGL fix path. |
 | Release hygiene | The validation harness now fails if accidental workstation-local paths are added to tracked text files. |
 

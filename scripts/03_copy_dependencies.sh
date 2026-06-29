@@ -72,6 +72,35 @@ if [[ "$QT_SOURCE" == "prebuild" ]]; then
         fi
     done
 
+    missing_required=0
+    for required_lib in \
+        libglib-2.0.0.dylib \
+        libgthread-2.0.0.dylib \
+        libintl.8.dylib \
+        libpcre2-16.0.dylib \
+        libpcre2-8.0.dylib \
+        libzstd.1.dylib \
+        libpng16.16.dylib \
+        libjpeg.8.dylib \
+        libfreetype.6.dylib \
+        libmd4c.0.dylib \
+        liblzma.5.dylib \
+        libtiff.6.dylib; do
+        if [[ ! -f "$GAME_FRAMEWORKS/$required_lib" ]]; then
+            echo "ERROR: Required bundled dependency missing: $required_lib"
+            ((++missing_required))
+        fi
+    done
+
+    if [[ $missing_required -gt 0 ]]; then
+        echo ""
+        echo "Pre-built dependency verification failed."
+        echo "Re-run the installer with --force to refresh the Qt package, or install the Homebrew fallback."
+        echo "COPIED_LIBS=$bundled_count"
+        echo "MISSING_LIBS=$missing_required"
+        exit 1
+    fi
+
     if [[ $bundled_count -gt 0 ]]; then
         echo "Found $bundled_count bundled dependencies"
         echo ""

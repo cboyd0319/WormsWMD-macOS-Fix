@@ -57,6 +57,20 @@ worms_log_path_inside_root() {
     return 1
 }
 
+worms_log_unique_path() {
+    local base="$1"
+    local suffix="$2"
+    local candidate="${base}${suffix}"
+    local counter=1
+
+    while [[ -e "$candidate" ]]; do
+        candidate="${base}-${counter}${suffix}"
+        counter=$((counter + 1))
+    done
+
+    printf '%s\n' "$candidate"
+}
+
 worms_prepare_log_file() {
     local script_name="$1"
     local default_root="$HOME/Library/Logs"
@@ -78,7 +92,7 @@ worms_prepare_log_file() {
     fi
 
     if [[ -z "${LOG_FILE:-}" ]]; then
-        LOG_FILE="$LOG_DIR/${script_name}-${timestamp}.log"
+        LOG_FILE=$(worms_log_unique_path "$LOG_DIR/${script_name}-${timestamp}-$$" ".log")
     fi
 
     case "$LOG_FILE" in

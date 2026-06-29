@@ -92,14 +92,20 @@ if [ -f "$BUILD_DIR/AGL" ]; then
 </dict>
 </plist>
 EOF
-    rm -f "$GAME_FRAMEWORKS/AGL.framework/Versions/A/A"
+    rm -f \
+        "$GAME_FRAMEWORKS/AGL.framework/AGL" \
+        "$GAME_FRAMEWORKS/AGL.framework/Resources" \
+        "$GAME_FRAMEWORKS/AGL.framework/Versions/Current" \
+        "$GAME_FRAMEWORKS/AGL.framework/Versions/A/A" \
+        "$GAME_FRAMEWORKS/AGL.framework/Versions/A/Resources/Resources"
     ln -sf A "$GAME_FRAMEWORKS/AGL.framework/Versions/Current"
     ln -sf Versions/Current/AGL "$GAME_FRAMEWORKS/AGL.framework/AGL"
     ln -sf Versions/Current/Resources "$GAME_FRAMEWORKS/AGL.framework/Resources"
     echo "AGL stub installed"
 else
-    echo "WARNING: AGL stub not found at $BUILD_DIR/AGL"
-    echo "Run 01_build_agl_stub.sh first"
+    echo "ERROR: AGL stub not found at $BUILD_DIR/AGL"
+    echo "Run 01_build_agl_stub.sh first."
+    exit 1
 fi
 
 fw_names=()

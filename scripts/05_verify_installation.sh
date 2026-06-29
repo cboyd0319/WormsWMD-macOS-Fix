@@ -195,6 +195,21 @@ fi
 echo ""
 echo "--- Checking frameworks ---"
 framework_found=false
+for required_fw in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
+    required_fw_dir="$GAME_FRAMEWORKS/$required_fw.framework"
+    if [ ! -d "$required_fw_dir" ]; then
+        echo "ERROR: Required framework missing: $required_fw.framework"
+        ((errors++))
+        continue
+    fi
+
+    required_fw_bin=$(worms_framework_binary "$required_fw_dir" "$required_fw" || true)
+    if [ -z "$required_fw_bin" ] || [ ! -f "$required_fw_bin" ]; then
+        echo "ERROR: Required framework binary missing: $required_fw.framework"
+        ((errors++))
+    fi
+done
+
 for fw_dir in "$GAME_FRAMEWORKS"/*.framework; do
     if [ -d "$fw_dir" ]; then
         fw_name=$(basename "$fw_dir" .framework)
@@ -247,14 +262,14 @@ if [ ! -f "$GAME_FRAMEWORKS/AGL.framework/Versions/A/AGL" ]; then
     echo "ERROR: AGL stub not found!"
     ((errors++))
 else
-    arch=$(lipo -archs "$GAME_FRAMEWORKS/AGL.framework/Versions/A/AGL" 2>/dev/null)
+    arch=$(lipo -archs "$GAME_FRAMEWORKS/AGL.framework/Versions/A/AGL" 2>/dev/null || true)
     if [ "$arch" = "x86_64" ]; then
         echo "OK: AGL stub (x86_64)"
     elif echo "$arch" | grep -q "x86_64" && echo "$arch" | grep -q "arm64"; then
         echo "OK: AGL stub (universal: $arch)"
     else
-        echo "WARNING: AGL stub architecture is $arch (expected x86_64 or universal)"
-        ((warnings++))
+        echo "ERROR: AGL stub architecture is ${arch:-unknown} (expected x86_64 or universal)"
+        ((errors++))
     fi
     print_deps "$GAME_FRAMEWORKS/AGL.framework/Versions/A/AGL" "AGL stub"
 fi
@@ -276,6 +291,14 @@ echo "OK: Library dependencies checked"
 # Check plugins
 echo ""
 echo "--- Checking plugins ---"
+if [ ! -f "$GAME_PLUGINS/platforms/libqcocoa.dylib" ]; then
+    echo "ERROR: Required platform plugin missing: platforms/libqcocoa.dylib"
+    ((errors++))
+fi
+if [ ! -f "$GAME_PLUGINS/imageformats/libqsvg.dylib" ]; then
+    echo "ERROR: Required image plugin missing: imageformats/libqsvg.dylib"
+    ((errors++))
+fi
 for plugin in "$GAME_PLUGINS/platforms/"*.dylib "$GAME_PLUGINS/imageformats/"*.dylib; do
     if [ -f "$plugin" ]; then
         name=$(basename "$plugin")

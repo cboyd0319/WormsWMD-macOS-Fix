@@ -4,7 +4,30 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
-No user-facing changes yet.
+### Fixed
+- Fixed issue #12 hardening so required runtime assets supplied by the fixer are
+  enforced as installer invariants. If the release artifact, cache, build
+  output, or selected Qt source is incomplete, the installer now fails clearly
+  instead of continuing toward a partial black-screen state.
+- Fixed support-bundle troubleshooting gaps by adding sanitized installer
+  history, runtime invariant status, backup integrity status, and required Qt
+  archive content checks.
+- Fixed default installer log naming so simultaneous runs do not reuse one
+  timestamp-only log file.
+- Fixed AGL stub building on macOS 27 Apple Silicon Command Line Tools by using
+  native `clang -arch x86_64` cross-compilation instead of launching `clang`
+  under Rosetta.
+- Fixed repeated AGL framework installs so stale nested framework symlinks are
+  repaired before backup manifest validation and are not recreated during AGL
+  replacement.
+- Fixed installer rollback on Bash 3.2 by enabling `ERR` trap inheritance for
+  failures inside installer functions.
+- Fixed Steam update watcher reapply paths so custom `GAME_APP` locations are
+  forwarded and persisted in the LaunchAgent.
+- Fixed manually dispatched release-bundle workflow artifact names for branch
+  refs containing `/`.
+- Fixed save restore semantics so restored backup roots replace stale local save
+  files instead of merging over them.
 
 ## Mainline maintenance after 1.7.2 (2026-06-22)
 

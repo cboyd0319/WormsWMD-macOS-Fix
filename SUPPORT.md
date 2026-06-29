@@ -30,7 +30,8 @@ still behaves incorrectly.
 Do not paste Steam account tokens, private config files, save archives, or game
 binaries into a public issue. The support bundle is designed to include
 sanitized diagnostics, macOS version, Rosetta package version when available,
-x86_64 execution status, Qt package status, and backup manifests only. Avoid
+x86_64 execution status, sanitized installer history, runtime invariant status,
+Qt package status, backup integrity status, and backup manifests only. Avoid
 uploading raw `.log` or `.trace` files; use the support bundle unless a
 maintainer specifically asks for a reviewed, redacted excerpt.
 

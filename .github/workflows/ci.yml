@@ -58,6 +58,12 @@ jobs:
       - name: Test issue 11 game detection
         run: ./tools/test_issue_11_game_detection.sh
 
+      - name: Test issue 12 AGL install failure
+        run: ./tools/test_issue_12_agl_install_failure.sh
+
+      - name: Test installer rollback regression
+        run: ./tools/test_installer_rollback_regression.sh
+
       - name: Test support bundle sanitization
         run: ./tools/test_support_bundle_sanitization.sh
 

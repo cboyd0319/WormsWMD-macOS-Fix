@@ -36,8 +36,10 @@ Back up and restore your save games, settings, and replays:
 ```
 
 New save backups include a `MANIFEST.tsv` file. Restore validates archive
-layout before extraction, verifies the manifest when present, and warns when
-restoring older legacy backups that predate manifests.
+layout before extraction, verifies the manifest when present, copies backup
+contents into a temporary tree, replaces the backed-up save roots, and verifies
+that stale files absent from the backup did not survive. Older legacy backups
+that predate manifests restore with an explicit warning.
 
 ## Steam update watcher
 
@@ -52,7 +54,8 @@ Steam's **Verify integrity of game files** overwrites the fix. Use the watcher t
 
 The watcher uses the same common game discovery as the installer when
 `GAME_APP` is not set, so it can check common Steam, GOG, Applications, and
-Games-folder installs.
+Games-folder installs. When installed as a LaunchAgent, it persists the selected
+`GAME_APP` so automatic reapply targets the same bundle.
 
 ## Steam launch options integration
 
@@ -104,7 +107,8 @@ Diagnostics output and support bundles are sanitized for issue reporting. The
 collector redacts home-account paths, external volume paths, temporary paths,
 email addresses, and common secret-like key/value strings. Support bundles
 contain diagnostics, macOS version, Rosetta package version when available,
-x86_64 execution status, pre-built Qt package verification details, and
+x86_64 execution status, sanitized installer history, runtime invariant status,
+pre-built Qt package verification details, backup integrity status, and
 available backup manifests; they do not include raw logs, crash logs, save
 files, game binaries, or private config file contents. The support-bundle
 archive also normalizes tar owner and group metadata so it does not expose the
@@ -138,6 +142,8 @@ or docs-topology changes:
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
 ./tools/test_issue_11_game_detection.sh
+./tools/test_issue_12_agl_install_failure.sh
+./tools/test_installer_rollback_regression.sh
 ./tools/test_support_bundle_sanitization.sh
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh

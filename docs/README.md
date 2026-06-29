@@ -54,6 +54,11 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Issue 11 game detection plan](exec-plans/2026-06-22-issue-11-game-detection.md)
   - completed fix for Bash 3.2 strict-mode game discovery and GOG install
     detection.
+- [Issue 12 AGL stub install failure plan](exec-plans/2026-06-29-issue-12-agl-stub-install.md)
+  - completed fix for missing AGL and required Qt runtime partial installs.
+- [Full repository deep audit plan](exec-plans/2026-06-29-full-repo-deep-audit.md)
+  - active repo-wide audit of installer, launcher, diagnostics, backup,
+    release, CI, and documentation behavior.
 - [macOS 27 Golden Gate compatibility plan](exec-plans/2026-06-22-macos-27-golden-gate.md)
   - completed full-repo compatibility and release-gate pass for macOS 27.
 - [Cheat sheet supply-chain hardening plan](exec-plans/2026-06-18-cheatsheet-supply-chain-hardening.md)

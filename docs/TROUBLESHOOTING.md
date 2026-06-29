@@ -92,10 +92,18 @@ The game window may appear very small after applying the fix. This happens becau
    ```bash
    ./fix_worms_wmd.sh --verify
    ```
-3. Check crash logs:
+3. If verification says `AGL stub not found` or diagnostics say
+   `AGL stub NOT installed`, run the launcher option `1` again. If it still
+   fails, choose launcher option `5` and attach the support bundle to a GitHub
+   issue.
+4. If backup creation reports a symlink or manifest error for
+   `AGL.framework`, update to the latest fixer and run option `1` again. The
+   current fixer repairs stale AGL framework links from older repeated installs
+   before validating the backup.
+5. Check crash logs:
    - Open **Console.app**
    - Look for entries related to "Worms" in **Crash Reports**
-4. Try a clean install:
+6. Try a clean install:
    - Restore original files: `./fix_worms_wmd.sh --restore`
    - Uninstall the game in Steam or GOG Galaxy
    - Reinstall the game
@@ -205,7 +213,8 @@ To gather system information for a bug report:
 
 Use `--bundle` when opening a community issue. It creates a sanitized support
 archive on your Desktop with diagnostics, macOS version, Rosetta package
-version when available, x86_64 execution status, Qt package verification
-details, and backup manifests when available. Do not upload raw `.log` or
+version when available, x86_64 execution status, sanitized installer history,
+runtime invariant status, Qt package verification details, backup integrity
+status, and backup manifests when available. Do not upload raw `.log` or
 `.trace` files unless you have reviewed and redacted account names, private
 paths, tokens, and private config values.

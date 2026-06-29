@@ -75,7 +75,7 @@ body:
     id: support_bundle
     attributes:
       label: Support bundle
-      description: Attach the sanitized `wormswmd-support-*.tar.gz` file from your Desktop. It includes macOS and Rosetta details. If you cannot attach it, explain why.
+      description: Attach the sanitized `wormswmd-support-*.tar.gz` file from your Desktop. It includes macOS and Rosetta details, installer history, runtime invariant status, Qt package checks, and backup integrity status. If you cannot attach it, explain why.
     validations:
       required: true
 
