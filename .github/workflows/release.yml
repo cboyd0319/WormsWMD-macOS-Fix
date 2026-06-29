@@ -37,8 +37,20 @@ jobs:
       - name: Check Qt package
         run: ./scripts/download_qt_frameworks.sh --check
 
+      - name: Compute release names
+        id: release_names
+        shell: bash
+        run: |
+          ref_name="${GITHUB_REF_NAME:-manual}"
+          safe_ref="${ref_name//[^A-Za-z0-9._-]/-}"
+          if [[ -z "$safe_ref" || "$safe_ref" == "." || "$safe_ref" == ".." ]]; then
+            safe_ref="manual"
+          fi
+          echo "version=$safe_ref" >> "$GITHUB_OUTPUT"
+          echo "artifact=WormsWMD-macOS-Fix-$safe_ref" >> "$GITHUB_OUTPUT"
+
       - name: Build release zip
-        run: ./tools/build_release_bundle.sh --version "${GITHUB_REF_NAME:-manual}"
+        run: ./tools/build_release_bundle.sh --version "${{ steps.release_names.outputs.version }}"
 
       - name: Attest release assets
         # actions/attest v4.1.0
@@ -52,7 +64,7 @@ jobs:
         # actions/upload-artifact v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: WormsWMD-macOS-Fix-${{ github.ref_name || 'manual' }}
+          name: ${{ steps.release_names.outputs.artifact }}
           path: |
             build/release/WormsWMD-macOS-Fix-*.zip
             build/release/WormsWMD-macOS-Fix-*.zip.sha256

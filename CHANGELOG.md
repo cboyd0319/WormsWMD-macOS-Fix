@@ -18,6 +18,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   failures inside installer functions.
 - Fixed Steam update watcher reapply paths so custom `GAME_APP` locations are
   forwarded and persisted in the LaunchAgent.
+- Fixed manually dispatched release-bundle workflow artifact names for branch
+  refs containing `/`.
 - Fixed save restore semantics so restored backup roots replace stale local save
   files instead of merging over them.
 
