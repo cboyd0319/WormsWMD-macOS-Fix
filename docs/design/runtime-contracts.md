@@ -168,9 +168,10 @@ Diagnostics and reports must not expose secrets, private account data, or
 unredacted sensitive config values. Diagnostics output should be sanitized by
 default for issue reporting. Support bundles should sanitize the diagnostics
 report, include macOS version, Rosetta package version when available, x86_64
-execution status, Qt package verification details, and backup manifests when
-available instead of copying full game or save contents. Support bundles must
-not include raw `.log`, `.trace`, crash-log, save, game-binary, or private
+execution status, sanitized installer history, runtime invariant status, Qt
+package verification details, backup integrity status, and backup manifests
+when available instead of copying full game or save contents. Support bundles
+must not include raw `.log`, `.trace`, crash-log, save, game-binary, or private
 config-file contents. Support-bundle archives should normalize tar owner/group
 metadata so archive listings do not expose local account names.
 The friendly launcher's support option should delegate to

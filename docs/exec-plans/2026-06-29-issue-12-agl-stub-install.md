@@ -94,6 +94,10 @@ shellcheck scripts/02_replace_qt_frameworks.sh scripts/03_copy_dependencies.sh s
   stale nested AGL framework symlinks that failed backup manifest validation.
   Patched AGL symlink replacement and backup-copy self-heal, then reran the
   packaged forced install successfully.
+- 2026-06-29: Reviewed the pasted support bundle for missing future
+  troubleshooting evidence. Added sanitized support-bundle sections for
+  installer history, runtime invariant status, backup integrity status, and
+  required Qt archive contents.
 
 ## Surprises & Discoveries
 
@@ -170,3 +174,9 @@ LOG_FILE=/tmp/wormswmd-real-launch.log ./tools/launch_worms.sh --check-fix --log
 
 The bounded launch test observed a live Worms process after Steam handoff,
 found no recent Worms crash report, and terminated the test-launched process.
+
+Support-bundle observability was also expanded after reviewing issue #12. Future
+bundles show the selected fix version or commit, recent installer outcomes and
+step timeline, AGL/Qt/plugin/dylib runtime invariant status, backup integrity
+status, and required Qt archive content checks without copying raw logs, saves,
+game binaries, or private config contents.

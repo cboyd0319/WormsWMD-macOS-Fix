@@ -120,6 +120,15 @@ Runtime checks to name if still unavailable:
   rebuilt the zip, and confirmed packaged forced install, diagnostics, launcher
   readiness, LaunchAgent install/check/uninstall, endpoint checks, and bounded
   launch all pass.
+- 2026-06-29: Reviewed the issue #12 pasted support bundle for missing future
+  troubleshooting evidence. Added sanitized support-bundle sections for
+  installer history, runtime invariant status, backup integrity status, and
+  required Qt archive contents so future reports show both the immediate error
+  and whether the fixer-supplied runtime assets were present.
+- 2026-06-29: Real support-bundle smoke testing exposed that simultaneous
+  installer commands could reuse a timestamp-only log path and mix timelines.
+  Added process-specific default log names with collision suffixing and
+  regression coverage.
 
 ## Surprises & Discoveries
 
@@ -174,6 +183,14 @@ The artifact validation pass also found and fixed a repeated-install AGL
 framework layout bug: stale framework symlinks are now removed before they are
 recreated, and backup manifest creation repairs the fixer's own stale AGL
 symlinks in the backup copy before validation.
+
+The support-bundle follow-up closes an observability gap from issue #12. Future
+bundles now include sanitized install-log summaries, the selected fix version or
+commit, a runtime invariant matrix for AGL, Qt frameworks, Qt plugins, bundled
+dylibs, backup integrity status, and required Qt archive content checks without
+copying raw logs, saves, game binaries, or private config contents.
+Default installer logs now include the process ID plus a suffix on collision, so
+same-second verify/dry-run/apply invocations do not mix into one log file.
 
 Verification passed on 2026-06-29:
 

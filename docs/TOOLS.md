@@ -107,7 +107,8 @@ Diagnostics output and support bundles are sanitized for issue reporting. The
 collector redacts home-account paths, external volume paths, temporary paths,
 email addresses, and common secret-like key/value strings. Support bundles
 contain diagnostics, macOS version, Rosetta package version when available,
-x86_64 execution status, pre-built Qt package verification details, and
+x86_64 execution status, sanitized installer history, runtime invariant status,
+pre-built Qt package verification details, backup integrity status, and
 available backup manifests; they do not include raw logs, crash logs, save
 files, game binaries, or private config file contents. The support-bundle
 archive also normalizes tar owner and group metadata so it does not expose the

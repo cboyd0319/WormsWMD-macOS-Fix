@@ -90,6 +90,6 @@ body:
     id: support_bundle
     attributes:
       label: Support bundle or logs
-      description: If this is not documentation-only, attach a sanitized support bundle from launcher option 5 or paste reviewed, redacted output. The bundle includes macOS and Rosetta details. Do not upload raw `.log` or `.trace` files.
+      description: If this is not documentation-only, attach a sanitized support bundle from launcher option 5 or paste reviewed, redacted output. The bundle includes macOS and Rosetta details, installer history, runtime invariant status, Qt package checks, and backup integrity status. Do not upload raw `.log` or `.trace` files.
     validations:
       required: false

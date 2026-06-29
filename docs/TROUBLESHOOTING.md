@@ -213,7 +213,8 @@ To gather system information for a bug report:
 
 Use `--bundle` when opening a community issue. It creates a sanitized support
 archive on your Desktop with diagnostics, macOS version, Rosetta package
-version when available, x86_64 execution status, Qt package verification
-details, and backup manifests when available. Do not upload raw `.log` or
+version when available, x86_64 execution status, sanitized installer history,
+runtime invariant status, Qt package verification details, backup integrity
+status, and backup manifests when available. Do not upload raw `.log` or
 `.trace` files unless you have reviewed and redacted account names, private
 paths, tokens, and private config values.

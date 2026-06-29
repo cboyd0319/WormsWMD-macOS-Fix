@@ -18,7 +18,8 @@ Include this information:
 - Error output or logs
 - Log file path from `~/Library/Logs/WormsWMD-Fix/`
 - Support bundle from `Worms W.M.D Fix.command` option 5, when available. It
-  includes macOS and Rosetta details needed for macOS 27 reports.
+  includes macOS and Rosetta details, sanitized installer history, runtime
+  invariant status, Qt package checks, and backup integrity status.
 - Steps to reproduce
 - Whether you tried `--restore` and re-applied the fix
 

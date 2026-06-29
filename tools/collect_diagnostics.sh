@@ -39,6 +39,33 @@ COPY_TO_CLIPBOARD=false
 SUPPORT_BUNDLE=false
 BUNDLE_OUTPUT_DIR="${BUNDLE_OUTPUT_DIR:-$HOME/Desktop}"
 BUNDLE_TEMP_DIR=""
+REQUIRED_QT_FRAMEWORKS=(
+    QtCore
+    QtGui
+    QtWidgets
+    QtOpenGL
+    QtPrintSupport
+    QtDBus
+    QtSvg
+)
+REQUIRED_QT_PLUGINS=(
+    platforms/libqcocoa.dylib
+    imageformats/libqsvg.dylib
+)
+REQUIRED_BUNDLED_DYLIBS=(
+    libglib-2.0.0.dylib
+    libgthread-2.0.0.dylib
+    libintl.8.dylib
+    libpcre2-16.0.dylib
+    libpcre2-8.0.dylib
+    libzstd.1.dylib
+    libpng16.16.dylib
+    libjpeg.8.dylib
+    libfreetype.6.dylib
+    libmd4c.0.dylib
+    liblzma.5.dylib
+    libtiff.6.dylib
+)
 
 cleanup() {
     if [[ -n "$BUNDLE_TEMP_DIR" ]] && [[ -d "$BUNDLE_TEMP_DIR" ]]; then
@@ -59,6 +86,10 @@ verify_qt_package_checksum() {
     (cd "$package_dir" && shasum -a 256 -c "$checksum_name" >/dev/null 2>&1)
 }
 
+fix_tool_version() {
+    awk -F= '/^VERSION=/{gsub(/"/, "", $2); print $2; exit}' "$REPO_DIR/fix_worms_wmd.sh" 2>/dev/null
+}
+
 sanitize_report() {
     local input="$1"
     local output="$2"
@@ -72,10 +103,50 @@ sanitize_report() {
             gsub(/\/var\/folders\/[^"<>]*/, "[redacted-path]")
             gsub(/\/tmp\/[^"<>]*/, "[redacted-path]")
             gsub(/[[:alnum:]._%+-]+@[[:alnum:].-]+[.][[:alpha:]]{2,}/, "[redacted-email]")
-            gsub(/([Tt]oken|[Ss]ecret|[Pp]assword|[Aa][Pp][Ii][_-]?[Kk]ey)[[:space:]]*[:=][[:space:]]*[^[:space:]]+/, "\\1=[redacted-secret]")
+            gsub(/[Tt][Oo][Kk][Ee][Nn][[:space:]]*[:=][[:space:]]*[^[:space:]]+/, "token=[redacted-secret]")
+            gsub(/[Ss][Ee][Cc][Rr][Ee][Tt][[:space:]]*[:=][[:space:]]*[^[:space:]]+/, "secret=[redacted-secret]")
+            gsub(/[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd][[:space:]]*[:=][[:space:]]*[^[:space:]]+/, "password=[redacted-secret]")
+            gsub(/[Aa][Pp][Ii][_-][Kk][Ee][Yy][[:space:]]*[:=][[:space:]]*[^[:space:]]+/, "api_key=[redacted-secret]")
+            gsub(/[Aa][Pp][Ii][Kk][Ee][Yy][[:space:]]*[:=][[:space:]]*[^[:space:]]+/, "apikey=[redacted-secret]")
             print
         }
     ' "$input" > "$output"
+}
+
+latest_fix_logs() {
+    local log_dir="$HOME/Library/Logs/WormsWMD-Fix"
+    local log_file mtime
+
+    [[ -d "$log_dir" ]] || return 0
+
+    find "$log_dir" -maxdepth 1 -type f -name 'fix_worms_wmd-*.log' -print0 2>/dev/null \
+        | while IFS= read -r -d '' log_file; do
+            mtime=$(stat -f "%m" "$log_file" 2>/dev/null || echo 0)
+            printf '%s\t%s\n' "$mtime" "$log_file"
+        done \
+        | sort -nr \
+        | awk -F '\t' 'NR <= 5 { sub(/^[^\t]*\t/, ""); print }'
+}
+
+infer_log_outcome() {
+    local log_file="$1"
+    local line outcome="unknown"
+
+    while IFS= read -r line; do
+        if [[ "$line" == *"Rolled back to original state."* ]]; then
+            outcome="failure: rollback completed"
+        elif [[ "$line" == *"ERROR:"* || "$line" == *"✗"* ]]; then
+            outcome="failure or warning: inspect timeline"
+        elif [[ "$line" == *"FIX COMPLETE!"* ]]; then
+            outcome="success: fix complete"
+        elif [[ "$line" == *"Dry run complete"* ]]; then
+            outcome="success: dry run"
+        elif [[ "$line" == *"SUCCESS: All checks passed"* ]]; then
+            outcome="success: verification passed"
+        fi
+    done < "$log_file"
+
+    echo "$outcome"
 }
 
 emit_sanitized_diagnostics() {
@@ -662,8 +733,10 @@ collect_diagnostics() {
 
 write_qt_package_bundle_info() {
     local bundle_dir="$1"
+    local raw_file="$bundle_dir/qt-package.raw.txt"
     local info_file="$bundle_dir/qt-package.txt"
     local local_qt_package=""
+    local listing_file required_fw required_plugin required_dylib entry
 
     {
         echo "Qt package status"
@@ -676,21 +749,290 @@ write_qt_package_bundle_info() {
             echo "Availability: unavailable (download script missing)"
         fi
 
-        local_qt_package=$(worms_latest_qt_package_by_version "$REPO_DIR/dist" true || true)
+        local_qt_package=$(worms_latest_qt_package_by_version "$REPO_DIR/dist" false || true)
         if [[ -n "$local_qt_package" ]]; then
             echo "Local package: $(basename "$local_qt_package")"
-            if verify_qt_package_checksum "$local_qt_package"; then
-                echo "Checksum: verified"
+            if [[ -f "${local_qt_package}.sha256" ]]; then
+                if verify_qt_package_checksum "$local_qt_package"; then
+                    echo "Checksum: verified"
+                else
+                    echo "Checksum: mismatch"
+                fi
             else
-                echo "Checksum: mismatch"
+                echo "Checksum: missing"
             fi
             echo ""
             echo "Metadata:"
             tar -xOf "$local_qt_package" METADATA.txt 2>/dev/null || echo "(metadata unavailable)"
+            echo ""
+            echo "Required archive contents"
+            echo "========================="
+
+            listing_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-qt-listing.XXXXXX")
+            if tar -tzf "$local_qt_package" > "$listing_file" 2>/dev/null; then
+                for required_fw in "${REQUIRED_QT_FRAMEWORKS[@]}"; do
+                    entry="Frameworks/${required_fw}.framework/Versions/5/${required_fw}"
+                    if grep -Fxq "$entry" "$listing_file"; then
+                        echo "PASS framework binary: $entry"
+                    else
+                        echo "FAIL framework binary missing: $entry"
+                    fi
+                done
+
+                for required_plugin in "${REQUIRED_QT_PLUGINS[@]}"; do
+                    entry="PlugIns/$required_plugin"
+                    if grep -Fxq "$entry" "$listing_file"; then
+                        echo "PASS plugin: $entry"
+                    else
+                        echo "FAIL plugin missing: $entry"
+                    fi
+                done
+
+                for required_dylib in "${REQUIRED_BUNDLED_DYLIBS[@]}"; do
+                    entry="Frameworks/$required_dylib"
+                    if grep -Fxq "$entry" "$listing_file"; then
+                        echo "PASS bundled dylib: $entry"
+                    else
+                        echo "FAIL bundled dylib missing: $entry"
+                    fi
+                done
+
+                if grep -Fxq "MANIFEST.txt" "$listing_file"; then
+                    echo "PASS manifest: MANIFEST.txt"
+                else
+                    echo "WARN manifest missing: MANIFEST.txt"
+                fi
+                if grep -Fxq "SOURCE_PROVENANCE.tsv" "$listing_file"; then
+                    echo "PASS source provenance: SOURCE_PROVENANCE.tsv"
+                else
+                    echo "WARN source provenance missing: SOURCE_PROVENANCE.tsv"
+                fi
+            else
+                echo "FAIL unable to list archive contents"
+            fi
+            rm -f "${listing_file:-}"
         else
             echo "Local package: none"
         fi
-    } > "$info_file"
+    } > "$raw_file"
+
+    sanitize_report "$raw_file" "$info_file"
+    rm -f "$raw_file"
+}
+
+write_install_summary() {
+    local bundle_dir="$1"
+    local raw_file="$bundle_dir/install-summary.raw.txt"
+    local summary_file="$bundle_dir/install-summary.txt"
+    local version git_commit git_ref release_line log_file log_name log_mtime log_size outcome logs_list_file
+
+    {
+        echo "Install history summary"
+        echo "======================="
+        echo ""
+
+        version=$(fix_tool_version || true)
+        echo "Fix tool version: ${version:-unknown}"
+        if [[ -d "$REPO_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+            git_commit=$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || true)
+            git_ref=$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+            echo "Git ref: ${git_ref:-unknown}"
+            echo "Git commit: ${git_commit:-unknown}"
+        elif [[ -f "$REPO_DIR/RELEASE_INFO.txt" ]]; then
+            release_line=$(awk -F': ' '/^Version:/{print $2; exit}' "$REPO_DIR/RELEASE_INFO.txt")
+            echo "Release bundle version: ${release_line:-unknown}"
+        else
+            echo "Source ref: unavailable"
+        fi
+        echo ""
+        echo "Latest installer logs"
+        echo "====================="
+
+        logs_list_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-fix-logs.XXXXXX")
+        latest_fix_logs > "$logs_list_file"
+
+        if [[ ! -s "$logs_list_file" ]]; then
+            echo "No fix_worms_wmd logs found in ~/Library/Logs/WormsWMD-Fix."
+        else
+            while IFS= read -r log_file; do
+                [[ -n "$log_file" ]] || continue
+                log_name=$(basename "$log_file")
+                log_mtime=$(date -r "$log_file" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || echo "unknown")
+                log_size=$(worms_file_size "$log_file" 2>/dev/null || echo "unknown")
+                outcome=$(infer_log_outcome "$log_file")
+
+                echo ""
+                echo "Log: $log_name"
+                echo "Modified: $log_mtime"
+                echo "Size bytes: $log_size"
+                echo "Inferred outcome: $outcome"
+                echo "Step timeline:"
+                grep -E '^(==>|.*(Log file:|ERROR:|SUCCESS:|Rolled back|Rolling back|Backup created|Backup manifest|All checks passed|Installation verification failed|Copying dependencies failed|AGL stub built successfully|Qt frameworks installed|Dependencies bundled|FIX COMPLETE|Dry run complete|Pre-flight checks|Creating backup|Building AGL|Replacing Qt|Copying dependencies|Fixing library paths|Applying enhancements|Applying finishing touches|Verifying installation))' "$log_file" \
+                    | tail -80 \
+                    | sed 's/[[:cntrl:]]//g' || true
+            done < "$logs_list_file"
+        fi
+        rm -f "$logs_list_file"
+    } > "$raw_file"
+
+    sanitize_report "$raw_file" "$summary_file"
+    rm -f "$raw_file"
+}
+
+write_runtime_invariants() {
+    local bundle_dir="$1"
+    local raw_file="$bundle_dir/runtime-invariants.raw.txt"
+    local summary_file="$bundle_dir/runtime-invariants.txt"
+    local frameworks_dir="$GAME_APP/Contents/Frameworks"
+    local plugins_dir="$GAME_APP/Contents/PlugIns"
+    local agl_path="$frameworks_dir/AGL.framework/Versions/A/AGL"
+    local required_fw required_plugin required_dylib binary archs size rel_path qt_info
+
+    {
+        echo "Required runtime invariant matrix"
+        echo "================================="
+        echo ""
+        echo "Game app: $GAME_APP"
+        echo ""
+
+        if [[ ! -d "$GAME_APP" ]]; then
+            echo "FAIL game app not found"
+        else
+            echo "AGL"
+            echo "---"
+            if [[ -f "$agl_path" ]]; then
+                archs=$(lipo -archs "$agl_path" 2>/dev/null || echo "unknown")
+                size=$(worms_file_size "$agl_path" 2>/dev/null || echo "unknown")
+                if echo "$archs" | tr ' ' '\n' | grep -qx "x86_64"; then
+                    echo "PASS AGL binary: Frameworks/AGL.framework/Versions/A/AGL"
+                else
+                    echo "FAIL AGL binary missing x86_64: $archs"
+                fi
+                echo "AGL archs: $archs"
+                echo "AGL size bytes: $size"
+            else
+                echo "FAIL AGL binary missing: Frameworks/AGL.framework/Versions/A/AGL"
+            fi
+
+            echo ""
+            echo "Qt frameworks"
+            echo "-------------"
+            for required_fw in "${REQUIRED_QT_FRAMEWORKS[@]}"; do
+                binary=$(worms_framework_binary "$frameworks_dir/${required_fw}.framework" "$required_fw" 2>/dev/null || true)
+                if [[ -n "$binary" && -f "$binary" ]]; then
+                    rel_path=${binary#"$GAME_APP/Contents/"}
+                    archs=$(lipo -archs "$binary" 2>/dev/null || echo "unknown")
+                    if echo "$archs" | tr ' ' '\n' | grep -qx "x86_64"; then
+                        echo "PASS $required_fw: $rel_path ($archs)"
+                    else
+                        echo "FAIL $required_fw missing x86_64: $rel_path ($archs)"
+                    fi
+                else
+                    echo "FAIL $required_fw binary missing"
+                fi
+            done
+            if [[ -f "$frameworks_dir/QtCore.framework/Versions/5/QtCore" ]]; then
+                qt_info=$(otool -L "$frameworks_dir/QtCore.framework/Versions/5/QtCore" 2>/dev/null | sed -n '2p' || true)
+                echo "QtCore install name: ${qt_info:-unknown}"
+            fi
+
+            echo ""
+            echo "Qt plugins"
+            echo "----------"
+            for required_plugin in "${REQUIRED_QT_PLUGINS[@]}"; do
+                if [[ -f "$plugins_dir/$required_plugin" ]]; then
+                    archs=$(lipo -archs "$plugins_dir/$required_plugin" 2>/dev/null || echo "unknown")
+                    if echo "$archs" | tr ' ' '\n' | grep -qx "x86_64"; then
+                        echo "PASS plugin: PlugIns/$required_plugin ($archs)"
+                    else
+                        echo "FAIL plugin missing x86_64: PlugIns/$required_plugin ($archs)"
+                    fi
+                else
+                    echo "FAIL plugin missing: PlugIns/$required_plugin"
+                fi
+            done
+
+            echo ""
+            echo "Bundled dependency dylibs"
+            echo "------------------------"
+            for required_dylib in "${REQUIRED_BUNDLED_DYLIBS[@]}"; do
+                if [[ -f "$frameworks_dir/$required_dylib" ]]; then
+                    archs=$(lipo -archs "$frameworks_dir/$required_dylib" 2>/dev/null || echo "unknown")
+                    if echo "$archs" | tr ' ' '\n' | grep -qx "x86_64"; then
+                        echo "PASS dylib: Frameworks/$required_dylib ($archs)"
+                    else
+                        echo "FAIL dylib missing x86_64: Frameworks/$required_dylib ($archs)"
+                    fi
+                else
+                    echo "FAIL dylib missing: Frameworks/$required_dylib"
+                fi
+            done
+        fi
+    } > "$raw_file"
+
+    sanitize_report "$raw_file" "$summary_file"
+    rm -f "$raw_file"
+}
+
+write_backup_summary() {
+    local bundle_dir="$1"
+    local raw_file="$bundle_dir/backup-summary.raw.txt"
+    local summary_file="$bundle_dir/backup-summary.txt"
+    local backup_count=0 backup manifest mtime symlink_status manifest_status
+
+    {
+        echo "Backup integrity summary"
+        echo "========================"
+        echo ""
+
+        if [[ ! -d "$HOME/Documents" ]]; then
+            echo "Documents directory not found."
+        else
+            backup_count=$(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print 2>/dev/null | wc -l | tr -d ' ')
+            echo "Backup count: $backup_count"
+
+            find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null \
+                | while IFS= read -r -d '' backup; do
+                    mtime=$(stat -f "%m" "$backup" 2>/dev/null || echo 0)
+                    printf '%s\t%s\n' "$mtime" "$backup"
+                done \
+                | sort -nr \
+                | awk -F '\t' 'NR <= 5 { sub(/^[^\t]*\t/, ""); print }' \
+                | while IFS= read -r backup; do
+                    [[ -n "$backup" ]] || continue
+                    manifest="$backup/BACKUP_MANIFEST.tsv"
+                    mtime=$(date -r "$backup" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || echo "unknown")
+                    if worms_validate_tree_symlinks "$backup" >/dev/null 2>&1; then
+                        symlink_status="PASS"
+                    else
+                        symlink_status="FAIL"
+                    fi
+                    if [[ -f "$manifest" ]]; then
+                        if worms_verify_manifest "$backup" "$manifest" >/dev/null 2>&1; then
+                            manifest_status="PASS"
+                        else
+                            manifest_status="FAIL"
+                        fi
+                    else
+                        manifest_status="WARN missing"
+                    fi
+
+                    echo ""
+                    echo "Backup: $(basename "$backup")"
+                    echo "Modified: $mtime"
+                    echo "Symlink validation: $symlink_status"
+                    echo "Manifest validation: $manifest_status"
+                    if [[ -d "$backup/Frameworks/AGL.framework" ]]; then
+                        echo "Looks already fixed: yes (AGL.framework present)"
+                    else
+                        echo "Looks already fixed: unknown/no AGL.framework"
+                    fi
+                done
+        fi
+    } > "$raw_file"
+
+    sanitize_report "$raw_file" "$summary_file"
+    rm -f "$raw_file"
 }
 
 copy_backup_manifests() {
@@ -704,8 +1046,8 @@ copy_backup_manifests() {
         while IFS= read -r -d '' backup; do
             manifest="$backup/BACKUP_MANIFEST.tsv"
             if [[ -f "$manifest" ]]; then
-                target_name="$(basename "$backup").tsv"
-                cp "$manifest" "$manifests_dir/$target_name"
+                target_name=$(printf 'backup-manifest-%02d.tsv' "$((copied + 1))")
+                sanitize_report "$manifest" "$manifests_dir/$target_name"
                 copied=$((copied + 1))
             fi
         done < <(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null)
@@ -730,7 +1072,7 @@ collect_support_bundle() {
         echo "Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')"
         echo "Repository: https://github.com/cboyd0319/WormsWMD-macOS-Fix"
         echo ""
-        echo "This bundle contains sanitized diagnostics, Qt package status, and backup manifests."
+        echo "This bundle contains sanitized diagnostics, install history, runtime invariant status, Qt package status, and backup manifests."
         echo "It does not include save files, game binaries, or raw crash logs."
     } > "$BUNDLE_TEMP_DIR/README.txt"
 
@@ -743,6 +1085,9 @@ collect_support_bundle() {
     rm -f "$raw_report"
 
     write_qt_package_bundle_info "$BUNDLE_TEMP_DIR"
+    write_install_summary "$BUNDLE_TEMP_DIR"
+    write_runtime_invariants "$BUNDLE_TEMP_DIR"
+    write_backup_summary "$BUNDLE_TEMP_DIR"
     copy_backup_manifests "$BUNDLE_TEMP_DIR"
 
     COPYFILE_DISABLE=1 tar \

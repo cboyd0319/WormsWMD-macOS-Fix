@@ -9,6 +9,11 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   enforced as installer invariants. If the release artifact, cache, build
   output, or selected Qt source is incomplete, the installer now fails clearly
   instead of continuing toward a partial black-screen state.
+- Fixed support-bundle troubleshooting gaps by adding sanitized installer
+  history, runtime invariant status, backup integrity status, and required Qt
+  archive content checks.
+- Fixed default installer log naming so simultaneous runs do not reuse one
+  timestamp-only log file.
 - Fixed AGL stub building on macOS 27 Apple Silicon Command Line Tools by using
   native `clang -arch x86_64` cross-compilation instead of launching `clang`
   under Rosetta.
