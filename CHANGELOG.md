@@ -4,6 +4,16 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
+No user-facing changes yet.
+
+## 1.7.3 (2026-06-29)
+
+### Changed
+- Updated installer, launcher, README, install, troubleshooting, trust,
+  security, support, and issue-template release surfaces for v1.7.3.
+- Kept release-tag bootstrap commit pins empty for the v1.7.3 tag commit; the
+  follow-up mainline maintenance commit should pin the exact tag target.
+
 ### Fixed
 - Fixed issue #12 hardening so required runtime assets supplied by the fixer are
   enforced as installer invariants. If the release artifact, cache, build

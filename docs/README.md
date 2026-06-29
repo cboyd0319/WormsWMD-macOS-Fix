@@ -57,8 +57,11 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Issue 12 AGL stub install failure plan](exec-plans/2026-06-29-issue-12-agl-stub-install.md)
   - completed fix for missing AGL and required Qt runtime partial installs.
 - [Full repository deep audit plan](exec-plans/2026-06-29-full-repo-deep-audit.md)
-  - active repo-wide audit of installer, launcher, diagnostics, backup,
+  - completed repo-wide audit of installer, launcher, diagnostics, backup,
     release, CI, and documentation behavior.
+- [v1.7.3 release plan](exec-plans/2026-06-29-v1.7.3-release.md)
+  - active release prep, publication, asset verification, and post-release
+    bootstrap pinning.
 - [macOS 27 Golden Gate compatibility plan](exec-plans/2026-06-22-macos-27-golden-gate.md)
   - completed full-repo compatibility and release-gate pass for macOS 27.
 - [Cheat sheet supply-chain hardening plan](exec-plans/2026-06-18-cheatsheet-supply-chain-hardening.md)

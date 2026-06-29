@@ -35,16 +35,16 @@ For most players:
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
 
-## v1.7.2 At A Glance
+## v1.7.3 At A Glance
 
 | Area | What changed |
 | --- | --- |
-| macOS 27 | Golden Gate is validated with Rosetta installed on Apple Silicon. |
-| Rosetta guidance | The launcher and preflight checks explain that Worms is an older Intel Mac game and show the install command when Rosetta is missing. |
-| Launch readiness | Launcher option `3` now checks both system readiness and the fixed game bundle before launch. |
+| Runtime completeness | Required AGL, Qt frameworks, Qt plugins, and bundled dylibs are enforced as fixer-supplied install invariants. |
+| Rollback | Post-backup installer failures now roll back reliably on Bash 3.2. |
+| Repeated installs | Stale AGL framework symlinks are repaired before backup validation and replacement. |
 | Support bundles | Diagnostics include macOS and Rosetta status, installer history, runtime invariant status, Qt package checks, and backup integrity status when available. |
-| macOS 26 | Tahoe behavior remains covered by regression tests and still uses the same AGL fix path. |
-| Release hygiene | The validation harness now fails if accidental workstation-local paths are added to tracked text files. |
+| Save restore | Restores replace backed-up save roots instead of merging stale local files over them. |
+| Log hygiene | Default installer logs are process-specific so same-second runs do not mix timelines. |
 
 ## Requirements
 
@@ -70,19 +70,19 @@ The release page includes a `.zip.sha256` checksum next to the zip file.
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.2.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.3.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.2.zip: OK
+WormsWMD-macOS-Fix-v1.7.3.zip: OK
 ```
 
 GitHub CLI users can also verify the release attestation:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.2.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.3.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 ## Launcher Menu
@@ -124,7 +124,7 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.2.zip --repo cboyd0319/WormsWMD-ma
 Review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.2/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3/install.sh
 ```
 
 ## Terminal Install
@@ -132,11 +132,11 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.2
 Use the release zip unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.2/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The bootstrap is pinned to release `v1.7.2`
+launcher menu as the release zip. The bootstrap is pinned to release `v1.7.3`
 by default. The post-release mainline bootstrap pins the exact release commit
 after the tag exists.
 
