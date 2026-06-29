@@ -348,7 +348,9 @@ collect_diagnostics() {
             local agl_archs agl_size
             agl_archs=$(lipo -archs "$agl_path" 2>/dev/null || echo "unknown")
             agl_size=$(stat -f%z "$agl_path" 2>/dev/null || echo "0")
-            if [[ "$agl_size" -lt 100000 ]]; then
+            if ! echo "$agl_archs" | tr ' ' '\n' | grep -qx "x86_64"; then
+                fail "AGL stub missing x86_64 architecture (archs: $agl_archs)"
+            elif [[ "$agl_size" -lt 100000 ]]; then
                 ok "AGL stub installed (archs: $agl_archs, size: ${agl_size} bytes)"
             else
                 warn "AGL framework present but may not be stub (size: ${agl_size} bytes)"
@@ -382,14 +384,26 @@ collect_diagnostics() {
         if [[ -d "$GAME_APP/Contents/Frameworks/QtDBus.framework" ]]; then
             ok "QtDBus.framework present"
         else
-            warn "QtDBus.framework missing"
+            fail "QtDBus.framework missing"
         fi
 
         # Check QtSvg
         if [[ -d "$GAME_APP/Contents/Frameworks/QtSvg.framework" ]]; then
             ok "QtSvg.framework present"
         else
-            warn "QtSvg.framework missing"
+            fail "QtSvg.framework missing"
+        fi
+
+        if [[ -f "$GAME_APP/Contents/PlugIns/platforms/libqcocoa.dylib" ]]; then
+            ok "Qt platform plugin present"
+        else
+            fail "Qt platform plugin missing"
+        fi
+
+        if [[ -f "$GAME_APP/Contents/PlugIns/imageformats/libqsvg.dylib" ]]; then
+            ok "Qt SVG image plugin present"
+        else
+            fail "Qt SVG image plugin missing"
         fi
     else
         fail "Frameworks directory not found"

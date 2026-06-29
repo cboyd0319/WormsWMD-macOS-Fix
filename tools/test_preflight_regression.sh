@@ -51,7 +51,7 @@ STUB
     cat > "$bin_dir/lipo" <<'STUB'
 #!/bin/bash
 if [[ "${1:-}" == "-archs" ]]; then
-    printf '%s\n' "x86_64"
+    printf '%s\n' "${WORMS_TEST_LIPO_ARCHS:-x86_64}"
     exit 0
 fi
 exit 1
@@ -74,6 +74,37 @@ run_preflight_for_version() {
         PATH="$fake_bin:$PATH" \
         GAME_APP="$game_app" \
         "$preflight" --quick 2>&1 || true
+}
+
+run_preflight_agl_case() {
+    local case_name="$1"
+    local agl_archs="$2"
+    local create_binary="$3"
+    local fake_bin="$tmp_dir/bin-agl-$case_name"
+    local game_app="$tmp_dir/game-agl-$case_name/Worms W.M.D.app"
+    local status
+
+    write_stub_tools "$fake_bin"
+    mkdir -p "$game_app/Contents/MacOS" "$game_app/Contents/Frameworks/AGL.framework/Versions/A"
+    : > "$game_app/Contents/MacOS/Worms W.M.D"
+    chmod +x "$game_app/Contents/MacOS/Worms W.M.D"
+    if [[ "$create_binary" == "true" ]]; then
+        : > "$game_app/Contents/Frameworks/AGL.framework/Versions/A/AGL"
+    fi
+
+    set +e
+    output=$(
+        WORMS_TEST_MACOS_VERSION=26.0.1 \
+            WORMS_TEST_ARCH=arm64 \
+            WORMS_TEST_LIPO_ARCHS="$agl_archs" \
+            PATH="$fake_bin:$PATH" \
+            GAME_APP="$game_app" \
+            "$preflight" --quick 2>&1
+    )
+    status=$?
+    set -e
+
+    printf '%s\t%s\n%s\n' "$status" "$case_name" "$output"
 }
 
 if grep -Fq 'https://ads.t17service.com' "$preflight"; then
@@ -129,5 +160,24 @@ grep -Fq 'macOS 27 (Golden Gate) detected' <<< "$preflight_27_output" \
 if grep -Fq 'macOS 26 (Tahoe) detected' <<< "$preflight_27_output"; then
     fail "preflight incorrectly reports macOS 26 for macOS 27"
 fi
+
+missing_agl_output=$(run_preflight_agl_case "missing-binary" "x86_64" "false")
+missing_agl_status=${missing_agl_output%%$'\t'*}
+if [[ "$missing_agl_status" -eq 0 ]]; then
+    fail "preflight succeeded with an AGL.framework directory but no AGL binary"
+fi
+grep -Fq "AGL stub binary NOT installed" <<< "$missing_agl_output" \
+    || fail "preflight did not report the missing AGL binary"
+if grep -Fq "AGL stub installed" <<< "$missing_agl_output"; then
+    fail "preflight reported AGL installed when the binary was missing"
+fi
+
+wrong_agl_output=$(run_preflight_agl_case "wrong-arch" "arm64" "true")
+wrong_agl_status=${wrong_agl_output%%$'\t'*}
+if [[ "$wrong_agl_status" -eq 0 ]]; then
+    fail "preflight succeeded with an AGL stub missing x86_64"
+fi
+grep -Fq "AGL stub does not include x86_64 architecture (arch: arm64)" <<< "$wrong_agl_output" \
+    || fail "preflight did not report the wrong AGL architecture"
 
 printf 'Preflight regression check passed.\n'

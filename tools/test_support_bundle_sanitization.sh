@@ -34,6 +34,8 @@ grep -Fq 'oahd process' "$diagnostics_script" \
     || fail "diagnostics do not report oahd process status"
 grep -Fq 'game-test-tool status' "$diagnostics_script" \
     || fail "diagnostics do not report macOS 27 game-test-tool status"
+grep -Fq 'AGL stub missing x86_64 architecture' "$diagnostics_script" \
+    || fail "diagnostics do not fail AGL stubs that are missing x86_64"
 
 fake_game="/Users/privateperson/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
 external_game="/Volumes/Private Drive/privateperson@example.com/Worms W.M.D.app"

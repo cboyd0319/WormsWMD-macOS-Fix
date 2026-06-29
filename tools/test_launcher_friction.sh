@@ -46,11 +46,48 @@ grep -Fq "| \`7\` | Launch Worms W.M.D. |" "$readme" \
     || fail "README.md launcher options table is missing option 7"
 grep -Fq 'option 7 to launch Worms W.M.D' "$install_doc" \
     || fail "docs/INSTALL.md launcher option list is missing option 7"
+grep -Fq "GAME_APP=\"\$GAME_APP\" ./fix_worms_wmd.sh --force" "$ROOT_DIR/tools/watch_for_updates.sh" \
+    || fail "watcher daemon reapply does not forward GAME_APP"
+if ! grep -F "GAME_APP=\"\$GAME_APP\" ./fix_worms_wmd.sh" "$ROOT_DIR/tools/watch_for_updates.sh" | grep -Fvq -- "--force"; then
+    fail "watcher interactive reapply does not forward GAME_APP"
+fi
 
 grep -Fq 'macOS 26+ Fix Installer' "$ROOT_DIR/install.sh" \
     || fail "install.sh banner still uses stale macOS version wording"
 grep -Fq 'macOS 26+ and macOS 27 Golden Gate' "$ROOT_DIR/Install Fix.command" \
     || fail "Install Fix.command banner does not mention macOS 27 Golden Gate"
+
+watch_home="$tmp_dir/watch-home"
+watch_bin="$tmp_dir/watch-bin"
+watch_log="$tmp_dir/launchctl.log"
+custom_game_app="$tmp_dir/Custom & Path/Worms W.M.D.app"
+mkdir -p "$watch_home" "$watch_bin" "$custom_game_app/Contents/MacOS"
+: > "$custom_game_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$custom_game_app/Contents/MacOS/Worms W.M.D"
+cat > "$watch_bin/launchctl" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$WORMS_TEST_LAUNCHCTL_LOG"
+exit 0
+STUB
+chmod +x "$watch_bin/launchctl"
+
+HOME="$watch_home" \
+    GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$watch_log" \
+    PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --install >/dev/null \
+    || fail "watcher install failed with a custom GAME_APP"
+
+watch_plist="$watch_home/Library/LaunchAgents/com.wormswmd.fix.watcher.plist"
+[[ -f "$watch_plist" ]] || fail "watcher install did not create a LaunchAgent plist"
+grep -Fq '<key>EnvironmentVariables</key>' "$watch_plist" \
+    || fail "watcher LaunchAgent does not persist environment variables"
+grep -Fq '<key>GAME_APP</key>' "$watch_plist" \
+    || fail "watcher LaunchAgent does not persist GAME_APP"
+grep -Fq '<string>'"$tmp_dir"'/Custom &amp; Path/Worms W.M.D.app</string>' "$watch_plist" \
+    || fail "watcher LaunchAgent does not XML-escape and persist the custom GAME_APP"
+grep -Fq "bootstrap gui/" "$watch_log" \
+    || fail "watcher install did not attempt to bootstrap the LaunchAgent"
 
 printf 'q\n' | bash "$launcher" > "$tmp_dir/menu.out" 2>&1 \
     || fail "launcher did not accept piped menu input"

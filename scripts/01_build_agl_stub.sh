@@ -41,7 +41,7 @@ mkdir -p "$BUILD_DIR"
 
 # Compile for x86_64 (required for Rosetta 2 compatibility)
 echo "Compiling agl_stub.c for x86_64..."
-arch -x86_64 clang -arch x86_64 \
+clang -arch x86_64 \
     -dynamiclib \
     -o "$BUILD_DIR/AGL_x86_64" \
     -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \

@@ -76,10 +76,13 @@ EOF
 # Check if the fix is still applied
 check_fix_status() {
     local game_frameworks="$GAME_APP/Contents/Frameworks"
+    local game_plugins="$GAME_APP/Contents/PlugIns"
 
     # Quick checks for fix status
     local has_agl=false
     local has_qt515=false
+    local has_required_runtime=true
+    local required_fw
 
     # Check AGL stub (small file = stub)
     if [[ -f "$game_frameworks/AGL.framework/Versions/A/AGL" ]]; then
@@ -98,7 +101,18 @@ check_fix_status() {
         fi
     fi
 
-    if $has_agl && $has_qt515; then
+    for required_fw in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
+        if [[ ! -d "$game_frameworks/$required_fw.framework" ]]; then
+            has_required_runtime=false
+            break
+        fi
+    done
+    if [[ ! -f "$game_plugins/platforms/libqcocoa.dylib" ]] \
+        || [[ ! -f "$game_plugins/imageformats/libqsvg.dylib" ]]; then
+        has_required_runtime=false
+    fi
+
+    if $has_agl && $has_qt515 && $has_required_runtime; then
         echo "applied"
     elif $has_agl || $has_qt515; then
         echo "partial"
@@ -182,7 +196,7 @@ do_daemon() {
                         if prompt_reapply; then
                             echo "Reapplying fix..."
                             cd "$REPO_DIR"
-                            ./fix_worms_wmd.sh --force
+                            GAME_APP="$GAME_APP" ./fix_worms_wmd.sh --force
                             send_notification "Worms W.M.D Fix" "Fix successfully reapplied!"
                         fi
                         ;;
@@ -204,11 +218,12 @@ do_daemon() {
 do_install() {
     echo "Installing update watcher as LaunchAgent..."
     local launch_domain="gui/${UID}"
-    local watcher_path log_path
+    local watcher_path log_path game_app_path
 
     mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/WormsWMD-Fix"
     watcher_path=$(printf '%s' "${SCRIPT_DIR}/watch_for_updates.sh" | xml_escape)
     log_path=$(printf '%s' "${HOME}/Library/Logs/WormsWMD-Fix/watcher.log" | xml_escape)
+    game_app_path=$(printf '%s' "$GAME_APP" | xml_escape)
 
     # Create LaunchAgent plist
     cat > "$LAUNCH_AGENT_PATH" << EOF
@@ -223,6 +238,11 @@ do_install() {
         <string>${watcher_path}</string>
         <string>--daemon</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>GAME_APP</key>
+        <string>${game_app_path}</string>
+    </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
@@ -301,7 +321,7 @@ case "${1:-}" in
                 echo ""
                 if [[ ! "${REPLY:-}" =~ ^[Nn]$ ]]; then
                     cd "$REPO_DIR"
-                    ./fix_worms_wmd.sh
+                    GAME_APP="$GAME_APP" ./fix_worms_wmd.sh
                 fi
                 ;;
         esac

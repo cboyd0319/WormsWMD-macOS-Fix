@@ -31,6 +31,11 @@ the plan before continuing.
 
 ## Current Plans
 
+- [Full repository deep audit](2026-06-29-full-repo-deep-audit.md) - completed
+  repo-wide audit of installer, launcher, diagnostics, backup, release, CI, and
+  documentation behavior.
+- [Issue 12 AGL stub install failure](2026-06-29-issue-12-agl-stub-install.md) - completed
+  fix for missing AGL and required Qt runtime partial installs.
 - [macOS 27 Golden Gate compatibility](2026-06-22-macos-27-golden-gate.md) - completed
   full-repo compatibility and release-gate pass for macOS 27.
 - [Issue 11 game detection](2026-06-22-issue-11-game-detection.md) - completed

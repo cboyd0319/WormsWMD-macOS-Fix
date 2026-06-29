@@ -51,6 +51,8 @@ change.
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
 ./tools/test_issue_11_game_detection.sh
+./tools/test_issue_12_agl_install_failure.sh
+./tools/test_installer_rollback_regression.sh
 ./tools/test_support_bundle_sanitization.sh
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh

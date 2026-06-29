@@ -356,6 +356,31 @@ worms_validate_tree_symlinks() {
     return "$status"
 }
 
+worms_repair_agl_framework_symlinks() {
+    local root_dir="$1"
+    local agl_framework="$root_dir/Frameworks/AGL.framework"
+    local link_path
+
+    [[ -d "$agl_framework" ]] || return 0
+    [[ -f "$agl_framework/Versions/A/AGL" ]] || return 0
+
+    for link_path in \
+        "$agl_framework/AGL" \
+        "$agl_framework/Resources" \
+        "$agl_framework/Versions/Current" \
+        "$agl_framework/Versions/A/A" \
+        "$agl_framework/Versions/A/Resources/Resources"; do
+        if [[ -L "$link_path" ]]; then
+            rm -f "$link_path"
+        fi
+    done
+
+    mkdir -p "$agl_framework/Versions/A/Resources"
+    [[ -e "$agl_framework/Versions/Current" ]] || ln -s A "$agl_framework/Versions/Current"
+    [[ -e "$agl_framework/AGL" ]] || ln -s Versions/Current/AGL "$agl_framework/AGL"
+    [[ -e "$agl_framework/Resources" ]] || ln -s Versions/Current/Resources "$agl_framework/Resources"
+}
+
 worms_validate_game_app_for_mutation() {
     local game_app="$1"
     local root_real contents contents_real path path_real

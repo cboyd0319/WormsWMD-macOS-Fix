@@ -48,6 +48,16 @@ macos_product_version() {
     sw_vers -productVersion 2>/dev/null || echo "unknown"
 }
 
+restore_assume_yes() {
+    case "${WORMSWMD_RESTORE_ASSUME_YES:-}" in
+        1|true|TRUE|yes|YES|y|Y)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
 print_help() {
     cat << 'EOF'
 Worms W.M.D - Save Game Backup Tool
@@ -163,8 +173,12 @@ restore_target_for_manifest_path() {
 verify_restored_saves() {
     local manifest="$TEMP_DIR/$SAVE_MANIFEST_NAME"
     local expected_hash expected_size rel_path target actual_hash actual_size status=0
+    local expected_rel_file actual_rel_file extra_rel user_dir user_id target_dir
 
     [[ -f "$manifest" ]] || return 0
+
+    expected_rel_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-save-expected.XXXXXX")
+    actual_rel_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-save-actual.XXXXXX")
 
     while IFS=$'\t' read -r expected_hash expected_size rel_path extra; do
         [[ -n "${expected_hash:-}" ]] || continue
@@ -186,9 +200,58 @@ verify_restored_saves() {
             echo -e "${YELLOW}WARNING:${NC} Restored file does not match backup manifest: $rel_path"
             status=1
         fi
+        printf '%s\n' "$rel_path" >> "$expected_rel_file"
     done < "$manifest"
 
+    if [[ -d "$TEMP_DIR/Team17" ]] && [[ -d "$TEAM17_SAVES" ]]; then
+        (
+            cd "$TEAM17_SAVES" || exit 1
+            find . -type f -print 2>/dev/null | sed 's#^\./#Team17/#'
+        ) >> "$actual_rel_file"
+    fi
+
+    if [[ -d "$TEMP_DIR/Steam" ]]; then
+        for user_dir in "$TEMP_DIR/Steam"/*; do
+            [[ -d "$user_dir" ]] || continue
+            user_id=$(basename "$user_dir")
+            target_dir="$STEAM_SAVES/$user_id/327030"
+            [[ -d "$target_dir" ]] || continue
+            (
+                cd "$target_dir" || exit 1
+                find . -type f -print 2>/dev/null | sed "s#^\./#Steam/$user_id/#"
+            ) >> "$actual_rel_file"
+        done
+    fi
+
+    LC_ALL=C sort -u "$expected_rel_file" -o "$expected_rel_file"
+    LC_ALL=C sort -u "$actual_rel_file" -o "$actual_rel_file"
+    extra_rel=$(comm -13 "$expected_rel_file" "$actual_rel_file" | head -1 || true)
+    if [[ -n "$extra_rel" ]]; then
+        echo -e "${YELLOW}WARNING:${NC} Restore left an unexpected file: $extra_rel"
+        status=1
+    fi
+
+    rm -f "$expected_rel_file" "$actual_rel_file"
+
     return "$status"
+}
+
+replace_save_tree() {
+    local source_dir="$1"
+    local target_dir="$2"
+    local target_parent target_base temp_target
+
+    target_parent=$(dirname "$target_dir")
+    target_base=$(basename "$target_dir")
+
+    mkdir -p "$target_parent"
+    temp_target=$(mktemp -d "$target_parent/.${target_base}.restore.XXXXXX")
+    if ! cp -R "$source_dir/." "$temp_target/"; then
+        rm -rf "$temp_target"
+        return 1
+    fi
+    rm -rf "$target_dir"
+    mv "$temp_target" "$target_dir"
 }
 
 # Create backup
@@ -291,12 +354,16 @@ do_restore() {
 
     echo -e "${YELLOW}WARNING: This will overwrite your current save games!${NC}"
     echo ""
-    read -p "Continue? [y/N] " -n 1 -r < /dev/tty
-    echo ""
+    if restore_assume_yes; then
+        echo "Continuing because WORMSWMD_RESTORE_ASSUME_YES is set."
+    else
+        read -p "Continue? [y/N] " -n 1 -r < /dev/tty
+        echo ""
 
-    if [[ ! "${REPLY:-}" =~ ^[Yy]$ ]]; then
-        echo "Restore cancelled."
-        exit 0
+        if [[ ! "${REPLY:-}" =~ ^[Yy]$ ]]; then
+            echo "Restore cancelled."
+            exit 0
+        fi
     fi
 
     echo ""
@@ -322,8 +389,7 @@ do_restore() {
     # Restore Team17 saves
     if [[ -d "$TEMP_DIR/Team17" ]]; then
         echo "Restoring Team17 saves..."
-        mkdir -p "$TEAM17_SAVES"
-        cp -R "$TEMP_DIR/Team17/." "$TEAM17_SAVES/"
+        replace_save_tree "$TEMP_DIR/Team17" "$TEAM17_SAVES"
     fi
 
     # Restore Steam saves
@@ -335,8 +401,7 @@ do_restore() {
                 local target_dir="$STEAM_SAVES/$user_id/327030"
 
                 echo "Restoring Steam saves for user $user_id..."
-                mkdir -p "$target_dir"
-                cp -R "$user_dir/." "$target_dir/"
+                replace_save_tree "$user_dir" "$target_dir"
             fi
         done
     fi

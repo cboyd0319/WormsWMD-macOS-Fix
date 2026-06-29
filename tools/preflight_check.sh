@@ -250,14 +250,20 @@ check_info "Bundle size: $bundle_size"
 section "Fix Status"
 
 FRAMEWORKS_DIR="$GAME_APP/Contents/Frameworks"
+PLUGINS_DIR="$GAME_APP/Contents/PlugIns"
 
 # Check AGL stub
-if [[ -d "$FRAMEWORKS_DIR/AGL.framework" ]]; then
-    agl_arch=$(binary_archs "$FRAMEWORKS_DIR/AGL.framework/Versions/A/AGL")
-    check_pass "AGL stub installed (arch: $agl_arch)"
+agl_stub="$FRAMEWORKS_DIR/AGL.framework/Versions/A/AGL"
+if [[ -f "$agl_stub" ]]; then
+    agl_arch=$(binary_archs "$agl_stub")
+    if echo "$agl_arch" | tr ' ' '\n' | grep -qx "x86_64"; then
+        check_pass "AGL stub installed (arch: $agl_arch)"
+    else
+        check_fail "AGL stub does not include x86_64 architecture (arch: $agl_arch)"
+    fi
 else
     if [[ "$macos_major" =~ ^[0-9]+$ ]] && [[ "$macos_major" -ge 26 ]]; then
-        check_fail "AGL stub NOT installed - game will not launch on macOS 26+"
+        check_fail "AGL stub binary NOT installed - game will not launch on macOS 26+"
     else
         check_info "AGL stub not installed (may not be needed)"
     fi
@@ -289,6 +295,14 @@ else
     check_fail "QtCore framework not found"
 fi
 
+for required_fw in QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
+    if [[ -d "$FRAMEWORKS_DIR/$required_fw.framework" ]]; then
+        check_pass "$required_fw.framework present"
+    else
+        check_fail "$required_fw.framework not found"
+    fi
+done
+
 # Check for AGL dependencies in Qt
 if [[ -f "$FRAMEWORKS_DIR/QtGui.framework/Versions/5/QtGui" ]]; then
     if $HAVE_OTOOL; then
@@ -302,6 +316,18 @@ if [[ -f "$FRAMEWORKS_DIR/QtGui.framework/Versions/5/QtGui" ]]; then
     fi
 else
     check_warn "QtGui framework not found"
+fi
+
+if [[ -f "$PLUGINS_DIR/platforms/libqcocoa.dylib" ]]; then
+    check_pass "Qt platform plugin present"
+else
+    check_fail "Qt platform plugin not found"
+fi
+
+if [[ -f "$PLUGINS_DIR/imageformats/libqsvg.dylib" ]]; then
+    check_pass "Qt SVG image plugin present"
+else
+    check_fail "Qt SVG image plugin not found"
 fi
 
 # Check code signing

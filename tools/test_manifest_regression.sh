@@ -36,4 +36,24 @@ if worms_verify_manifest "$tmp_dir" "$manifest" 2>/dev/null; then
     fail "manifest verification did not detect file corruption"
 fi
 
+agl_root="$tmp_dir/agl-root"
+mkdir -p "$agl_root/Frameworks/AGL.framework/Versions/A/Resources"
+printf 'fake agl\n' > "$agl_root/Frameworks/AGL.framework/Versions/A/AGL"
+ln -s A "$agl_root/Frameworks/AGL.framework/Versions/Current"
+ln -s Versions/Current/AGL "$agl_root/Frameworks/AGL.framework/AGL"
+ln -s Versions/Current/Resources "$agl_root/Frameworks/AGL.framework/Resources"
+ln -s A "$agl_root/Frameworks/AGL.framework/Versions/A/A"
+ln -s Versions/Current/Resources "$agl_root/Frameworks/AGL.framework/Versions/A/Resources/Resources"
+
+if worms_validate_tree_symlinks "$agl_root" 2>/dev/null; then
+    fail "stale nested AGL framework symlinks unexpectedly passed validation before repair"
+fi
+worms_repair_agl_framework_symlinks "$agl_root"
+worms_validate_tree_symlinks "$agl_root" \
+    || fail "repaired AGL framework symlinks did not pass validation"
+[[ ! -L "$agl_root/Frameworks/AGL.framework/Versions/A/A" ]] \
+    || fail "AGL symlink repair left nested Versions/A/A"
+[[ ! -L "$agl_root/Frameworks/AGL.framework/Versions/A/Resources/Resources" ]] \
+    || fail "AGL symlink repair left nested Resources/Resources"
+
 printf 'Manifest regression check passed.\n'

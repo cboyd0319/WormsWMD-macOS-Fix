@@ -74,11 +74,18 @@ must verify it before copying files back and must verify the restored files
 afterward. Backups without a manifest are legacy backups and may be restored
 only with an explicit warning.
 
+Backup creation may repair the fixer's own stale AGL framework symlink layout
+inside the backup copy before manifest validation. This self-heals repeated
+installs from older fixer versions without mutating save data or trusting
+symlinks that escape the backup root.
+
 Save-game backup behavior belongs to `tools/backup_saves.sh` and must remain
 separate from game-bundle restore behavior. Save-game archives must validate
 their tar layout and entry metadata before extraction, reject symlinks,
-hardlinks, and special files, verify `MANIFEST.tsv` when present, and warn when
-restoring older archives that do not include a manifest.
+hardlinks, and special files, verify `MANIFEST.tsv` when present, restore
+backed-up save roots from a temporary copy before replacing the target, detect
+stale files that were absent from the backup, and warn when restoring older
+archives that do not include a manifest.
 
 ## Qt Distribution Contract
 
@@ -97,6 +104,13 @@ When replacing the Qt archive:
   slices.
 - Run the packaging or install verification relevant to the change.
 - Update user docs if the version, source, or fallback behavior changes.
+
+Installer and verifier success requires the runtime pieces the game needs to
+launch: an AGL stub binary with an x86_64 slice, QtCore, QtGui, QtWidgets,
+QtOpenGL, QtPrintSupport, QtDBus, QtSvg, `PlugIns/platforms/libqcocoa.dylib`,
+`PlugIns/imageformats/libqsvg.dylib`, and the required bundled Qt dependency
+dylibs. Missing required runtime inputs must fail before destructive replacement
+where possible, and post-backup failures must trigger rollback.
 
 When multiple local Qt packages are present, scripts should choose the highest
 verified supported Qt 5.15.x version rather than the newest file by modification
@@ -171,6 +185,8 @@ For source-only changes, use the checks that match the blast radius:
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
 ./tools/test_issue_11_game_detection.sh
+./tools/test_issue_12_agl_install_failure.sh
+./tools/test_installer_rollback_regression.sh
 ./tools/test_support_bundle_sanitization.sh
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh

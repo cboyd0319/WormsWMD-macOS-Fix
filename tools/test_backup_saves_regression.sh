@@ -52,4 +52,22 @@ for expected in \
     fi
 done
 
+printf 'corrupt team17\n' > "$team17_dir/visible-team17"
+printf 'stale team17\n' > "$team17_dir/stale-team17"
+printf 'corrupt steam\n' > "$steam_dir/visible-steam"
+printf 'stale steam\n' > "$steam_dir/stale-steam"
+
+HOME="$test_home" BACKUP_DIR="$backup_dir" WORMSWMD_RESTORE_ASSUME_YES=1 \
+    "$ROOT_DIR/tools/backup_saves.sh" --restore "$archive" >/dev/null \
+    || fail "save restore failed"
+
+grep -Fxq 'team17 visible' "$team17_dir/visible-team17" \
+    || fail "Team17 save file was not restored from backup"
+grep -Fxq 'steam visible' "$steam_dir/visible-steam" \
+    || fail "Steam save file was not restored from backup"
+[[ ! -e "$team17_dir/stale-team17" ]] \
+    || fail "Team17 restore left a file that was absent from the backup"
+[[ ! -e "$steam_dir/stale-steam" ]] \
+    || fail "Steam restore left a file that was absent from the backup"
+
 printf 'Save backup regression check passed.\n'

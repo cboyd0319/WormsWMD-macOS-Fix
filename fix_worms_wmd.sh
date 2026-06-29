@@ -21,7 +21,7 @@
 #   - Pre-built Qt frameworks are downloaded automatically
 #
 
-set -euo pipefail
+set -Eeuo pipefail
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do
@@ -400,6 +400,7 @@ cleanup() {
 write_game_backup_manifest() {
     local backup_dir="$1"
 
+    worms_repair_agl_framework_symlinks "$backup_dir"
     worms_validate_tree_symlinks "$backup_dir"
     worms_write_manifest "$backup_dir" "$backup_dir/$BACKUP_MANIFEST_NAME" \
         Frameworks \
@@ -785,9 +786,12 @@ detect_qt_source() {
 
 check_already_applied() {
     local game_frameworks="$GAME_APP/Contents/Frameworks"
+    local game_plugins="$GAME_APP/Contents/PlugIns"
     local has_agl=false
     local has_qt=false
     local has_deps=false
+    local has_required_runtime=true
+    local required_fw
 
     # Check for AGL stub
     if [[ -f "$game_frameworks/AGL.framework/Versions/A/AGL" ]]; then
@@ -828,7 +832,18 @@ check_already_applied() {
         has_deps=true
     fi
 
-    if $has_agl && $has_qt && $has_deps; then
+    for required_fw in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
+        if [[ ! -d "$game_frameworks/$required_fw.framework" ]]; then
+            has_required_runtime=false
+            break
+        fi
+    done
+    if [[ ! -f "$game_plugins/platforms/libqcocoa.dylib" ]] \
+        || [[ ! -f "$game_plugins/imageformats/libqsvg.dylib" ]]; then
+        has_required_runtime=false
+    fi
+
+    if $has_agl && $has_qt && $has_deps && $has_required_runtime; then
         echo "yes"
     elif $has_agl || $has_qt || $has_deps; then
         echo "partial"
@@ -1359,15 +1374,31 @@ do_fix() {
     # Fix Info.plist
     if [[ -f "$SCRIPTS_DIR/06_fix_info_plist.sh" ]]; then
         chmod +x "$SCRIPTS_DIR/06_fix_info_plist.sh"
-        "$SCRIPTS_DIR/06_fix_info_plist.sh" > /dev/null 2>&1 || true
-        print_substep "Info.plist updated (bundle ID, HiDPI, min version)"
+        local info_plist_output
+        if info_plist_output=$("$SCRIPTS_DIR/06_fix_info_plist.sh" 2>&1); then
+            print_substep "Info.plist updated (bundle ID, HiDPI, min version)"
+        else
+            print_error "Info.plist update failed"
+            echo "$info_plist_output" | head -5 | while read -r line; do
+                [[ -n "$line" ]] && print_substep "$line"
+            done || true
+            return 1
+        fi
     fi
 
     # Fix config URLs
     if [[ -f "$SCRIPTS_DIR/07_fix_config_urls.sh" ]]; then
         chmod +x "$SCRIPTS_DIR/07_fix_config_urls.sh"
-        "$SCRIPTS_DIR/07_fix_config_urls.sh" > /dev/null 2>&1 || true
-        print_substep "Config URLs secured (HTTP→HTTPS)"
+        local config_output
+        if config_output=$("$SCRIPTS_DIR/07_fix_config_urls.sh" 2>&1); then
+            print_substep "Config URLs secured (HTTP→HTTPS)"
+        else
+            print_error "Config URL update failed"
+            echo "$config_output" | head -5 | while read -r line; do
+                [[ -n "$line" ]] && print_substep "$line"
+            done || true
+            return 1
+        fi
     fi
 
     # ============================================================
