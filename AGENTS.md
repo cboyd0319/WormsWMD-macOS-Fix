@@ -63,6 +63,10 @@ shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.co
 for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
 ./fix_worms_wmd.sh --dry-run
+./scripts/download_qt_frameworks.sh --check
+./tools/package_qt_frameworks.sh --help
+./tools/collect_diagnostics.sh --help
+./tools/backup_saves.sh --help
 ./tools/build_release_bundle.sh --version local-smoke --skip-zip
 clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
 ```

@@ -18,7 +18,8 @@ files or official Team17/Worms artwork.
 
 For most players:
 
-1. Download the [latest release zip](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest).
+1. Open the [latest release page](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest) and download
+   `WormsWMD-macOS-Fix-v1.7.3.zip`.
 2. Unzip it.
 3. Double-click `Worms W.M.D Fix.command`.
 4. Press `1`.
@@ -56,9 +57,10 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 | Developer tools | `git`, usually provided by the Xcode Command Line Tools. |
 | Internet | Needed for the one-line installer, updates, and optional checks. |
 
-Earlier macOS versions usually do not need the AGL fix, but macOS 15.x players
-with keyboard buffering or lag may still benefit from the Qt 5.15 runtime
-refresh.
+This release targets macOS 26 Tahoe and later. Earlier macOS versions usually
+do not need the AGL fix. There is one confirmed macOS 15.7.3 report that the Qt
+5.15 refresh improved keyboard buffering or lag, but macOS 15.x is not a
+validated support target for v1.7.3.
 
 On macOS 27 Golden Gate, Rosetta may need to be installed again after an
 upgrade. The preview command reports this without changing your Mac; the game
@@ -137,8 +139,8 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3
 
 With no command-line flags and an interactive Terminal, this opens the same
 launcher menu as the release zip. The bootstrap is pinned to release `v1.7.3`
-by default. The post-release mainline bootstrap pins the exact release commit
-after the tag exists.
+by default. The current mainline bootstrap also verifies the exact `v1.7.3`
+tag target commit before running the launcher.
 
 ## Pre-Flight Check
 
