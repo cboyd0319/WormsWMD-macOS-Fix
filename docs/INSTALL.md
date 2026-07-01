@@ -56,9 +56,9 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.4
 With no command-line flags and an interactive Terminal, `install.sh` opens the
 same friendly launcher menu. When flags are provided, it forwards them directly
 to `fix_worms_wmd.sh`. By default, the bootstrap pins the cloned repository to
-release `v1.7.4`. The release-tag bootstrap pins the tag and the next mainline
-maintenance commit pins the exact release commit after the tag exists.
-Non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1`.
+release `v1.7.4`. The release-tag bootstrap pins the tag and the mainline
+maintenance bootstrap verifies the exact release commit. Non-default refs
+require `WORMSWMD_ALLOW_UNPINNED_REF=1`.
 
 ## Preview changes
 

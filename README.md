@@ -139,9 +139,8 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.4
 
 With no command-line flags and an interactive Terminal, this opens the same
 launcher menu as the release zip. The bootstrap is pinned to release `v1.7.4`
-by default. The `v1.7.4` raw tag bootstrap pins the release tag; the follow-up
-mainline maintenance commit should pin the exact `v1.7.4` tag target commit
-after the tag exists.
+by default. The `v1.7.4` raw tag bootstrap pins the release tag, and the
+mainline maintenance bootstrap verifies the exact `v1.7.4` tag target commit.
 
 ## Pre-Flight Check
 

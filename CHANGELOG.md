@@ -6,6 +6,13 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No user-facing changes yet.
 
+## Mainline maintenance after 1.7.4 (2026-07-01)
+
+### Security
+- Pinned mainline bootstrap commit verification to the `v1.7.4` tag target.
+  This follow-up commit lives on `main` after the `v1.7.4` release tag so
+  one-line installers can verify the exact release commit.
+
 ## 1.7.4 (2026-07-01)
 
 ### Added
@@ -23,8 +30,8 @@ No user-facing changes yet.
 - Updated installer, launcher, README, install, trust, security, runtime
   contract, runbook, tools, harness, and issue-template release surfaces for
   v1.7.4.
-- Kept release-tag bootstrap commit pins empty for the v1.7.4 tag commit; the
-  follow-up mainline maintenance commit should pin the exact tag target.
+- Kept release-tag bootstrap commit pins empty for the v1.7.4 tag commit;
+  exact pinning is recorded in the following mainline maintenance entry.
 - Shared the config-file inventory used by backup, rollback, URL mutation, and
   verification so the restore contract matches the mutating surface.
 
