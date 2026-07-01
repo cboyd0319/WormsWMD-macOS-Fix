@@ -6,6 +6,48 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No user-facing changes yet.
 
+## 1.7.4 (2026-07-01)
+
+### Added
+- Added regression coverage for bootstrap install path safety, game-bundle
+  mutation boundaries, log-path side effects, hardlinked log refusal, optional
+  WebP dependency parsing, GOG discovery, rollback, launch-helper reapply, and
+  issue-driven installer failure paths.
+- Added a repo-local `.agents` layer and stricter harness validation for agent
+  instructions, docs topology, local-path hygiene, CI regression coverage,
+  CODEOWNERS coverage, and full-SHA GitHub Actions pins.
+- Added a completed post-1.7.3 audit execution plan that records the issue
+  review, fixes, live Steam validation, and release-gate evidence.
+
+### Changed
+- Updated installer, launcher, README, install, trust, security, runtime
+  contract, runbook, tools, harness, and issue-template release surfaces for
+  v1.7.4.
+- Kept release-tag bootstrap commit pins empty for the v1.7.4 tag commit; the
+  follow-up mainline maintenance commit should pin the exact tag target.
+- Shared the config-file inventory used by backup, rollback, URL mutation, and
+  verification so the restore contract matches the mutating surface.
+
+### Fixed
+- Fixed dry-run and verify game discovery so Steam, GOG, custom `GAME_APP`, and
+  empty `GAME_APP` cases behave consistently with the apply path.
+- Fixed noninteractive multiple-install discovery so ambiguous installs fail
+  with guidance instead of silently choosing a target.
+- Fixed launcher `--check-fix` reapply so custom `GAME_APP` paths are preserved.
+- Fixed rollback coverage for `DataOSX` and `CommonData` config files,
+  including `PcLanConfig.txt`.
+- Fixed mutation safety so existing critical bundle paths must be directories
+  inside `Contents`, and symlinked or hardlinked config files are refused before
+  any URL rewrite.
+- Fixed bootstrap installer safety so `INSTALL_DIR` values that resolve through
+  symlinks or `..` into system paths are rejected after normalization.
+- Fixed logging side effects so rejected `LOG_DIR` and `LOG_FILE` values do not
+  create directories outside `~/Library/Logs`.
+- Fixed launcher logging so safe nested log files under `~/Library/Logs` still
+  work while hardlinked log files are refused.
+- Fixed launcher crash-report directory creation so it only happens when
+  logging and crash reporting are enabled.
+
 ## Mainline maintenance after 1.7.3 (2026-06-29)
 
 ### Security

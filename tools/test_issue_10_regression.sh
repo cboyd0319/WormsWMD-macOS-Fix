@@ -113,4 +113,56 @@ fi
     [[ "$first_log" != "$second_log" ]]
 ) || fail "default log path generation can reuse an existing log path"
 
+(
+    HOME="$tmp_dir/log-dir-home"
+    mkdir -p "$HOME/Library/Logs"
+    LOG_DIR="$HOME/Library/Logs/../OutsideLogs"
+    LOG_FILE=""
+    set +e
+    worms_prepare_log_file "fix_worms_wmd" >/dev/null 2>&1
+    status=$?
+    set -e
+    [[ "$status" -ne 0 ]] || exit 1
+    [[ ! -e "$HOME/Library/OutsideLogs" ]]
+) || fail "rejected LOG_DIR created a directory outside ~/Library/Logs"
+
+(
+    HOME="$tmp_dir/log-file-home"
+    mkdir -p "$HOME/Library/Logs"
+    LOG_DIR=""
+    LOG_FILE="$HOME/Library/Logs/../OutsideLogFile/fix.log"
+    set +e
+    worms_prepare_log_file "fix_worms_wmd" >/dev/null 2>&1
+    status=$?
+    set -e
+    [[ "$status" -ne 0 ]] || exit 1
+    [[ ! -e "$HOME/Library/OutsideLogFile" ]]
+) || fail "rejected LOG_FILE created a directory outside ~/Library/Logs"
+
+(
+    HOME="$tmp_dir/safe-nested-log-home"
+    mkdir -p "$HOME/Library/Logs"
+    LOG_DIR=""
+    LOG_FILE="$HOME/Library/Logs/WormsWMD-Fix/Nested/fix.log"
+    worms_prepare_log_file "fix_worms_wmd" >/dev/null 2>&1
+    [[ "$LOG_FILE" == "$HOME/Library/Logs/WormsWMD-Fix/Nested/fix.log" ]]
+    [[ -d "$HOME/Library/Logs/WormsWMD-Fix/Nested" ]]
+) || fail "safe nested LOG_FILE under ~/Library/Logs was rejected"
+
+(
+    HOME="$tmp_dir/hardlinked-log-home"
+    mkdir -p "$HOME/Library/Logs"
+    outside_log_peer="$HOME/outside-log-peer.txt"
+    hardlinked_log="$HOME/Library/Logs/hardlinked.log"
+    printf 'outside peer\n' > "$outside_log_peer"
+    ln "$outside_log_peer" "$hardlinked_log"
+    LOG_DIR=""
+    LOG_FILE="$hardlinked_log"
+    set +e
+    worms_prepare_log_file "fix_worms_wmd" >/dev/null 2>&1
+    status=$?
+    set -e
+    [[ "$status" -ne 0 ]] || exit 1
+) || fail "hardlinked LOG_FILE was accepted"
+
 printf 'Issue #10 regression check passed.\n'

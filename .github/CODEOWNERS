@@ -2,7 +2,11 @@
 
 * @cboyd0319
 
+/.agents/** @cboyd0319
+/.github/** @cboyd0319
+/.github/ISSUE_TEMPLATE/** @cboyd0319
 /.github/workflows/** @cboyd0319
+/AGENTS.md @cboyd0319
 /install.sh @cboyd0319
 /fix_worms_wmd.sh @cboyd0319
 /*.command @cboyd0319
@@ -11,4 +15,8 @@
 /src/** @cboyd0319
 /dist/** @cboyd0319
 /SECURITY.md @cboyd0319
+/docs/design/runtime-contracts.md @cboyd0319
+/docs/runbooks/agent-session.md @cboyd0319
+/docs/style/agent-harness.md @cboyd0319
+/docs/exec-plans/** @cboyd0319
 /docs/TRUST.md @cboyd0319

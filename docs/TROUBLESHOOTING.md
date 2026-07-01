@@ -59,7 +59,7 @@ Gatekeeper blocks `.command` files downloaded from the internet. Try these optio
 
 5. **Use the one-liner instead:**
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.4/install.sh | bash
    ```
    Requires `git` (installed by Xcode Command Line Tools).
 

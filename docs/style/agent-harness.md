@@ -5,6 +5,16 @@ constraints, tools, state, validation, observation, and review. For this repo,
 the rule is simple: make the project legible, keep work bounded, and make
 correctness observable from files and commands in the repository.
 
+## Five Subsystems
+
+| Subsystem | Owner files | Purpose | Enforced by |
+| --- | --- | --- | --- |
+| Instructions | `AGENTS.md`, `.agents/`, `.github/copilot-instructions.md`, `docs/` | Tell agents where facts live and what is non-negotiable. | `./tools/validate_harness.sh` required-file, marker, link, and line-cap gates |
+| Tools | `tools/`, `scripts/`, `.github/workflows/` | Provide repeatable checks instead of remembered workflows. | CI, ShellCheck, `bash -n`, focused regression scripts |
+| Environment | `dist/`, checksums, workflows, release scripts | Keep runtime inputs reproducible and auditable. | Qt checksum checks, release bundle manifests, pinned actions |
+| State | `docs/exec-plans/`, docs index, git history | Preserve active work, decisions, surprises, and verification evidence. | execution-plan status and docs-index gates |
+| Feedback | tests, dry-run, verify, preflight, diagnostics, launch smoke | Prove behavior from runnable evidence. | focused checks plus macOS runtime validation when available |
+
 ## Entry Points Stay Short
 
 - `AGENTS.md` is a map, not a manual.
@@ -66,6 +76,26 @@ Agents need local evidence, not only advice. When debugging, collect or point to
 
 Do not paste secrets or unredacted private config values into docs, issues, or
 reports.
+
+## Harness Change Rules
+
+- Add the smallest artifact that fixes the observed failure mode.
+- Prefer mechanical gates over repeated prose reminders.
+- Keep root `AGENTS.md` short; route durable detail to `docs/` or `.agents/`.
+- Treat agent rules, GitHub workflows, release tooling, and harness validation
+  as security-sensitive.
+- Use repo-relative paths, generic `$HOME` or `~` examples, and canonical URLs
+  in tracked artifacts.
+
+## Clean-State Checklist
+
+Before ending substantial harness work:
+
+- `./tools/validate_harness.sh` passed.
+- Required docs and execution-plan indexes link new Markdown files.
+- Changed harness rules are backed by a mechanical check where practical.
+- Required validation commands ran, or the gap is named in the handoff.
+- No generated logs, diagnostics, local paths, or support bundles are staged.
 
 ## Review The Harness
 

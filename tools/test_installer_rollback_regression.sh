@@ -175,3 +175,157 @@ backup_count=$(find "$test_home/Documents" -mindepth 1 -maxdepth 1 -type d -name
 [[ "$backup_count" == "1" ]] || fail "expected one preserved rollback backup, found $backup_count"
 
 printf 'Installer rollback regression check passed.\n'
+
+config_home="$tmp_dir/config-home"
+config_fake_bin="$tmp_dir/config-bin"
+config_game_app="$config_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+
+mkdir -p \
+    "$config_fake_bin" \
+    "$config_game_app/Contents/MacOS" \
+    "$config_game_app/Contents/Frameworks" \
+    "$config_game_app/Contents/PlugIns/platforms" \
+    "$config_game_app/Contents/PlugIns/imageformats" \
+    "$config_game_app/Contents/Resources/DataOSX" \
+    "$config_game_app/Contents/Resources/CommonData"
+
+printf '#!/bin/bash\nexit 0\n' > "$config_game_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$config_game_app/Contents/MacOS/Worms W.M.D"
+printf 'original framework\n' > "$config_game_app/Contents/Frameworks/original-framework.txt"
+printf 'original platform plugin\n' > "$config_game_app/Contents/PlugIns/platforms/original-platform.dylib"
+printf 'original image plugin\n' > "$config_game_app/Contents/PlugIns/imageformats/original-image.dylib"
+printf '<plist version="1.0"><dict></dict></plist>\n' > "$config_game_app/Contents/Info.plist"
+printf 'URL_Internal = "http://xom.team17.com"\n' > "$config_game_app/Contents/Resources/DataOSX/SteamConfig.txt"
+printf 'URL_Internal = "http://xom.team17.com"\n' > "$config_game_app/Contents/Resources/DataOSX/PcLanConfig.txt"
+printf 'MainUrl = "http://www.google-analytics.com"\n' > "$config_game_app/Contents/Resources/CommonData/AnalyticsConfig.txt"
+config_pclan_original=$(cat "$config_game_app/Contents/Resources/DataOSX/PcLanConfig.txt")
+
+cat > "$config_fake_bin/sw_vers" <<'STUB'
+#!/bin/bash
+case "${1:-}" in
+    -productName) printf '%s\n' "macOS" ;;
+    -productVersion) printf '%s\n' "26.0.1" ;;
+    -buildVersion) printf '%s\n' "99A999" ;;
+    *) exit 1 ;;
+esac
+STUB
+
+cat > "$config_fake_bin/uname" <<'STUB'
+#!/bin/bash
+printf '%s\n' "x86_64"
+STUB
+
+cat > "$config_fake_bin/arch" <<'STUB'
+#!/bin/bash
+if [[ "${1:-}" == "-x86_64" ]]; then
+    shift
+fi
+exec "$@"
+STUB
+
+cat > "$config_fake_bin/clang" <<'STUB'
+#!/bin/bash
+out=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -o)
+            out="${2:-}"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+[[ -n "$out" ]] || exit 1
+mkdir -p "$(dirname "$out")"
+printf 'fake macho\n' > "$out"
+exit 0
+STUB
+
+cat > "$config_fake_bin/lipo" <<'STUB'
+#!/bin/bash
+case "${1:-}" in
+    -create)
+        out=""
+        while [[ $# -gt 0 ]]; do
+            if [[ "$1" == "-output" ]]; then
+                out="${2:-}"
+                break
+            fi
+            shift
+        done
+        [[ -n "$out" ]] || exit 1
+        printf 'fake universal macho\n' > "$out"
+        ;;
+    -archs)
+        if [[ "${2:-}" == *"AGL.framework"* ]]; then
+            printf '%s\n' "arm64"
+        else
+            printf '%s\n' "x86_64"
+        fi
+        ;;
+    -info)
+        printf '%s\n' "Architectures in the fat file: ${2:-binary} are: x86_64 arm64"
+        ;;
+    *)
+        exit 1
+        ;;
+esac
+STUB
+
+cat > "$config_fake_bin/file" <<'STUB'
+#!/bin/bash
+printf '%s: Mach-O universal binary with 2 architectures\n' "${1:-binary}"
+STUB
+
+cat > "$config_fake_bin/otool" <<'STUB'
+#!/bin/bash
+if [[ "${1:-}" == "-L" ]]; then
+    printf '%s:\n' "${2:-binary}"
+    printf '\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
+    exit 0
+fi
+exit 1
+STUB
+
+cat > "$config_fake_bin/install_name_tool" <<'STUB'
+#!/bin/bash
+exit 0
+STUB
+
+cat > "$config_fake_bin/codesign" <<'STUB'
+#!/bin/bash
+exit 0
+STUB
+
+cat > "$config_fake_bin/xattr" <<'STUB'
+#!/bin/bash
+exit 0
+STUB
+
+chmod +x "$config_fake_bin"/*
+
+set +e
+config_output=$(
+    HOME="$config_home" \
+        PATH="$config_fake_bin:$PATH" \
+        GAME_APP="$config_game_app" \
+        "$ROOT_DIR/fix_worms_wmd.sh" --force 2>&1
+)
+config_status=$?
+set -e
+
+if [[ "$config_status" -eq 0 ]]; then
+    fail "installer succeeded even though AGL verification was forced to fail"
+fi
+
+grep -Fq "Rolled back to original state." <<< "$config_output" \
+    || fail "post-config failure did not report successful rollback: $config_output"
+
+config_pclan_after=$(cat "$config_game_app/Contents/Resources/DataOSX/PcLanConfig.txt")
+if [[ "$config_pclan_after" != "$config_pclan_original" ]]; then
+    fail "PcLanConfig.txt was not restored after rollback"
+fi
+
+printf 'Installer config rollback regression check passed.\n'

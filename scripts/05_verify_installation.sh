@@ -367,15 +367,15 @@ check_config_urls() {
 }
 
 if [ -d "$data_dir" ]; then
-    for config_file in SteamConfig.txt SteamConfigDemo.txt GOGConfig.txt; do
+    while IFS= read -r config_file; do
         check_config_urls "$data_dir/$config_file" "DataOSX/$config_file"
-    done
+    done < <(worms_dataosx_config_files)
 fi
 
 if [ -d "$common_data_dir" ]; then
-    for config_file in AnalyticsConfig.txt HttpConfig.txt; do
+    while IFS= read -r config_file; do
         check_config_urls "$common_data_dir/$config_file" "CommonData/$config_file"
-    done
+    done < <(worms_commondata_config_files)
 fi
 
 if [ "$warnings" -eq "$warnings_before" ]; then

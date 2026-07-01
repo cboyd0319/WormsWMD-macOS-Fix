@@ -96,9 +96,9 @@ fix_config_file() {
 if [[ -d "$DATA_OSX_DIR" ]]; then
     echo ""
     echo "--- DataOSX Directory ---"
-    for config_file in "SteamConfig.txt" "SteamConfigDemo.txt" "GOGConfig.txt" "PcLanConfig.txt" "SwitchConfig.txt" "SwitchConfigGOG.txt"; do
+    while IFS= read -r config_file; do
         fix_config_file "$DATA_OSX_DIR/$config_file"
-    done
+    done < <(worms_dataosx_config_files)
 else
     echo "WARNING: DataOSX directory not found at: $DATA_OSX_DIR"
 fi
@@ -107,9 +107,9 @@ fi
 if [[ -d "$COMMON_DATA_DIR" ]]; then
     echo ""
     echo "--- CommonData Directory ---"
-    for config_file in "AnalyticsConfig.txt" "HttpConfig.txt"; do
+    while IFS= read -r config_file; do
         fix_config_file "$COMMON_DATA_DIR/$config_file"
-    done
+    done < <(worms_commondata_config_files)
 else
     echo "WARNING: CommonData directory not found at: $COMMON_DATA_DIR"
 fi

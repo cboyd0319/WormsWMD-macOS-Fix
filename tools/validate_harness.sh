@@ -22,6 +22,33 @@ require_file() {
     fi
 }
 
+require_marker() {
+    local rel="$1"
+    local marker="$2"
+
+    if [[ ! -f "$ROOT_DIR/$rel" ]]; then
+        return
+    fi
+    if ! grep -Fq "$marker" "$ROOT_DIR/$rel"; then
+        fail "$rel is missing required marker: $marker"
+    fi
+}
+
+check_line_cap() {
+    local rel="$1"
+    local max_lines="$2"
+    local line_count
+
+    if [[ ! -f "$ROOT_DIR/$rel" ]]; then
+        return
+    fi
+
+    line_count=$(wc -l < "$ROOT_DIR/$rel" | tr -d ' ')
+    if (( line_count > max_lines )); then
+        fail "$rel exceeds harness line cap: $line_count lines, max $max_lines"
+    fi
+}
+
 normalize_existing_path() {
     local path="$1"
     local dir
@@ -213,22 +240,153 @@ collect_repo_text_files() {
 check_no_local_machine_paths() {
     local source="$1"
     local source_abs="$ROOT_DIR/$source"
-    local users_root="/Users"
-    local short_home="$users_root/c"
-    local var_root="/var"
-    local forbidden_var="$var_root/folders"
+    local slash="/"
+    local users_root="${slash}Users${slash}"
+    local home_root="${slash}home${slash}"
+    local var_folders="${slash}var${slash}folders${slash}"
+    local volumes_root="${slash}Volumes${slash}"
     local forbidden_pattern
+    local hit
     local line_number
+    local line_text
 
-    forbidden_pattern="(${short_home}([^A-Za-z0-9._-]|$)|${users_root}/[A-Za-z0-9._-]+/(Downloads|Documents)([^A-Za-z0-9._-]|$)|${forbidden_var}([^A-Za-z0-9._-]|$))"
+    forbidden_pattern="(${users_root}[A-Za-z0-9._-]+${slash}|${home_root}[A-Za-z0-9._-]+${slash}|${var_folders}|${volumes_root}[A-Za-z0-9._-]+${slash}|[A-Za-z]:\\\\Users\\\\|~${slash}Documents${slash}GitHub(${slash}|$)|~${slash}\\.codex(${slash}|$))"
 
-    while IFS= read -r line_number; do
+    while IFS= read -r hit; do
+        line_number=${hit%%:*}
+        line_text=${hit#*:}
+        case "$line_text" in
+            *"/Users/example/"*|*"/Users/you/"*|*"/Users/privateperson/"*)
+                continue
+                ;;
+        esac
         fail "$source:$line_number contains a local machine path; use a repo-relative path or HOME-based placeholder"
-    done < <(LC_ALL=C grep -nE "$forbidden_pattern" "$source_abs" | cut -d: -f1 || true)
+    done < <(LC_ALL=C grep -nE "$forbidden_pattern" "$source_abs" || true)
+}
+
+check_harness_markers() {
+    require_marker "AGENTS.md" "## Project Shape"
+    require_marker "AGENTS.md" "## Non-Negotiables"
+    require_marker "AGENTS.md" "## Startup Path"
+    require_marker "AGENTS.md" "## Common Commands"
+    require_marker "AGENTS.md" "## Documentation Entrypoints"
+    require_marker "AGENTS.md" "## Completion Checklist"
+
+    require_marker ".agents/README.md" "## Inventory"
+    require_marker ".agents/CLAUDE.md" "AGENTS.md"
+    require_marker ".agents/rules/wormswmd-maintenance.md" "security-critical"
+    require_marker ".agents/rules/wormswmd-maintenance.md" "local-path"
+
+    require_marker "docs/style/agent-harness.md" "## Five Subsystems"
+    require_marker "docs/style/agent-harness.md" "## Harness Change Rules"
+    require_marker "docs/style/agent-harness.md" "## Clean-State Checklist"
+    require_marker "docs/runbooks/agent-session.md" "## Start A Session"
+    require_marker "docs/runbooks/agent-session.md" "## Choose Validation"
+    require_marker "docs/runbooks/agent-session.md" "## Clean-State Checklist"
+    require_marker "docs/design/runtime-contracts.md" "## Validation Contract"
+}
+
+check_harness_line_caps() {
+    check_line_cap "AGENTS.md" 180
+    check_line_cap ".agents/README.md" 180
+    check_line_cap ".agents/CLAUDE.md" 120
+    check_line_cap ".agents/rules/wormswmd-maintenance.md" 120
+    check_line_cap ".github/copilot-instructions.md" 80
+    check_line_cap "docs/style/agent-harness.md" 260
+    check_line_cap "docs/runbooks/agent-session.md" 220
+    check_line_cap "docs/design/runtime-contracts.md" 260
+    check_line_cap "docs/exec-plans/TEMPLATE.md" 120
+    check_line_cap "docs/exec-plans/README.md" 160
+    check_line_cap "tools/validate_harness.sh" 520
+    check_line_cap ".github/workflows/ci.yml" 180
+    check_line_cap ".github/workflows/release.yml" 140
+}
+
+check_ci_and_ownership_gates() {
+    local ci_file="$ROOT_DIR/.github/workflows/ci.yml"
+    local release_file="$ROOT_DIR/.github/workflows/release.yml"
+    local codeowners="$ROOT_DIR/.github/CODEOWNERS"
+    local required_ci_check
+    local required_owner
+    local workflow
+    local line
+    local line_number
+    local action_ref
+    local ref_part
+
+    for required_ci_check in \
+        "./tools/validate_harness.sh" \
+        "./tools/test_bootstrap_installer_safety.sh" \
+        "./tools/test_issue_10_regression.sh" \
+        "./tools/test_issue_11_game_detection.sh" \
+        "./tools/test_issue_12_agl_install_failure.sh" \
+        "./tools/test_installer_rollback_regression.sh" \
+        "./tools/test_mutation_safety.sh" \
+        "./tools/test_support_bundle_sanitization.sh" \
+        "./tools/test_backup_saves_regression.sh" \
+        "./tools/test_launcher_friction.sh" \
+        "./tools/test_preflight_regression.sh" \
+        "./tools/test_manifest_regression.sh" \
+        "./tools/test_qt_version_pinning.sh" \
+        "./tools/build_release_bundle.sh --version ci --skip-zip"; do
+        if [[ -f "$ci_file" ]] && ! grep -Fq "$required_ci_check" "$ci_file"; then
+            fail ".github/workflows/ci.yml does not run required check: $required_ci_check"
+        fi
+    done
+
+    if [[ -f "$release_file" ]] && ! grep -Fq "./tools/validate_harness.sh" "$release_file"; then
+        fail ".github/workflows/release.yml does not validate the harness"
+    fi
+
+    for required_owner in \
+        "/.agents/** @cboyd0319" \
+        "/.github/** @cboyd0319" \
+        "/AGENTS.md @cboyd0319" \
+        "/docs/exec-plans/** @cboyd0319" \
+        "/docs/style/agent-harness.md @cboyd0319" \
+        "/docs/runbooks/agent-session.md @cboyd0319" \
+        "/docs/design/runtime-contracts.md @cboyd0319"; do
+        if [[ -f "$codeowners" ]] && ! grep -Fxq "$required_owner" "$codeowners"; then
+            fail ".github/CODEOWNERS is missing protected surface: $required_owner"
+        fi
+    done
+
+    for workflow in "$ROOT_DIR"/.github/workflows/*.yml "$ROOT_DIR"/.github/workflows/*.yaml; do
+        [[ -f "$workflow" ]] || continue
+        while IFS= read -r line; do
+            line_number=${line%%:*}
+            action_ref=${line#*:}
+            action_ref=${action_ref#*uses:}
+            action_ref=${action_ref%%#*}
+            action_ref=${action_ref//[[:space:]\"\']/}
+            [[ -n "$action_ref" ]] || continue
+
+            case "$action_ref" in
+                ./*|../*|docker://*)
+                    continue
+                    ;;
+            esac
+
+            if [[ "$action_ref" != *@* ]]; then
+                fail "${workflow#"$ROOT_DIR"/}:$line_number uses an action without an explicit ref: $action_ref"
+                continue
+            fi
+            ref_part=${action_ref##*@}
+            if [[ ! "$ref_part" =~ ^[0-9a-f]{40}$ ]]; then
+                fail "${workflow#"$ROOT_DIR"/}:$line_number uses an action ref that is not a full commit SHA: $action_ref"
+            fi
+        done < <(grep -nE '^[[:space:]]*uses:' "$workflow" || true)
+    done
 }
 
 require_file "AGENTS.md"
+require_file ".agents/README.md"
+require_file ".agents/CLAUDE.md"
+require_file ".agents/rules/wormswmd-maintenance.md"
+require_file ".github/CODEOWNERS"
 require_file ".github/copilot-instructions.md"
+require_file ".github/workflows/ci.yml"
+require_file ".github/workflows/release.yml"
 require_file "docs/README.md"
 require_file "docs/design/runtime-contracts.md"
 require_file "docs/runbooks/agent-session.md"
@@ -236,12 +394,9 @@ require_file "docs/style/agent-harness.md"
 require_file "docs/exec-plans/README.md"
 require_file "docs/exec-plans/TEMPLATE.md"
 
-if [[ -f "$ROOT_DIR/AGENTS.md" ]]; then
-    agent_lines=$(wc -l < "$ROOT_DIR/AGENTS.md" | tr -d ' ')
-    if (( agent_lines > 180 )); then
-        fail "AGENTS.md is too long for an entrypoint: $agent_lines lines"
-    fi
-fi
+check_harness_markers
+check_harness_line_caps
+check_ci_and_ownership_gates
 
 for section in \
     "## Problem" \

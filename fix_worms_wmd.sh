@@ -31,7 +31,7 @@ while [[ -L "$SCRIPT_PATH" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.7.3"
+VERSION="1.7.4"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -44,7 +44,12 @@ source "$SCRIPTS_DIR/common.sh"
 
 # Default game location (uses $HOME instead of ~ for reliability)
 DEFAULT_GAME_PATH="$(worms_default_game_app)"
+GAME_APP_EXPLICIT=false
+if [[ -n "${GAME_APP:-}" ]]; then
+    GAME_APP_EXPLICIT=true
+fi
 GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
+GAME_APP_AUTO_DETECTED=false
 
 # Global state
 DRY_RUN=false
@@ -179,6 +184,8 @@ stop_spinner() {
 auto_detect_game() {
     local unique_games=()
     local game
+    local choice
+    local prompt_output="/dev/stderr"
 
     while IFS= read -r -d '' game; do
         unique_games+=("$game")
@@ -189,24 +196,35 @@ auto_detect_game() {
     elif [[ ${#unique_games[@]} -eq 1 ]]; then
         echo "${unique_games[0]}"
     else
+        if [[ ! -r /dev/tty ]] || [[ ! -w /dev/tty ]]; then
+            echo "Several Worms W.M.D installations were found; set GAME_APP to the exact .app path." >&2
+            return 1
+        fi
+
+        prompt_output="/dev/tty"
+
         # Multiple installations found - let user choose
-        echo ""
-        print_info "Multiple game installations found:"
-        echo ""
+        echo "" > "$prompt_output"
+        print_info "Multiple game installations found:" > "$prompt_output"
+        echo "" > "$prompt_output"
         local i=1
         for game in "${unique_games[@]}"; do
-            echo "    $i) $game"
+            echo "    $i) $game" > "$prompt_output"
             ((i++))
         done
-        echo ""
+        echo "" > "$prompt_output"
 
         while true; do
-            read -r -p "Which installation do you want to fix? [1-${#unique_games[@]}] " choice < /dev/tty
+            printf "Which installation do you want to fix? [1-%s] " "${#unique_games[@]}" > "$prompt_output"
+            if ! IFS= read -r choice < /dev/tty; then
+                echo "Could not read selection; set GAME_APP to the exact .app path." >&2
+                return 1
+            fi
             if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -le ${#unique_games[@]} ]]; then
                 echo "${unique_games[$((choice-1))]}"
                 return
             fi
-            echo "Please enter a number between 1 and ${#unique_games[@]}"
+            echo "Please enter a number between 1 and ${#unique_games[@]}" > "$prompt_output"
         done
     fi
 }
@@ -634,17 +652,13 @@ trap cleanup EXIT
 # Detection Functions
 # ============================================================
 
-validate_game_app() {
+validate_game_app_for_read() {
     worms_reject_control_chars "$GAME_APP" "GAME_APP"
 
-    # If GAME_APP wasn't explicitly set, try auto-detection
-    if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]] && [[ ! -d "$GAME_APP" ]]; then
+    if ! $GAME_APP_EXPLICIT; then
         print_step "Looking for Worms W.M.D..."
-        local detected_game
-        detected_game=$(auto_detect_game)
-
-        if [[ -n "$detected_game" ]]; then
-            GAME_APP="$detected_game"
+        detect_game_app_if_needed
+        if [[ -n "${GAME_APP:-}" ]] && [[ -d "$GAME_APP/Contents" ]]; then
             print_substep "Found: $GAME_APP"
         fi
     fi
@@ -682,12 +696,34 @@ validate_game_app() {
         echo "Try reinstalling the game through Steam or GOG, then run this fix again."
         exit 1
     fi
+}
+
+validate_game_app() {
+    validate_game_app_for_read
 
     if ! worms_validate_game_app_for_mutation "$GAME_APP"; then
         print_error "Game bundle contains unsafe linked mutation paths."
         echo ""
         echo "Refusing to modify a bundle whose writable subpaths resolve outside Contents."
         exit 1
+    fi
+}
+
+detect_game_app_if_needed() {
+    worms_reject_control_chars "$GAME_APP" "GAME_APP"
+
+    if $GAME_APP_EXPLICIT; then
+        return 0
+    fi
+    if $GAME_APP_AUTO_DETECTED; then
+        return 0
+    fi
+
+    local detected_game
+    detected_game=$(auto_detect_game || true)
+    if [[ -n "$detected_game" ]]; then
+        GAME_APP="$detected_game"
+        GAME_APP_AUTO_DETECTED=true
     fi
 }
 
@@ -998,6 +1034,7 @@ do_restore() {
 do_verify() {
     init_logging "fix_worms_wmd"
     print_header
+    validate_game_app_for_read
     export GAME_APP
     chmod +x "$SCRIPTS_DIR/05_verify_installation.sh"
     "$SCRIPTS_DIR/05_verify_installation.sh"
@@ -1013,6 +1050,7 @@ do_dry_run() {
     print_header
 
     print_step "Pre-flight checks..."
+    detect_game_app_if_needed
 
     if [[ -d "$GAME_APP/Contents" ]] && [[ -f "$GAME_APP/Contents/MacOS/Worms W.M.D" ]]; then
         print_dry_run "Game found: $GAME_APP"
@@ -1111,6 +1149,7 @@ do_dry_run() {
 do_fix() {
     init_logging "fix_worms_wmd"
     print_header
+    validate_game_app
 
     # ============================================================
     # Check if already applied
@@ -1186,7 +1225,6 @@ do_fix() {
     print_substep "Build tools: available"
 
     # Find the game (with auto-detection)
-    validate_game_app
     print_substep "Game found: $GAME_APP"
 
     # Check Qt source: prefer pre-built, fall back to Homebrew.
@@ -1241,21 +1279,21 @@ do_fix() {
     local data_dir="$GAME_APP/Contents/Resources/DataOSX"
     if [[ -d "$data_dir" ]]; then
         mkdir -p "$BACKUP_DIR/DataOSX"
-        for config_file in SteamConfig.txt SteamConfigDemo.txt GOGConfig.txt; do
+        while IFS= read -r config_file; do
             if [[ -f "$data_dir/$config_file" ]]; then
                 cp "$data_dir/$config_file" "$BACKUP_DIR/DataOSX/$config_file"
             fi
-        done
+        done < <(worms_dataosx_config_files)
     fi
 
     local common_data_dir="$GAME_APP/Contents/Resources/CommonData"
     if [[ -d "$common_data_dir" ]]; then
         mkdir -p "$BACKUP_DIR/CommonData"
-        for config_file in AnalyticsConfig.txt HttpConfig.txt; do
+        while IFS= read -r config_file; do
             if [[ -f "$common_data_dir/$config_file" ]]; then
                 cp "$common_data_dir/$config_file" "$BACKUP_DIR/CommonData/$config_file"
             fi
-        done
+        done < <(worms_commondata_config_files)
     fi
 
     print_substep "Creating backup manifest (this can take a few minutes)..."

@@ -127,17 +127,20 @@ log_message() {
 
 prepare_logging_paths() {
     local logs_root="$HOME/Library/Logs"
+    local link_count
 
     worms_reject_control_chars "$GAME_APP" "GAME_APP"
     worms_reject_control_chars "$GAME_EXEC" "GAME_EXEC"
     worms_reject_control_chars "$LOG_DIR" "LOG_DIR"
     worms_reject_control_chars "$LOG_FILE" "LOG_FILE"
 
-    mkdir -p "$logs_root" "$LOG_DIR"
-    if ! worms_path_inside_root "$logs_root" "$LOG_DIR"; then
+    mkdir -p "$logs_root"
+    if ! worms_path_creatable_inside_root "$logs_root" "$LOG_DIR" \
+        || { [[ -e "$LOG_DIR" ]] && [[ ! -d "$LOG_DIR" ]]; }; then
         echo -e "${RED}LOG_DIR must be inside $logs_root${NC}"
         exit 1
     fi
+    mkdir -p "$LOG_DIR"
 
     if [[ -n "$LOG_FILE" ]]; then
         case "$LOG_FILE" in
@@ -148,15 +151,22 @@ prepare_logging_paths() {
                 exit 1
                 ;;
         esac
-        mkdir -p "$(dirname "$LOG_FILE")"
-        if ! worms_path_inside_root "$logs_root" "$LOG_FILE"; then
+        if ! worms_path_creatable_inside_root "$logs_root" "$LOG_FILE"; then
             echo -e "${RED}--log-file must be inside $logs_root${NC}"
             exit 1
         fi
-        if [[ -L "$LOG_FILE" ]] || [[ -d "$LOG_FILE" ]]; then
-            echo -e "${RED}--log-file must be a regular log file path${NC}"
+        if [[ -L "$LOG_FILE" ]] || [[ -d "$LOG_FILE" ]] || { [[ -e "$LOG_FILE" ]] && [[ ! -f "$LOG_FILE" ]]; }; then
+            echo -e "${RED}--log-file must be a regular non-linked log file path${NC}"
             exit 1
         fi
+        if [[ -e "$LOG_FILE" ]]; then
+            link_count=$(worms_file_link_count "$LOG_FILE")
+            if [[ "$link_count" =~ ^[0-9]+$ ]] && [[ "$link_count" -gt 1 ]]; then
+                echo -e "${RED}--log-file must be a regular non-linked log file path${NC}"
+                exit 1
+            fi
+        fi
+        mkdir -p "$(dirname "$LOG_FILE")"
     fi
 }
 
@@ -318,7 +328,7 @@ if [[ "$CHECK_FIX" == true ]]; then
             echo ""
             if [[ ! "${REPLY:-}" =~ ^[Nn]$ ]]; then
                 cd "$REPO_DIR"
-                ./fix_worms_wmd.sh --force
+                GAME_APP="$GAME_APP" ./fix_worms_wmd.sh --force
             else
                 echo "Launching anyway (may not work correctly)..."
             fi
@@ -328,8 +338,11 @@ if [[ "$CHECK_FIX" == true ]]; then
     fi
 fi
 
-# Create crash directory
-mkdir -p "$CRASH_DIR"
+# Create crash directory only when it can be used. LOG_DIR is validated in
+# logging setup above, and crash reports are only generated in logging mode.
+if [[ "$ENABLE_LOGGING" == true && "$CRASH_REPORT" == true ]]; then
+    mkdir -p "$CRASH_DIR"
+fi
 
 # Generate crash report function
 generate_crash_report() {

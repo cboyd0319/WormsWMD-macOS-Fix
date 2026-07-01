@@ -3,17 +3,17 @@
 # install.sh - One-liner installer for Worms W.M.D macOS Fix
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.4/install.sh | bash
 #
 # Or with options:
-#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.4/install.sh | bash -s -- --dry-run
 #
 
 set -euo pipefail
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
-DEFAULT_INSTALL_REF="v1.7.3"
-DEFAULT_INSTALL_COMMIT="3db851f4237410e22c56ec14f231324e32b503d4"
+DEFAULT_INSTALL_REF="v1.7.4"
+DEFAULT_INSTALL_COMMIT=""
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
 INSTALL_REF="${INSTALL_REF:-$DEFAULT_INSTALL_REF}"
 
@@ -32,6 +32,18 @@ print_step() { echo -e "${GREEN}==>${NC} ${BOLD}$1${NC}"; }
 print_error() { echo -e "${RED}✗${NC}  ${RED}ERROR:${NC} $1"; }
 print_success() { echo -e "${GREEN}✓${NC}  ${GREEN}SUCCESS:${NC} $1"; }
 print_info() { echo -e "${BLUE}ℹ${NC}  $1"; }
+
+install_dir_is_system_path() {
+    local path="$1"
+
+    case "$path" in
+        /|/Applications|/Applications/*|/Library|/Library/*|/System|/System/*|/bin|/bin/*|/etc|/etc/*|/sbin|/sbin/*|/usr|/usr/*)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
 
 validate_install_ref() {
     if [[ -z "$INSTALL_REF" ]]; then
@@ -74,12 +86,10 @@ normalize_install_dir() {
         exit 1
     fi
 
-    case "$raw_dir" in
-        /|/Applications|/Applications/*|/Library|/Library/*|/System|/System/*|/bin|/bin/*|/etc|/etc/*|/sbin|/sbin/*|/usr|/usr/*)
-            print_error "INSTALL_DIR must be a user-writable project directory, not a system path: $raw_dir"
-            exit 1
-            ;;
-    esac
+    if install_dir_is_system_path "$raw_dir"; then
+        print_error "INSTALL_DIR must be a user-writable project directory, not a system path: $raw_dir"
+        exit 1
+    fi
 
     parent=$(dirname "$raw_dir")
     base=$(basename "$raw_dir")
@@ -87,6 +97,11 @@ normalize_install_dir() {
     parent=$(cd "$parent" && pwd -P)
     INSTALL_DIR="$parent/$base"
     home_real=$(cd "$HOME" && pwd -P)
+
+    if install_dir_is_system_path "$INSTALL_DIR"; then
+        print_error "INSTALL_DIR resolves to a system path: $INSTALL_DIR"
+        exit 1
+    fi
 
     if [[ "$INSTALL_DIR" == "/" ]] || [[ "$INSTALL_DIR" == "$home_real" ]]; then
         print_error "INSTALL_DIR cannot be the filesystem root or your home directory."

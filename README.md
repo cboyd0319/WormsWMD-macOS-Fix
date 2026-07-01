@@ -19,7 +19,7 @@ files or official Team17/Worms artwork.
 For most players:
 
 1. Open the [latest release page](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest) and download
-   `WormsWMD-macOS-Fix-v1.7.3.zip`.
+   `WormsWMD-macOS-Fix-v1.7.4.zip`.
 2. Unzip it.
 3. Double-click `Worms W.M.D Fix.command`.
 4. Press `1`.
@@ -36,16 +36,16 @@ For most players:
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
 
-## v1.7.3 At A Glance
+## v1.7.4 At A Glance
 
 | Area | What changed |
 | --- | --- |
-| Runtime completeness | Required AGL, Qt frameworks, Qt plugins, and bundled dylibs are enforced as fixer-supplied install invariants. |
-| Rollback | Post-backup installer failures now roll back reliably on Bash 3.2. |
-| Repeated installs | Stale AGL framework symlinks are repaired before backup validation and replacement. |
-| Support bundles | Diagnostics include macOS and Rosetta status, installer history, runtime invariant status, Qt package checks, and backup integrity status when available. |
-| Save restore | Restores replace backed-up save roots instead of merging stale local files over them. |
-| Log hygiene | Default installer logs are process-specific so same-second runs do not mix timelines. |
+| Detection | Steam, GOG, custom `GAME_APP`, dry-run, verify, diagnostics, and launcher paths use consistent game discovery. |
+| Rollback | Every config file the fixer can mutate is backed up, restored, and verified through the same shared list. |
+| Mutation safety | The fixer refuses malformed bundle paths plus symlinked or hardlinked config files before writing. |
+| Bootstrap safety | Terminal and double-click bootstraps are pinned to `v1.7.4` and reject install directories that resolve into system paths. |
+| Log hygiene | Rejected log paths do not create directories outside `~/Library/Logs`, hardlinked log files are refused, and safe nested log paths still work. |
+| Harness | CI and repo-local harness rules now enforce the release regression suite, CODEOWNERS coverage, and full-SHA GitHub Actions pins. |
 
 ## Requirements
 
@@ -60,7 +60,7 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 This release targets macOS 26 Tahoe and later. Earlier macOS versions usually
 do not need the AGL fix. There is one confirmed macOS 15.7.3 report that the Qt
 5.15 refresh improved keyboard buffering or lag, but macOS 15.x is not a
-validated support target for v1.7.3.
+validated support target for v1.7.4.
 
 On macOS 27 Golden Gate, Rosetta may need to be installed again after an
 upgrade. The preview command reports this without changing your Mac; the game
@@ -72,19 +72,19 @@ The release page includes a `.zip.sha256` checksum next to the zip file.
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.3.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.4.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.3.zip: OK
+WormsWMD-macOS-Fix-v1.7.4.zip: OK
 ```
 
 GitHub CLI users can also verify the release attestation:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.3.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.4.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 ## Launcher Menu
@@ -126,7 +126,7 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.3.zip --repo cboyd0319/WormsWMD-ma
 Review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.4/install.sh
 ```
 
 ## Terminal Install
@@ -134,13 +134,14 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3
 Use the release zip unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.3/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.4/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The bootstrap is pinned to release `v1.7.3`
-by default. The current mainline bootstrap also verifies the exact `v1.7.3`
-tag target commit before running the launcher.
+launcher menu as the release zip. The bootstrap is pinned to release `v1.7.4`
+by default. The `v1.7.4` raw tag bootstrap pins the release tag; the follow-up
+mainline maintenance commit should pin the exact `v1.7.4` tag target commit
+after the tag exists.
 
 ## Pre-Flight Check
 

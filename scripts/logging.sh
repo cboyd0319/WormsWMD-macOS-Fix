@@ -35,6 +35,12 @@ worms_log_real_dir() {
     (cd "$path" 2>/dev/null && pwd -P)
 }
 
+worms_log_file_link_count() {
+    local path="$1"
+
+    stat -f "%l" "$path" 2>/dev/null || stat -c "%h" "$path" 2>/dev/null || echo 1
+}
+
 worms_log_path_inside_root() {
     local root="$1"
     local path="$2"
@@ -49,6 +55,52 @@ worms_log_path_inside_root() {
     fi
 
     case "$path_real" in
+        "$root_real"|"$root_real"/*)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+worms_log_path_creatable_inside_root() {
+    local root="$1"
+    local path="$2"
+    local root_real probe component probe_real
+
+    case "$path" in
+        /*)
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+    case "$path" in
+        ..|../*|*/..|*/../*)
+            return 1
+            ;;
+    esac
+
+    root_real=$(worms_log_real_dir "$root") || return 1
+    if [[ -e "$path" ]] && [[ ! -d "$path" ]]; then
+        probe=$(dirname "$path")
+    else
+        probe="$path"
+    fi
+
+    while [[ ! -e "$probe" ]]; do
+        component=$(basename "$probe")
+        case "$component" in
+            ""|"."|"..")
+                return 1
+                ;;
+        esac
+        probe=$(dirname "$probe")
+    done
+
+    [[ -d "$probe" ]] || return 1
+    probe_real=$(worms_log_real_dir "$probe") || return 1
+    case "$probe_real" in
         "$root_real"|"$root_real"/*)
             return 0
             ;;
@@ -85,11 +137,13 @@ worms_prepare_log_file() {
         return 1
     fi
 
-    mkdir -p "$default_root" "$LOG_DIR"
-    if ! worms_log_path_inside_root "$default_root" "$LOG_DIR"; then
+    mkdir -p "$default_root"
+    if ! worms_log_path_creatable_inside_root "$default_root" "$LOG_DIR" \
+        || { [[ -e "$LOG_DIR" ]] && [[ ! -d "$LOG_DIR" ]]; }; then
         echo "LOG_DIR must be inside $default_root: $LOG_DIR" >&2
         return 1
     fi
+    mkdir -p "$LOG_DIR"
 
     if [[ -z "${LOG_FILE:-}" ]]; then
         LOG_FILE=$(worms_log_unique_path "$LOG_DIR/${script_name}-${timestamp}-$$" ".log")
@@ -104,15 +158,23 @@ worms_prepare_log_file() {
             ;;
     esac
 
-    mkdir -p "$(dirname "$LOG_FILE")"
-    if ! worms_log_path_inside_root "$default_root" "$LOG_FILE"; then
+    if ! worms_log_path_creatable_inside_root "$default_root" "$LOG_FILE"; then
         echo "LOG_FILE must be inside $default_root: $LOG_FILE" >&2
         return 1
     fi
-    if [[ -L "$LOG_FILE" ]] || [[ -d "$LOG_FILE" ]]; then
-        echo "LOG_FILE must be a regular log file path: $LOG_FILE" >&2
+    if [[ -L "$LOG_FILE" ]] || [[ -d "$LOG_FILE" ]] || { [[ -e "$LOG_FILE" ]] && [[ ! -f "$LOG_FILE" ]]; }; then
+        echo "LOG_FILE must be a regular non-linked log file path: $LOG_FILE" >&2
         return 1
     fi
+    if [[ -e "$LOG_FILE" ]]; then
+        local link_count
+        link_count=$(worms_log_file_link_count "$LOG_FILE")
+        if [[ "$link_count" =~ ^[0-9]+$ ]] && [[ "$link_count" -gt 1 ]]; then
+            echo "LOG_FILE must be a regular non-linked log file path: $LOG_FILE" >&2
+            return 1
+        fi
+    fi
+    mkdir -p "$(dirname "$LOG_FILE")"
 }
 
 worms_log_init() {

@@ -31,6 +31,12 @@ the plan before continuing.
 
 ## Current Plans
 
+- [v1.7.4 release](2026-07-01-v1.7.4-release.md) - active release prep,
+  validation, publication, asset verification, and post-release bootstrap
+  pinning.
+- [Post-1.7.3 audit fixes](2026-07-01-post-173-audit-fixes.md) - completed
+  follow-up for installer detection, rollback, launcher, docs, harness
+  tightening, live Steam validation, and final hardening.
 - [v1.7.3 release](2026-06-29-v1.7.3-release.md) - completed release prep,
   publication, asset verification, and post-release bootstrap pinning.
 - [Full repository deep audit](2026-06-29-full-repo-deep-audit.md) - completed

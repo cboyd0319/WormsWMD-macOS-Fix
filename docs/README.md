@@ -38,6 +38,12 @@ current when adding, moving, renaming, or deleting Markdown files.
 
 ## Agent Harness
 
+- [Repo-local agent layer](../.agents/README.md) - local agent routing assets
+  and maintenance rules.
+- [Tool compatibility agent layer](../.agents/CLAUDE.md) - compatibility loader
+  for tools that discover `.agents/CLAUDE.md`.
+- [Repo-local maintenance rules](../.agents/rules/wormswmd-maintenance.md) -
+  compact always-on agent rule loader.
 - [Runtime contracts](design/runtime-contracts.md) - architecture, data,
   network, and runtime invariants.
 - [Agent session runbook](runbooks/agent-session.md) - startup, validation,
@@ -59,9 +65,15 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Full repository deep audit plan](exec-plans/2026-06-29-full-repo-deep-audit.md)
   - completed repo-wide audit of installer, launcher, diagnostics, backup,
     release, CI, and documentation behavior.
+- [v1.7.4 release plan](exec-plans/2026-07-01-v1.7.4-release.md)
+  - active release prep, validation, publication, asset verification, and
+    post-release bootstrap pinning.
 - [v1.7.3 release plan](exec-plans/2026-06-29-v1.7.3-release.md)
   - completed release prep, publication, asset verification, and post-release
     bootstrap pinning.
+- [Post-1.7.3 audit fixes plan](exec-plans/2026-07-01-post-173-audit-fixes.md)
+  - completed follow-up for installer detection, rollback, launcher, docs,
+    harness tightening, live Steam validation, and final hardening.
 - [macOS 27 Golden Gate compatibility plan](exec-plans/2026-06-22-macos-27-golden-gate.md)
   - completed full-repo compatibility and release-gate pass for macOS 27.
 - [Cheat sheet supply-chain hardening plan](exec-plans/2026-06-18-cheatsheet-supply-chain-hardening.md)

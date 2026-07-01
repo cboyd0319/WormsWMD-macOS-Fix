@@ -89,6 +89,54 @@ fi
 launch_output=$(HOME="$gog_home" "$ROOT_DIR/tools/launch_worms.sh" --no-crash-report 2>&1) \
     || fail "enhanced launcher did not auto-detect the GOG-style app path: $launch_output"
 
+verify_output=$(HOME="$gog_home" "$installer" --verify 2>&1 || true)
+if grep -Fq "Game not found at: $gog_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app" <<< "$verify_output"; then
+    fail "installer --verify did not auto-detect the GOG-style app path"
+fi
+if ! grep -Fq "Game location: $gog_app" <<< "$verify_output"; then
+    fail "installer --verify did not verify the GOG-style app path: $verify_output"
+fi
+
+dry_run_output=$(HOME="$gog_home" "$installer" --dry-run 2>&1 || true)
+if ! grep -Fq "[dry-run] Game found: $gog_app" <<< "$dry_run_output"; then
+    fail "installer --dry-run did not auto-detect the GOG-style app path: $dry_run_output"
+fi
+
+empty_game_app_output=$(HOME="$gog_home" GAME_APP="" "$installer" --dry-run 2>&1 || true)
+if ! grep -Fq "[dry-run] Game found: $gog_app" <<< "$empty_game_app_output"; then
+    fail "empty GAME_APP should not disable auto-detection: $empty_game_app_output"
+fi
+
+multi_home="$tmp_dir/multi-home"
+multi_steam_app="$multi_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+multi_gog_app="$multi_home/GOG Games/Worms W.M.D/Worms W.M.D.app"
+make_game "$multi_steam_app"
+make_game "$multi_gog_app"
+set +e
+multi_output=$(run_detection "$multi_home" </dev/null 2>&1)
+multi_status=$?
+set -e
+if [[ "$multi_status" -eq 0 ]] && [[ -n "$multi_output" ]]; then
+    fail "noninteractive multiple-install discovery returned ambiguous output: $multi_output"
+fi
+if grep -Fq "Multiple game installations found" <<< "$multi_output"; then
+    fail "noninteractive multiple-install discovery polluted stdout with menu text: $multi_output"
+fi
+
+verify_link_home="$tmp_dir/verify-link-home"
+verify_link_app="$verify_link_home/Applications/Worms W.M.D.app"
+verify_link_target="$tmp_dir/linked-dataosx"
+make_game "$verify_link_app"
+mkdir -p "$verify_link_app/Contents/Resources" "$verify_link_target"
+ln -s "$verify_link_target" "$verify_link_app/Contents/Resources/DataOSX"
+verify_link_output=$(HOME="$verify_link_home" GAME_APP="$verify_link_app" "$installer" --verify 2>&1 || true)
+if grep -Fq "unsafe linked mutation paths" <<< "$verify_link_output"; then
+    fail "installer --verify should not require mutation-safe bundle paths: $verify_link_output"
+fi
+if ! grep -Fq "Game location: $verify_link_app" <<< "$verify_link_output"; then
+    fail "installer --verify did not reach read-only verification for linked resource paths: $verify_link_output"
+fi
+
 legacy_gog_home="$tmp_dir/legacy-gog-home"
 legacy_gog_app="$legacy_gog_home/Library/Application Support/GOG.com/Games/Worms W.M.D/Worms W.M.D.app"
 make_game "$legacy_gog_app"

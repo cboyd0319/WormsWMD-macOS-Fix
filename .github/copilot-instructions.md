@@ -8,6 +8,7 @@ Before editing, read:
 - `../docs/design/runtime-contracts.md`
 - `../docs/runbooks/agent-session.md`
 - `../docs/style/agent-harness.md`
+- `../.agents/rules/wormswmd-maintenance.md`
 
 For multi-step work, create or update an execution plan under
 `../docs/exec-plans/` using `../docs/exec-plans/TEMPLATE.md`.

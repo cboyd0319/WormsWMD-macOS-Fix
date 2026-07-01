@@ -91,6 +91,22 @@ worms_first_detected_game_app() {
     return 1
 }
 
+worms_dataosx_config_files() {
+    printf '%s\n' \
+        SteamConfig.txt \
+        SteamConfigDemo.txt \
+        GOGConfig.txt \
+        PcLanConfig.txt \
+        SwitchConfig.txt \
+        SwitchConfigGOG.txt
+}
+
+worms_commondata_config_files() {
+    printf '%s\n' \
+        AnalyticsConfig.txt \
+        HttpConfig.txt
+}
+
 worms_latest_path_by_mtime() {
     local search_dir="$1"
     local name_glob="$2"
@@ -324,6 +340,52 @@ worms_path_inside_root() {
     return 1
 }
 
+worms_path_creatable_inside_root() {
+    local root="$1"
+    local path="$2"
+    local root_real probe component probe_real
+
+    case "$path" in
+        /*)
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+    case "$path" in
+        ..|../*|*/..|*/../*)
+            return 1
+            ;;
+    esac
+
+    root_real=$(worms_real_dir "$root") || return 1
+    if [[ -e "$path" ]] && [[ ! -d "$path" ]]; then
+        probe=$(dirname "$path")
+    else
+        probe="$path"
+    fi
+
+    while [[ ! -e "$probe" ]]; do
+        component=$(basename "$probe")
+        case "$component" in
+            ""|"."|"..")
+                return 1
+                ;;
+        esac
+        probe=$(dirname "$probe")
+    done
+
+    [[ -d "$probe" ]] || return 1
+    probe_real=$(worms_real_dir "$probe") || return 1
+    case "$probe_real" in
+        "$root_real"|"$root_real"/*)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
 worms_validate_tree_symlinks() {
     local root_dir="$1"
     local root_real
@@ -419,18 +481,22 @@ worms_validate_game_app_for_mutation() {
             echo "Refusing symlinked game bundle mutation path: $path" >&2
             return 1
         fi
-        if [[ -d "$path" ]]; then
-            path_real=$(worms_real_dir "$path") || return 1
-            case "$path_real" in
-                "$contents_real"|"$contents_real"/*)
-                    ;;
-                *)
-                    echo "Game bundle mutation path resolves outside Contents: $path" >&2
-                    return 1
-                    ;;
-            esac
+        if [[ ! -d "$path" ]]; then
+            echo "Refusing non-directory game bundle mutation path: $path" >&2
+            return 1
         fi
+        path_real=$(worms_real_dir "$path") || return 1
+        case "$path_real" in
+            "$contents_real"|"$contents_real"/*)
+                ;;
+            *)
+                echo "Game bundle mutation path resolves outside Contents: $path" >&2
+                return 1
+                ;;
+        esac
     done
+
+    return 0
 }
 
 worms_refuse_linked_file_for_mutation() {

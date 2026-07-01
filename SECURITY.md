@@ -99,24 +99,24 @@ matching `.sha256` file, then verifies the checksum before leaving the zip in
 ## Download verification
 
 Release bundles publish both a zip and a matching SHA-256 checksum file. For
-the `v1.7.3` release:
+the `v1.7.4` release:
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.3.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.4.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.3.zip: OK
+WormsWMD-macOS-Fix-v1.7.4.zip: OK
 ```
 
 Release bundles also receive GitHub artifact attestations from the release
 workflow:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.3.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.4.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 The checksum verifies the file content. The attestation verifies that GitHub
@@ -193,7 +193,7 @@ User-controllable environment variables are validated:
 |----------|------------|
 | `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D`; writable bundle subpaths must not be symlinks or resolve outside `Contents` |
 | `INSTALL_DIR` | Refuses system paths, home directory, non-empty non-repo directories, and Git repositories with a different remote |
-| `INSTALL_REF` | Defaults to pinned release `v1.7.3`; mainline maintenance bootstraps also verify the exact release commit when known; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
+| `INSTALL_REF` | Defaults to pinned release `v1.7.4`; raw tag bootstraps pin the release tag, and the follow-up mainline maintenance commit should verify the exact release commit after the tag exists; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
 | `LOG_FILE` | Must be a regular `.log` path under `~/Library/Logs` |
 | `QT_PREFIX` | Verified to contain expected Qt frameworks; direct custom Homebrew prefixes require explicit opt-in |
 
@@ -316,6 +316,7 @@ The fix automatically creates a backup before making changes:
 - `PlugIns/` - Original Qt plugins
 - `Info.plist` - Original app metadata
 - `DataOSX/` - Original configuration files
+- `CommonData/` - Original shared configuration files
 - `BACKUP_MANIFEST.tsv` - SHA256 and size manifest for backup verification
 
 **Restore command**:
