@@ -355,6 +355,19 @@ check_ci_and_ownership_gates() {
         [[ -f "$workflow" ]] || continue
         while IFS= read -r line; do
             line_number=${line%%:*}
+            runner_label=${line#*:}
+            runner_label=${runner_label#*runs-on:}
+            runner_label=${runner_label%%#*}
+            runner_label=${runner_label//[[:space:]\"\']/}
+            [[ -n "$runner_label" ]] || continue
+
+            if [[ "$runner_label" == *-latest ]]; then
+                fail "${workflow#"$ROOT_DIR"/}:$line_number uses a mutable runner label: $runner_label"
+            fi
+        done < <(grep -nE '^[[:space:]]*runs-on:' "$workflow" || true)
+
+        while IFS= read -r line; do
+            line_number=${line%%:*}
             action_ref=${line#*:}
             action_ref=${action_ref#*uses:}
             action_ref=${action_ref%%#*}
@@ -377,6 +390,12 @@ check_ci_and_ownership_gates() {
             fi
         done < <(grep -nE '^[[:space:]]*uses:' "$workflow" || true)
     done
+
+    if [[ -f "$ci_file" ]] && grep -Fq "ludeeus/action-shellcheck@" "$ci_file"; then
+        if ! grep -Eq '^[[:space:]]+version:[[:space:]]+v[0-9]+[.][0-9]+[.][0-9]+[[:space:]]*$' "$ci_file"; then
+            fail ".github/workflows/ci.yml runs action-shellcheck without a pinned ShellCheck binary version"
+        fi
+    fi
 }
 
 require_file "AGENTS.md"

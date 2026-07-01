@@ -45,7 +45,7 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 | Mutation safety | The fixer refuses malformed bundle paths plus symlinked or hardlinked config files before writing. |
 | Bootstrap safety | Terminal and double-click bootstraps are pinned to `v1.7.4` and reject install directories that resolve into system paths. |
 | Log hygiene | Rejected log paths do not create directories outside `~/Library/Logs`, hardlinked log files are refused, and safe nested log paths still work. |
-| Harness | CI and repo-local harness rules now enforce the release regression suite, CODEOWNERS coverage, and full-SHA GitHub Actions pins. |
+| Harness | CI and repo-local harness rules now enforce the release regression suite, CODEOWNERS coverage, full-SHA GitHub Actions pins, explicit runner labels, and a pinned ShellCheck binary. |
 
 ## Requirements
 

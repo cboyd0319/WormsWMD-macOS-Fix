@@ -38,6 +38,9 @@ parser.parse!(ARGV)
 
 abort parser.to_s if options[:output].to_s.empty?
 abort 'Use either --lock or --write-lock, not both.' if options[:lock] && options[:write_lock]
+if !options[:lock] && options[:version].to_s.empty?
+  abort 'Pinned --version is required when resolving Homebrew metadata. Use --lock for an existing provenance lock.'
+end
 
 def run!(*cmd)
   system(*cmd) || abort("Command failed: #{cmd.shelljoin}")

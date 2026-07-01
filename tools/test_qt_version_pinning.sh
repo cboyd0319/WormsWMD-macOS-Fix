@@ -68,4 +68,12 @@ grep -Fq 'SOURCE_PROVENANCE.tsv' "$ROOT_DIR/scripts/download_qt_frameworks.sh" \
 [[ -x "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" ]] \
     || fail "Homebrew bottle provenance fetcher is missing or not executable"
 
+if "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" \
+    --output "$tmp_dir/provenance-prefix" \
+    --write-lock "$tmp_dir/provenance.tsv" >"$tmp_dir/provenance.out" 2>&1; then
+    fail "Homebrew bottle provenance fetcher accepted an unpinned root formula version"
+fi
+grep -Fq 'Pinned --version is required' "$tmp_dir/provenance.out" \
+    || fail "Homebrew bottle provenance fetcher did not explain the missing version pin"
+
 printf 'Qt version pinning check passed.\n'

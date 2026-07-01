@@ -198,7 +198,8 @@ QT_SOURCE_PROVENANCE_FILE=dist/qt-frameworks-x86_64-5.15.19.source-provenance.ts
 ```
 
 To intentionally refresh the bottle lock for a newer Qt 5.15.x artifact, write
-a new lock from current Homebrew metadata, inspect the diff, then rebuild:
+a new lock from current Homebrew metadata with an explicit `--version`, inspect
+the diff, then rebuild:
 
 ```bash
 ./tools/fetch_qt_homebrew_bottles.rb \
