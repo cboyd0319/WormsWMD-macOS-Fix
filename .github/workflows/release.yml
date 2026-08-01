@@ -54,7 +54,7 @@ jobs:
 
       - name: Attest release assets
         # actions/attest v4.1.1
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d
         with:
           subject-path: |
             build/release/WormsWMD-macOS-Fix-*.zip
