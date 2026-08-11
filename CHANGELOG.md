@@ -6,6 +6,18 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No user-facing changes yet.
 
+## 1.7.5 (2026-08-11)
+
+### Changed
+- Updated release, bootstrap, verification, documentation, and issue-template
+  surfaces for v1.7.5.
+- Kept exact bootstrap commit pins empty in the release-tag commit; the
+  follow-up mainline commit pins the immutable v1.7.5 tag target.
+
+### Fixed
+- Addressed issue #19 installation failures on macOS 26.6 by making copied Qt
+  framework binaries writable before updating their install names.
+
 ## Mainline maintenance after 1.7.4 (2026-07-01)
 
 ### Security

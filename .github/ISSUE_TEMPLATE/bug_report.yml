@@ -24,7 +24,7 @@ body:
     attributes:
       label: Fix version
       description: Run `./fix_worms_wmd.sh --help` or check the release zip name.
-      placeholder: "v1.7.4"
+      placeholder: "v1.7.5"
     validations:
       required: false
 

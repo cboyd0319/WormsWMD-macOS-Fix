@@ -31,7 +31,12 @@ the plan before continuing.
 
 ## Current Plans
 
-- [v1.7.4 release](2026-07-01-v1.7.4-release.md) - active release prep,
+- [v1.7.5 release](2026-08-11-v1.7.5-release.md) - active release prep,
+  validation, publication, asset verification, and post-release bootstrap
+  pinning.
+- [Issue 19 QtCore bad file descriptor](2026-08-11-issue-19-qtcore-bad-fd.md) - completed
+  fix for read-only copied Qt framework binaries on macOS 26.6.
+- [v1.7.4 release](2026-07-01-v1.7.4-release.md) - completed release prep,
   validation, publication, asset verification, and post-release bootstrap
   pinning.
 - [Post-1.7.3 audit fixes](2026-07-01-post-173-audit-fixes.md) - completed

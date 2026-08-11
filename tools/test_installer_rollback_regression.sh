@@ -176,6 +176,62 @@ backup_count=$(find "$test_home/Documents" -mindepth 1 -maxdepth 1 -type d -name
 
 printf 'Installer rollback regression check passed.\n'
 
+readonly_home="$tmp_dir/readonly-home"
+readonly_bin="$tmp_dir/readonly-bin"
+readonly_game_app="$readonly_home/Games/Worms W.M.D.app"
+readonly_qt_prefix="$tmp_dir/readonly-qt"
+
+mkdir -p \
+    "$readonly_bin" \
+    "$readonly_game_app/Contents/MacOS" \
+    "$readonly_qt_prefix/lib" \
+    "$readonly_qt_prefix/plugins/platforms" \
+    "$readonly_qt_prefix/plugins/imageformats"
+printf '#!/bin/bash\nexit 0\n' > "$readonly_game_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$readonly_game_app/Contents/MacOS/Worms W.M.D"
+
+for framework in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
+    framework_binary="$readonly_qt_prefix/lib/$framework.framework/Versions/5/$framework"
+    mkdir -p "$(dirname "$framework_binary")"
+    printf 'fake Mach-O\n' > "$framework_binary"
+    chmod 444 "$framework_binary"
+done
+printf 'fake plugin\n' > "$readonly_qt_prefix/plugins/platforms/libqcocoa.dylib"
+printf 'fake plugin\n' > "$readonly_qt_prefix/plugins/imageformats/libqsvg.dylib"
+
+cat > "$readonly_bin/install_name_tool" <<'STUB'
+#!/bin/bash
+target=""
+for target in "$@"; do
+    :
+done
+if [[ -z "$target" ]] || [[ ! -w "$target" ]]; then
+    printf '%s\n' "install_name_tool: can't write new headers in file: ${target:-unknown} (Bad file descriptor)" >&2
+    exit 1
+fi
+STUB
+chmod +x "$readonly_bin/install_name_tool"
+
+if ! readonly_output=$(
+    HOME="$readonly_home" \
+        PATH="$readonly_bin:$PATH" \
+        GAME_APP="$readonly_game_app" \
+        QT_SOURCE=homebrew \
+        QT_PREFIX="$readonly_qt_prefix" \
+        WORMSWMD_ALLOW_CUSTOM_QT_PREFIX=1 \
+        "$ROOT_DIR/scripts/02_replace_qt_frameworks.sh" 2>&1
+); then
+    fail "Qt replacement could not rewrite copied read-only framework binaries: $readonly_output"
+fi
+
+for framework in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
+    installed_binary="$readonly_game_app/Contents/Frameworks/$framework.framework/Versions/5/$framework"
+    [[ -w "$installed_binary" ]] \
+        || fail "installed $framework framework binary is not owner-writable"
+done
+
+printf 'Read-only Qt framework regression check passed.\n'
+
 config_home="$tmp_dir/config-home"
 config_fake_bin="$tmp_dir/config-bin"
 config_game_app="$config_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"

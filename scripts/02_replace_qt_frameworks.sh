@@ -199,6 +199,8 @@ for fw in "${FRAMEWORKS[@]}"; do
     fw_bin=$(worms_framework_binary "$fw_path" "$fw" || true)
     if [ -n "$fw_bin" ]; then
         rel_path="${fw_bin#"$fw_path"/}"
+        # Packaged framework binaries may be read-only, but this copy is mutable.
+        chmod u+w "$fw_bin"
         install_name_tool -id "@executable_path/../Frameworks/$fw.framework/$rel_path" \
             "$fw_bin"
     fi

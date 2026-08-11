@@ -62,11 +62,16 @@ current when adding, moving, renaming, or deleting Markdown files.
     detection.
 - [Issue 12 AGL stub install failure plan](exec-plans/2026-06-29-issue-12-agl-stub-install.md)
   - completed fix for missing AGL and required Qt runtime partial installs.
+- [Issue 19 QtCore bad file descriptor plan](exec-plans/2026-08-11-issue-19-qtcore-bad-fd.md)
+  - completed fix for read-only copied Qt framework binaries on macOS 26.6.
+- [v1.7.5 release plan](exec-plans/2026-08-11-v1.7.5-release.md)
+  - active release prep, validation, publication, asset verification, and
+    post-release bootstrap pinning.
 - [Full repository deep audit plan](exec-plans/2026-06-29-full-repo-deep-audit.md)
   - completed repo-wide audit of installer, launcher, diagnostics, backup,
     release, CI, and documentation behavior.
 - [v1.7.4 release plan](exec-plans/2026-07-01-v1.7.4-release.md)
-  - active release prep, validation, publication, asset verification, and
+  - completed release prep, validation, publication, asset verification, and
     post-release bootstrap pinning.
 - [v1.7.3 release plan](exec-plans/2026-06-29-v1.7.3-release.md)
   - completed release prep, publication, asset verification, and post-release

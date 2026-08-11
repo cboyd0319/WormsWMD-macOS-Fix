@@ -112,6 +112,10 @@ QtOpenGL, QtPrintSupport, QtDBus, QtSvg, `PlugIns/platforms/libqcocoa.dylib`,
 dylibs. Missing required runtime inputs must fail before destructive replacement
 where possible, and post-backup failures must trigger rollback.
 
+Copied Qt framework binaries must be made owner-writable before
+`install_name_tool` rewrites them. Package inputs may intentionally be
+read-only, but the game-bundle copies are mutable installer working files.
+
 When multiple local Qt packages are present, scripts should choose the highest
 verified supported Qt 5.15.x version rather than the newest file by modification
 time. The current `dist/` package is Qt 5.15.19 and must include a matching
