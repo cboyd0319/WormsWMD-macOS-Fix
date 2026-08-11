@@ -6,13 +6,20 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No user-facing changes yet.
 
+## Mainline maintenance after 1.7.5 (2026-08-11)
+
+### Security
+- Pinned mainline bootstrap commit verification to the `v1.7.5` tag target.
+  This follow-up commit lives on `main` after the `v1.7.5` release tag so
+  one-line installers can verify the exact release commit.
+
 ## 1.7.5 (2026-08-11)
 
 ### Changed
 - Updated release, bootstrap, verification, documentation, and issue-template
   surfaces for v1.7.5.
-- Kept exact bootstrap commit pins empty in the release-tag commit; the
-  follow-up mainline commit pins the immutable v1.7.5 tag target.
+- Kept exact bootstrap commit pins empty in the release-tag commit. Exact
+  pinning is recorded in the following mainline maintenance entry.
 
 ### Fixed
 - Addressed issue #19 installation failures on macOS 26.6 by making copied Qt
