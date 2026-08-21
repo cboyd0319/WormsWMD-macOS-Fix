@@ -175,6 +175,7 @@ fix_binary() {
     local dep_id
     local fw_name
     local dep_base
+    local dep_rel
 
     if [ ! -f "$bin" ]; then
         return
@@ -200,6 +201,12 @@ fix_binary() {
 
         dep_base=$(basename "$dep")
         dep_id=$(dylib_id_for "$dep_base" || true)
+        dep_rel="${dep#@rpath/}"
+        if [[ -z "$dep_id" ]] && [[ "$dep" == @rpath/* ]] \
+            && ! worms_path_has_parent_escape "$dep_rel" \
+            && [[ -f "$GAME_APP/Contents/MacOS/$dep_rel" ]]; then
+            dep_id="@executable_path/$dep_rel"
+        fi
         if [ -n "$dep_id" ]; then
             install_name_tool -change "$dep" "$dep_id" "$bin" 2>/dev/null || true
         fi

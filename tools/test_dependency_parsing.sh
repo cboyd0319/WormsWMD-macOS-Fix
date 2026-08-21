@@ -36,6 +36,47 @@ fi
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-dependency-parsing.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
 
+rpath_game_app="$tmp_dir/rpath/Worms W.M.D.app"
+rpath_build_dir="$tmp_dir/rpath/build"
+mkdir -p \
+    "$rpath_game_app/Contents/MacOS" \
+    "$rpath_game_app/Contents/Frameworks" \
+    "$rpath_game_app/Contents/PlugIns/platforms" \
+    "$rpath_game_app/Contents/PlugIns/imageformats" \
+    "$rpath_build_dir"
+
+cat > "$tmp_dir/galaxy.c" <<'EOF'
+int galaxy(void) { return 0; }
+EOF
+cat > "$tmp_dir/main.c" <<'EOF'
+int galaxy(void);
+int main(void) { return galaxy(); }
+EOF
+
+clang -arch x86_64 -dynamiclib \
+    -Wl,-install_name,@rpath/libGalaxy.dylib \
+    -o "$rpath_game_app/Contents/MacOS/libGalaxy.dylib" \
+    "$tmp_dir/galaxy.c"
+clang -arch x86_64 \
+    '-Wl,-rpath,@executable_path' \
+    -L"$rpath_game_app/Contents/MacOS" \
+    -lGalaxy \
+    -o "$rpath_game_app/Contents/MacOS/Worms W.M.D" \
+    "$tmp_dir/main.c"
+cp "$rpath_game_app/Contents/MacOS/libGalaxy.dylib" "$rpath_build_dir/AGL"
+
+GAME_APP="$rpath_game_app" BUILD_DIR="$rpath_build_dir" \
+    "$ROOT_DIR/scripts/04_fix_library_paths.sh" >/dev/null
+
+if worms_otool_dependencies "$rpath_game_app/Contents/MacOS/Worms W.M.D" \
+    | grep -Fq '@rpath/libGalaxy.dylib'; then
+    fail "GOG Galaxy dependency was not rewritten from @rpath"
+fi
+if ! worms_otool_dependencies "$rpath_game_app/Contents/MacOS/Worms W.M.D" \
+    | grep -Fq '@executable_path/libGalaxy.dylib'; then
+    fail "GOG Galaxy dependency was not rewritten beside the executable"
+fi
+
 game_app="$tmp_dir/Worms W.M.D.app"
 fake_bin="$tmp_dir/bin"
 mkdir -p \

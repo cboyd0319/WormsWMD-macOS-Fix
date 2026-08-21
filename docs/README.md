@@ -52,6 +52,8 @@ current when adding, moving, renaming, or deleting Markdown files.
   standard.
 - [Execution plans](exec-plans/README.md) - plan lifecycle and required shape.
 - [Execution plan template](exec-plans/TEMPLATE.md) - reusable plan scaffold.
+- [Issue 20 GOG Galaxy rpath plan](exec-plans/2026-08-21-issue-20-gog-galaxy-rpath.md)
+  - completed fix for the GOG executable's locally resolvable Galaxy dependency.
 - [Deep repository audit plan](exec-plans/2026-06-10-deep-repo-audit.md) -
   completed audit trail for the repository-wide defect pass.
 - [Issue 10 backup stall plan](exec-plans/2026-06-18-issue-10-backup-stall.md)

@@ -31,6 +31,8 @@ the plan before continuing.
 
 ## Current Plans
 
+- [Issue 20 GOG Galaxy rpath](2026-08-21-issue-20-gog-galaxy-rpath.md) - completed
+  fix for the GOG executable's locally resolvable `libGalaxy.dylib` dependency.
 - [v1.7.5 release](2026-08-11-v1.7.5-release.md) - completed release prep,
   validation, publication, asset verification, and post-release bootstrap
   pinning.
