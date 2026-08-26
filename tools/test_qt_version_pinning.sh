@@ -69,6 +69,14 @@ grep -Fq 'SOURCE_PROVENANCE.tsv' "$ROOT_DIR/scripts/download_qt_frameworks.sh" \
     || fail "Homebrew bottle provenance fetcher is missing or not executable"
 
 committed_package="$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.tar.gz"
+archive_manifest=$(tar -xOzf "$committed_package" MANIFEST.txt)
+grep -Fq '# WormsWMD manifest v2' <<< "$archive_manifest" \
+    || fail "committed Qt package manifest does not cover symlink entries"
+archive_symlink_count=$(tar -tvzf "$committed_package" \
+    | awk 'substr($1,1,1) == "l" {count++} END {print count+0}')
+manifest_symlink_count=$(grep -c '^symlink:' <<< "$archive_manifest" || true)
+[[ "$archive_symlink_count" == "$manifest_symlink_count" ]] \
+    || fail "Qt package manifest symlink count does not match the archive"
 if tar -tzf "$committed_package" \
     | awk -F/ '$1 == "Frameworks" && NF == 2 && $2 ~ /^libq.*[.]dylib$/ { found=1 } END { exit(found ? 0 : 1) }'; then
     fail "committed Qt package duplicates plugin self-references as framework dependencies"

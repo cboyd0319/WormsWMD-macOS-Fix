@@ -241,7 +241,7 @@ Last audit: 2026-08-26
 | Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
-| Backup restore | Pass | Game backups cover the executable, bind new backups to the source app, reject unrecorded files, validate safe symlinks, and refuse ambiguous cross-install legacy restore |
+| Backup restore | Pass | Game backups cover the executable, bind new backups to the source app, record v2 symlink targets, reject unrecorded entries, and refuse ambiguous cross-install legacy restore |
 | Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
 
 ## Verifying the fix

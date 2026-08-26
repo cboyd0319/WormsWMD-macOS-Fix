@@ -127,6 +127,10 @@ disposable copy is created first.
 - 2026-08-26: Addressed both Copilot review findings with fail-first tests:
   option 7 now launches the interactive selection instead of a stale local
   value, and duplicate-member validation propagates unreadable archive errors.
+- 2026-08-26: Addressed the three follow-up Copilot findings with regressions
+  for run-path owner expansion, weak install names containing spaces, changed
+  symlink targets, and unrecorded symlinks. New manifests are v2; v1 remains a
+  compatible legacy format.
 
 ## Surprises & Discoveries
 
@@ -172,8 +176,9 @@ smaller, clearer support bundles.
 
 The Qt archive was deterministically repaired from the existing verified,
 provenance-locked payload. Its checksum passes; it contains 104 unique members,
-15 runtime dependency dylibs, no duplicate plugin copies, and is 11,102,001
-bytes. A second independent repack produced the same SHA-256.
+15 runtime dependency dylibs, no duplicate plugin copies, 21 recorded framework
+symlinks, and is 11,102,530 bytes. A second independent repack produced the same
+SHA-256 `6e3d4783cd55a03e3e0237856da718d942dafe0e0e32b12338d5e228a65b9998`.
 
 Fresh completion evidence:
 

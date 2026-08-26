@@ -82,8 +82,11 @@ must verify it before copying files back and must verify the restored files
 afterward. Backups without a manifest are legacy backups and may be restored
 only with an explicit warning.
 
-Manifest verification must reject missing, changed, and unrecorded extra files;
-restore must never copy unmanifested additions from a current backup.
+Manifest verification must reject missing, changed, and unrecorded entries.
+Version 2 manifests record symlink paths and target digests in addition to
+regular files; restore must never copy unmanifested additions from a current
+backup. Version 1 manifests remain readable as legacy manifests without symlink
+identity coverage.
 
 New backups are eligible for manual restore only when their recorded canonical
 source app matches the selected `GAME_APP`. Legacy backups without source

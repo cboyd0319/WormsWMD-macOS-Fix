@@ -684,6 +684,7 @@ verify_restored_game_backup() {
     local manifest="$backup_dir/$BACKUP_MANIFEST_NAME"
     local expected_hash expected_size rel_path target actual_size status=0
     local paths_file expected_file actual_file hash_line actual_hash actual_path actual_extra expected_target
+    local symlink_hash symlink_target
 
     [[ -f "$manifest" ]] || return 0
 
@@ -702,7 +703,30 @@ verify_restored_game_backup() {
             continue
         fi
         target=$(game_path_for_backup_relpath "$rel_path" || true)
-        if [[ -z "$target" ]] || [[ ! -f "$target" ]]; then
+        if [[ -z "$target" ]]; then
+            print_warning "Restored file missing: $rel_path"
+            status=1
+            continue
+        fi
+
+        if [[ "$expected_hash" == symlink:* ]]; then
+            symlink_hash=${expected_hash#symlink:}
+            if [[ ! -L "$target" ]]; then
+                print_warning "Restored symlink missing: $rel_path"
+                status=1
+                continue
+            fi
+            symlink_target=$(readlink "$target" 2>/dev/null || true)
+            actual_size=$(worms_text_size "$symlink_target")
+            actual_hash=$(worms_text_sha256 "$symlink_target")
+            if [[ "$actual_size" != "$expected_size" ]] || [[ "$actual_hash" != "$symlink_hash" ]]; then
+                print_warning "Restored symlink did not match backup manifest: $rel_path"
+                status=1
+            fi
+            continue
+        fi
+
+        if [[ ! -f "$target" ]] || [[ -L "$target" ]]; then
             print_warning "Restored file missing: $rel_path"
             status=1
             continue

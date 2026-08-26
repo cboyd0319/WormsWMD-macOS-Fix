@@ -34,6 +34,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   always recommending Steam repair.
 - Made manifest verification reject unrecorded extra files and Qt archive
   validation reject unreadable archives and duplicate members before extraction.
+- Added v2 manifest coverage for symlink paths and target digests while keeping
+  existing v1 backups compatible with their legacy guarantees.
 
 ## Mainline maintenance after 1.7.5 (2026-08-11)
 

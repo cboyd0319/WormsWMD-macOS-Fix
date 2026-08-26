@@ -213,6 +213,49 @@ if PATH="$fake_bin:$PATH" worms_resolve_macho_rpath_dependency \
     fail "@rpath resolution accepted a symlink target outside the app bundle"
 fi
 
+owner_bin="$tmp_dir/owner-bin"
+owner_plugin="$game_app/Contents/PlugIns/imageformats/libowner.dylib"
+owner_dependency="$game_app/Contents/MacOS/libOwnedByExecutable.dylib"
+mkdir -p "$owner_bin"
+: > "$owner_plugin"
+: > "$owner_dependency"
+cat > "$owner_bin/otool" <<'STUB'
+#!/bin/bash
+if [[ "${1:-}" != "-l" ]]; then
+    exit 1
+fi
+case "${2:-}" in
+    */Contents/MacOS/Worms\ W.M.D)
+        cat <<'LOADS'
+Load command 1
+          cmd LC_RPATH
+      cmdsize 32
+         path @loader_path (offset 12)
+LOADS
+        ;;
+    *libowner.dylib)
+        cat <<'LOADS'
+Load command 1
+          cmd LC_LOAD_WEAK_DYLIB
+      cmdsize 64
+         name @rpath/Weak Galaxy Library.dylib (offset 24)
+LOADS
+        ;;
+esac
+STUB
+chmod +x "$owner_bin/otool"
+
+owner_resolved=$(PATH="$owner_bin:$PATH" worms_resolve_macho_rpath_dependency \
+    "$owner_plugin" \
+    '@rpath/libOwnedByExecutable.dylib' \
+    "$game_app/Contents/MacOS/Worms W.M.D" \
+    "$game_app" || true)
+[[ "$owner_resolved" == "$owner_dependency" ]] \
+    || fail "main executable LC_RPATH expanded @loader_path relative to the nested plugin: $owner_resolved"
+PATH="$owner_bin:$PATH" worms_macho_dependency_is_weak \
+    "$owner_plugin" '@rpath/Weak Galaxy Library.dylib' \
+    || fail "weak-load parser truncated an install name containing spaces"
+
 set +e
 verify_output=$(
     PATH="$fake_bin:$PATH" \
