@@ -28,6 +28,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   instead of suppressing their underlying errors.
 - Stopped rollback from claiming success when restored-file verification
   fails.
+- Made restore guidance use the recorded Steam or GOG storefront instead of
+  always recommending Steam repair.
 - Made manifest verification reject unrecorded extra files and Qt archive
   validation reject duplicate members before extraction.
 

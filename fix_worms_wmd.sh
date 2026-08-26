@@ -490,6 +490,24 @@ backup_targets_game_app() {
     [[ "$recorded_path" == "$game_app_real" ]]
 }
 
+print_store_repair_guidance() {
+    local game_source="$1"
+
+    case "$game_source" in
+        gog)
+            echo "Use GOG Galaxy to repair the game if needed:"
+            echo "  Manage installation → Verify / Repair"
+            ;;
+        steam)
+            echo "Use Steam to repair the game if needed:"
+            echo "  Right-click Worms W.M.D → Properties → Installed Files → Verify integrity"
+            ;;
+        *)
+            echo "Use your game store's verify or repair action if the bundle still needs recovery."
+            ;;
+    esac
+}
+
 write_game_backup_manifest() {
     local backup_dir="$1"
 
@@ -1088,7 +1106,7 @@ EOF
 
 do_restore() {
     local detected_game detected_real game_app_real target_seen=false
-    local installation_count=0 allow_legacy=false
+    local installation_count=0 allow_legacy=false restore_source="unknown"
 
     init_logging "fix_worms_wmd"
     print_header
@@ -1144,6 +1162,8 @@ do_restore() {
     echo "Selected backup: $latest"
     if [[ ! -f "$latest/$BACKUP_METADATA_NAME" ]]; then
         print_warning "This legacy backup has no source-app identity metadata."
+    elif backup_metadata_is_manifested "$latest"; then
+        restore_source=$(backup_metadata_value "$latest" "game_source" || echo "unknown")
     fi
     echo ""
 
@@ -1182,7 +1202,7 @@ do_restore() {
         print_error "Restore verification failed after copying files."
         echo ""
         echo "The backup was copied, but at least one restored file did not match its recorded checksum."
-        echo "Use Steam's file verification if you need to repair the game bundle."
+        print_store_repair_guidance "$restore_source"
         exit 1
     fi
     stop_spinner
@@ -1190,8 +1210,7 @@ do_restore() {
     echo ""
     print_success "Game restored to original game files."
     echo ""
-    echo "You may want to verify game files in Steam:"
-    echo "  Right-click Worms W.M.D → Properties → Local Files → Verify integrity"
+    print_store_repair_guidance "$restore_source"
     exit 0
 }
 

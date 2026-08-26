@@ -47,8 +47,9 @@ Non-goals:
 - Do not weaken checksum, archive-layout, symlink, or executable validation.
 - The committed Qt archive may change only with a new checksum, manifest,
   deterministic packaging, and extraction-layout verification.
-- A real GOG executable is not locally available, so its exact weak-load/rpath
-  shape requires a synthetic Mach-O fixture plus reporter evidence.
+- The real GOG executable is a strong Galaxy load with both
+  `@executable_path/../Frameworks` and `@executable_path` run paths. The latter
+  resolves `Contents/MacOS/libGalaxy.dylib`.
 
 ## Milestones
 
@@ -119,6 +120,10 @@ disposable copy is created first.
   paths, escaping rpath symlinks, unmanifested and invalid backup metadata,
   custom-path legacy ambiguity, signature-resource restoration, duplicate
   archive members, and unrecorded manifest files.
+- 2026-08-26: Installed the entitled GOG macOS build and tested a disposable
+  APFS copy. The full fix and verbose post-sign verification passed, the intro
+  and main menu rendered, and restore recovered the exact original executable
+  hash, Qt 5.3.2 files, and unsigned signature state.
 
 ## Surprises & Discoveries
 
@@ -178,8 +183,11 @@ Fresh completion evidence:
 - A disposable real Mach-O executable resolved a strong
   `@rpath/libGalaxy.dylib` through `LC_RPATH` and classified an absent
   `LC_LOAD_WEAK_DYLIB` Galaxy dependency as optional.
+- A disposable copy of the actual GOG app completed apply and post-sign verify,
+  rendered the main menu on macOS 27.0, and restored the original executable
+  SHA-256 `119b2bde18871423e0ffad74548cfa8f07b0f7f08b3f2c86ab313eb44fcccb05`.
 - `./tools/build_release_bundle.sh --version local-smoke --skip-zip` and an
   x86_64 AGL compilation smoke passed; generated smoke artifacts were removed.
 
-No installed game files were mutated during this work. Release publication and
-the reporter's live GOG confirmation remain outside this implementation pass.
+The installed GOG app remained unchanged; all mutations occurred on a disposable
+copy. Release publication remains outside this implementation pass.

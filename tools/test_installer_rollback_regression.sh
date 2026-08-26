@@ -614,4 +614,36 @@ fi
 grep -Fxq 'custom original' "$custom_target_app/Contents/Frameworks/store-marker.txt" \
     || fail "ambiguous legacy restore modified a custom game installation"
 
+gog_guidance_home="$tmp_dir/gog-guidance-home"
+gog_guidance_app="$gog_guidance_home/GOG Games/Worms W.M.D/Worms W.M.D.app"
+gog_guidance_backup="$gog_guidance_home/Documents/WormsWMD-Backup-20960101-000000"
+mkdir -p \
+    "$gog_guidance_app/Contents/MacOS" \
+    "$gog_guidance_app/Contents/Frameworks" \
+    "$gog_guidance_app/Contents/PlugIns" \
+    "$gog_guidance_backup/Frameworks" \
+    "$gog_guidance_backup/PlugIns"
+printf '#!/bin/bash\nexit 0\n' > "$gog_guidance_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$gog_guidance_app/Contents/MacOS/Worms W.M.D"
+printf 'current gog files\n' > "$gog_guidance_app/Contents/Frameworks/store-marker.txt"
+printf 'restored gog files\n' > "$gog_guidance_backup/Frameworks/store-marker.txt"
+gog_guidance_real=$(cd "$gog_guidance_app" && pwd -P)
+printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tgog\ncode_signature_present\tfalse\n' \
+    "$gog_guidance_real" > "$gog_guidance_backup/BACKUP_METADATA.tsv"
+(
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/scripts/common.sh"
+    worms_write_manifest "$gog_guidance_backup" "$gog_guidance_backup/BACKUP_MANIFEST.tsv" \
+        Frameworks PlugIns BACKUP_METADATA.tsv
+)
+gog_guidance_output=$(HOME="$gog_guidance_home" \
+    GAME_APP="$gog_guidance_app" \
+    "$ROOT_DIR/fix_worms_wmd.sh" --restore --force 2>&1) \
+    || fail "restore rejected a valid GOG backup: $gog_guidance_output"
+grep -Fq 'Use GOG Galaxy to repair the game if needed:' <<< "$gog_guidance_output" \
+    || fail "GOG restore did not print storefront-appropriate repair guidance: $gog_guidance_output"
+if grep -Fq 'Use Steam to repair the game if needed:' <<< "$gog_guidance_output"; then
+    fail "GOG restore incorrectly printed Steam repair guidance"
+fi
+
 printf 'Installer config rollback regression check passed.\n'
