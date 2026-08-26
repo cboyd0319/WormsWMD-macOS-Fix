@@ -24,6 +24,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   existing code-signature resources.
 - Bound new backups to their canonical source app and prevented an automatic
   restore from applying a GOG backup to Steam, or a Steam backup to GOG.
+- Fixed friendly-launcher option 7 so an interactive Steam or GOG selection is
+  used for the actual launch action.
 - Made install-name rewrite failures and AGL compiler failures actionable
   instead of suppressing their underlying errors.
 - Stopped rollback from claiming success when restored-file verification
@@ -31,7 +33,7 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 - Made restore guidance use the recorded Steam or GOG storefront instead of
   always recommending Steam repair.
 - Made manifest verification reject unrecorded extra files and Qt archive
-  validation reject duplicate members before extraction.
+  validation reject unreadable archives and duplicate members before extraction.
 
 ## Mainline maintenance after 1.7.5 (2026-08-11)
 

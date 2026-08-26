@@ -182,11 +182,12 @@ offer_support_bundle() {
 
 launch_game() {
     local default_game_path detected_game
-    local game_app="${GAME_APP:-}"
+    local game_app
 
     print_line ""
     worms_print_step "Launching Worms W.M.D"
     select_game_app_if_needed || return 1
+    game_app="${GAME_APP:-}"
 
     if ! command -v open >/dev/null 2>&1; then
         worms_print_warning "Automatic launch is unavailable here."

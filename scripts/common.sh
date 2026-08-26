@@ -9,10 +9,11 @@ worms_default_game_app() {
 
 worms_game_search_paths() {
     local steam_config line lib_path root found_path
+    local system_applications_root="${WORMSWMD_TEST_APPLICATIONS_ROOT:-/Applications}"
 
     printf '%s\0' "$(worms_default_game_app)"
-    printf '%s\0' "/Applications/Worms W.M.D.app"
-    printf '%s\0' "/Applications/Worms WMD.app"
+    printf '%s\0' "$system_applications_root/Worms W.M.D.app"
+    printf '%s\0' "$system_applications_root/Worms WMD.app"
     printf '%s\0' "$HOME/Applications/Worms W.M.D.app"
     printf '%s\0' "$HOME/Applications/Worms WMD.app"
     printf '%s\0' "$HOME/Games/Worms W.M.D.app"
@@ -22,7 +23,7 @@ worms_game_search_paths() {
     printf '%s\0' "$HOME/Library/Application Support/GOG.com/Games/Worms W.M.D/Worms W.M.D.app"
 
     for root in \
-        "/Applications" \
+        "$system_applications_root" \
         "$HOME/Applications" \
         "$HOME/Games" \
         "$HOME/GOG Games" \
@@ -674,9 +675,14 @@ worms_validate_tar_entry_metadata() {
 
 worms_validate_tar_no_duplicate_entries() {
     local archive="$1"
-    local duplicate
+    local duplicate listing
 
-    duplicate=$(tar -tzf "$archive" 2>/dev/null | awk '
+    if ! listing=$(tar -tzf "$archive" 2>/dev/null); then
+        echo "Unable to read archive entries: $archive" >&2
+        return 1
+    fi
+
+    duplicate=$(printf '%s\n' "$listing" | awk '
         {
             entry = $0
             sub(/^\.\//, "", entry)

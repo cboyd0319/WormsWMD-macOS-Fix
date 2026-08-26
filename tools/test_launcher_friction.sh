@@ -7,6 +7,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/common.sh"
+
 fail() {
     printf 'launcher friction check failed: %s\n' "$*" >&2
     exit 1
@@ -172,7 +175,18 @@ chmod +x \
     "$multi_steam_app/Contents/MacOS/Worms W.M.D" \
     "$multi_gog_app/Contents/MacOS/Worms W.M.D"
 
-printf '5\n2\n\nq\nq\n' | HOME="$multi_home" bash "$launcher" > "$tmp_dir/multi-menu.out" 2>&1 \
+multi_gog_choice=0
+candidate_number=1
+while IFS= read -r -d '' candidate_game; do
+    if [[ "$candidate_game" == "$multi_gog_app" ]]; then
+        multi_gog_choice=$candidate_number
+        break
+    fi
+    candidate_number=$((candidate_number + 1))
+done < <(HOME="$multi_home" worms_find_game_apps)
+[[ "$multi_gog_choice" -gt 0 ]] || fail "test could not identify the synthetic GOG installation"
+
+printf '5\n%s\n\nq\nq\n' "$multi_gog_choice" | HOME="$multi_home" bash "$launcher" > "$tmp_dir/multi-menu.out" 2>&1 \
     || fail "launcher did not create support for a selected GOG installation"
 multi_bundle=$(find "$multi_home/Desktop" -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
 [[ -n "$multi_bundle" ]] || fail "multi-install launcher did not create a support bundle"
@@ -180,6 +194,27 @@ mkdir -p "$tmp_dir/multi-extracted"
 tar -xzf "$multi_bundle" -C "$tmp_dir/multi-extracted"
 grep -Fq 'Found: ~/GOG Games/Worms W.M.D/Worms W.M.D.app' "$tmp_dir/multi-extracted/diagnostics.txt" \
     || fail "support bundle inspected Steam instead of the selected GOG installation"
+
+multi_bin="$tmp_dir/multi-bin"
+multi_open_log="$tmp_dir/multi-open.log"
+mkdir -p "$multi_bin"
+cat > "$multi_bin/open" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$WORMS_TEST_OPEN_LOG"
+exit 0
+STUB
+chmod +x "$multi_bin/open"
+printf '7\n%s\n\nq\n' "$multi_gog_choice" | \
+    HOME="$multi_home" \
+    PATH="$multi_bin:$PATH" \
+    WORMS_TEST_OPEN_LOG="$multi_open_log" \
+    bash "$launcher" > "$tmp_dir/multi-launch.out" 2>&1 \
+    || fail "launcher did not launch the selected GOG installation"
+grep -Fxq "$multi_gog_app" "$multi_open_log" \
+    || fail "launcher did not pass the selected GOG app to open: $(cat "$multi_open_log")"
+if grep -Fq 'steam://run/327030' "$multi_open_log"; then
+    fail "launcher ignored the selected GOG app and launched Steam"
+fi
 
 printf 'q\n' | bash "$launcher" > "$tmp_dir/menu.out" 2>&1 \
     || fail "launcher did not accept piped menu input"

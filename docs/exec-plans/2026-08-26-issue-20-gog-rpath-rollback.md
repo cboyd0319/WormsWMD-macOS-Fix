@@ -124,6 +124,9 @@ disposable copy is created first.
   APFS copy. The full fix and verbose post-sign verification passed, the intro
   and main menu rendered, and restore recovered the exact original executable
   hash, Qt 5.3.2 files, and unsigned signature state.
+- 2026-08-26: Addressed both Copilot review findings with fail-first tests:
+  option 7 now launches the interactive selection instead of a stale local
+  value, and duplicate-member validation propagates unreadable archive errors.
 
 ## Surprises & Discoveries
 

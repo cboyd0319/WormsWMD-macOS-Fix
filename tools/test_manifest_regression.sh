@@ -58,6 +58,12 @@ if worms_validate_tar_no_duplicate_entries "$duplicate_archive" 2>/dev/null; the
     fail "archive validation accepted duplicate members"
 fi
 
+corrupt_archive="$tmp_dir/corrupt.tar.gz"
+printf 'not a gzip archive\n' > "$corrupt_archive"
+if worms_validate_tar_no_duplicate_entries "$corrupt_archive" 2>/dev/null; then
+    fail "duplicate-entry validation accepted an unreadable archive"
+fi
+
 agl_root="$tmp_dir/agl-root"
 mkdir -p "$agl_root/Frameworks/AGL.framework/Versions/A/Resources"
 printf 'fake agl\n' > "$agl_root/Frameworks/AGL.framework/Versions/A/AGL"

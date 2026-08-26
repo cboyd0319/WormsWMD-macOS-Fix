@@ -15,6 +15,8 @@ fail() {
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-issue11.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
+export WORMSWMD_TEST_APPLICATIONS_ROOT="$tmp_dir/system-applications"
+mkdir -p "$WORMSWMD_TEST_APPLICATIONS_ROOT"
 
 function_file="$tmp_dir/auto_detect_game.sh"
 awk '
