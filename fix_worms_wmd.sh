@@ -420,7 +420,8 @@ game_source_for_backup() {
     local game_app="$1"
     local game_exec="$game_app/Contents/MacOS/Worms W.M.D"
 
-    if worms_otool_dependencies "$game_exec" | grep -Fqi 'libGalaxy.dylib'; then
+    if [[ -f "$game_app/Contents/MacOS/libGalaxy.dylib" ]] \
+        || worms_otool_dependencies "$game_exec" | grep -Fqi 'libGalaxy.dylib'; then
         echo "gog"
     elif [[ -f "$game_app/Contents/Frameworks/libsteam_api.dylib" ]] \
         || worms_otool_dependencies "$game_exec" | grep -Fqi 'libsteam_api.dylib'; then
@@ -476,7 +477,7 @@ backup_metadata_is_manifested() {
 backup_targets_game_app() {
     local backup_dir="$1"
     local game_app="$2"
-    local recorded_path game_app_real
+    local recorded_path recorded_source game_app_real current_source
 
     if ! backup_metadata_is_manifested "$backup_dir"; then
         return 2
@@ -487,7 +488,18 @@ backup_targets_game_app() {
     worms_reject_control_chars "$recorded_path" "backup game_app_path" || return 1
     [[ "$recorded_path" == /* ]] || return 1
     game_app_real=$(worms_real_dir "$game_app") || return 1
-    [[ "$recorded_path" == "$game_app_real" ]]
+    [[ "$recorded_path" == "$game_app_real" ]] || return 1
+
+    recorded_source=$(backup_metadata_value "$backup_dir" "game_source" || true)
+    case "$recorded_source" in
+        steam|gog|unknown)
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+    current_source=$(game_source_for_backup "$game_app")
+    [[ "$recorded_source" == "$current_source" ]]
 }
 
 print_store_repair_guidance() {

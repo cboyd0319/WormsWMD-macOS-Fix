@@ -131,6 +131,11 @@ disposable copy is created first.
   for run-path owner expansion, weak install names containing spaces, changed
   symlink targets, and unrecorded symlinks. New manifests are v2; v1 remains a
   compatible legacy format.
+- 2026-08-26: Addressed the final three Copilot findings with fail-first
+  regressions for linked `Contents/MacOS`, same-path cross-store restore, and
+  missing weak `@executable_path` dependencies. Mutation containment now covers
+  `Contents/MacOS`, new-backup restore requires path and storefront identity,
+  and weak-load handling is consistent across supported Mach-O path tokens.
 
 ## Surprises & Discoveries
 

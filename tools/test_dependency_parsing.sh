@@ -103,6 +103,7 @@ if [[ "${1:-}" == "-L" ]]; then
     printf '%s:\n' "${2:-binary}"
     case "${2:-}" in
         */Contents/MacOS/Worms\ W.M.D)
+            printf '\t@executable_path/libOptionalGalaxy.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
             printf '\t@rpath/libGalaxy.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
             printf '\t@rpath/libGalaxyCSharp.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
             printf '\t@rpath/libglib-2.0.0.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
@@ -114,6 +115,7 @@ if [[ "${1:-}" == "-L" ]]; then
             printf '\t@executable_path/../Frameworks/QtCore.framework/Versions/5/QtCore (compatibility version 5.15.0, current version 5.15.19)\n'
             ;;
         *libwebp.7.dylib)
+            printf '\t@loader_path/libOptionalWebPHelper.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
             printf '\t@rpath/libsharpyuv.0.dylib (compatibility version 2.0.0, current version 2.2.0)\n'
             ;;
     esac
@@ -137,6 +139,10 @@ Load command 3
       cmdsize 64
          path @loader_path/Path With Spaces (offset 12)
 Load command 4
+          cmd LC_LOAD_WEAK_DYLIB
+      cmdsize 64
+         name @executable_path/libOptionalGalaxy.dylib (offset 24)
+Load command 5
           cmd LC_LOAD_DYLIB
       cmdsize 48
          name @rpath/libGalaxy.dylib (offset 24)
@@ -161,6 +167,10 @@ LOADS
         *libwebp.7.dylib)
             cat <<'LOADS'
 Load command 1
+          cmd LC_LOAD_WEAK_DYLIB
+      cmdsize 64
+         name @loader_path/libOptionalWebPHelper.dylib (offset 24)
+Load command 2
           cmd LC_LOAD_WEAK_DYLIB
       cmdsize 56
          name @rpath/libsharpyuv.0.dylib (offset 24)
@@ -276,6 +286,10 @@ if grep -Fq "ERROR: libwebp.7.dylib has unresolved @rpath dependency: @rpath/lib
 fi
 grep -Fq "WARNING: Main executable has optional unresolved @rpath dependency: @rpath/libGalaxyCSharp.dylib" <<< "$verify_output" \
     || fail "verifier did not preserve the optional unresolved Galaxy dependency: $verify_output"
+grep -Fq "WARNING: Worms W.M.D has optional missing dependency: @executable_path/libOptionalGalaxy.dylib" <<< "$verify_output" \
+    || fail "verifier treated an optional @executable_path dependency as required: $verify_output"
+grep -Fq "WARNING: libwebp.7.dylib has optional missing dependency: @loader_path/libOptionalWebPHelper.dylib" <<< "$verify_output" \
+    || fail "verifier treated an optional @loader_path dependency as required: $verify_output"
 if grep -Fq "ERROR: Main executable has unresolved @rpath dependency: @rpath/libGalaxy.dylib" <<< "$verify_output"; then
     fail "verifier rejected a Galaxy dependency resolved by LC_RPATH"
 fi

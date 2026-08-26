@@ -23,7 +23,7 @@ This fix is designed to be safe against:
 | Man-in-the-middle attacks | HTTPS with TLS 1.2+ required, checksums verified |
 | Insecure game URLs | HTTP URLs upgraded to HTTPS, staging URLs disabled |
 | Privilege escalation | No `sudo`, no SUID, runs entirely as current user |
-| Symlink attacks | Temp files use `mktemp`, cleanup traps prevent dangling files |
+| Symlink attacks | Temp files use `mktemp`; mutation directories, including `Contents/MacOS`, must resolve inside the selected app |
 | Supply chain attacks | Pre-built packages require SHA256, metadata, manifest, and architecture verification |
 
 ## What the fix modifies
@@ -232,7 +232,7 @@ Last audit: 2026-08-26
 | Path traversal | Pass | Qt and save-backup archive validation, link rejection, no unvalidated path concatenation |
 | Network security | Pass | HTTPS-only, TLS 1.2+, checksums required |
 | Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
-| Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory, cleanup traps, bundle containment checks, and archive link rejection |
+| Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory, cleanup traps, containment checks for mutable bundle directories including `Contents/MacOS`, and archive link rejection |
 | Race conditions | Pass | Atomic operations where possible |
 | Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
 | Support bundle privacy | Pass | Sanitized bundles include OS, Rosetta, installer-history, runtime-invariant, Qt-package, and backup-integrity context without raw logs, saves, game binaries, or private config contents |
@@ -241,7 +241,7 @@ Last audit: 2026-08-26
 | Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
-| Backup restore | Pass | Game backups cover the executable, bind new backups to the source app, record v2 symlink targets, reject unrecorded entries, and refuse ambiguous cross-install legacy restore |
+| Backup restore | Pass | Game backups cover the executable, bind new backups to the canonical source app and storefront, record v2 symlink targets, reject unrecorded entries, and refuse ambiguous cross-install legacy restore |
 | Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
 
 ## Verifying the fix

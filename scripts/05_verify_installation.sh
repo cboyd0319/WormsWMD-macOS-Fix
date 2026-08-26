@@ -144,8 +144,13 @@ check_missing_deps() {
         fi
 
         if [ ! -f "$resolved" ]; then
-            echo "ERROR: Missing dependency for $(basename "$bin"): $dep"
-            ((errors++))
+            if worms_macho_dependency_is_weak "$bin" "$dep"; then
+                echo "WARNING: $(basename "$bin") has optional missing dependency: $dep"
+                ((warnings++))
+            else
+                echo "ERROR: Missing dependency for $(basename "$bin"): $dep"
+                ((errors++))
+            fi
         fi
     done < <(worms_otool_dependencies "$bin")
 }

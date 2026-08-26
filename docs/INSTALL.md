@@ -139,7 +139,8 @@ restored with a warning only when the selected installation is unambiguous.
 
 Prefer automatic restore when possible because it performs manifest validation.
 Manual restore is useful for inspection or recovery, but it bypasses the
-automated manifest checks.
+automated manifest and storefront checks. Confirm both `game_app_path` and
+`game_source` in `BACKUP_METADATA.tsv` before copying files manually.
 
 ```bash
 # Find your backup

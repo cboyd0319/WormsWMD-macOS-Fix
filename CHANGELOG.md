@@ -20,10 +20,16 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 - Fixed issue #20 verification for GOG executables by resolving `@rpath`
   dependencies through `LC_RPATH` and allowing unresolved weak-load
   dependencies as warnings. Required unresolved dependencies still fail.
+- Applied the weak-load warning policy consistently to missing
+  `@executable_path` and `@loader_path` dependencies.
 - Fixed game-bundle backup and rollback coverage for the main executable and
   existing code-signature resources.
 - Bound new backups to their canonical source app and prevented an automatic
   restore from applying a GOG backup to Steam, or a Steam backup to GOG.
+- Required both canonical path and storefront identity to match before an
+  automatic restore, including when different installations reuse a path.
+- Rejected game bundles whose mutable `Contents/MacOS` directory resolves
+  outside the selected app.
 - Fixed friendly-launcher option 7 so an interactive Steam or GOG selection is
   used for the actual launch action.
 - Made install-name rewrite failures and AGL compiler failures actionable

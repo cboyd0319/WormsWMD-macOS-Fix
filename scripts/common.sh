@@ -583,6 +583,7 @@ worms_validate_game_app_for_mutation() {
     fi
 
     critical_paths=(
+        "$contents/MacOS"
         "$contents/Frameworks"
         "$contents/PlugIns"
         "$contents/PlugIns/platforms"

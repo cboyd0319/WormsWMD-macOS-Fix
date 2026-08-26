@@ -470,6 +470,7 @@ chmod +x \
 restore_steam_real=$(cd "$restore_steam_app" && pwd -P)
 restore_gog_real=$(cd "$restore_gog_app" && pwd -P)
 printf 'steam original\n' > "$restore_steam_app/Contents/Frameworks/store-marker.txt"
+: > "$restore_steam_app/Contents/Frameworks/libsteam_api.dylib"
 printf 'gog backup\n' > "$gog_backup/Frameworks/store-marker.txt"
 printf '<plist version="1.0"><dict></dict></plist>\n' > "$gog_backup/Info.plist"
 printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tgog\n' \
@@ -514,6 +515,32 @@ if [[ "$unmanifested_status" -eq 0 ]]; then
 fi
 grep -Fxq 'steam original' "$restore_steam_app/Contents/Frameworks/store-marker.txt" \
     || fail "unmanifested backup metadata allowed a cross-install mutation"
+
+same_path_gog_backup="$restore_home/Documents/WormsWMD-Backup-20987500-000000"
+mkdir -p "$same_path_gog_backup/Frameworks" "$same_path_gog_backup/PlugIns"
+printf 'same-path gog backup\n' > "$same_path_gog_backup/Frameworks/store-marker.txt"
+printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tgog\ncode_signature_present\tfalse\n' \
+    "$restore_steam_real" > "$same_path_gog_backup/BACKUP_METADATA.tsv"
+(
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/scripts/common.sh"
+    worms_write_manifest "$same_path_gog_backup" "$same_path_gog_backup/BACKUP_MANIFEST.tsv" \
+        Frameworks PlugIns BACKUP_METADATA.tsv
+)
+set +e
+same_path_output=$(
+    HOME="$restore_home" \
+        GAME_APP="$restore_steam_app" \
+        "$ROOT_DIR/fix_worms_wmd.sh" --restore --force 2>&1
+)
+same_path_status=$?
+set -e
+if [[ "$same_path_status" -eq 0 ]]; then
+    fail "restore accepted a GOG backup for a Steam app at the same canonical path: $same_path_output"
+fi
+grep -Fxq 'steam original' "$restore_steam_app/Contents/Frameworks/store-marker.txt" \
+    || fail "same-path cross-store restore modified the selected Steam app"
+mv "$same_path_gog_backup" "$restore_home/Rejected-WormsWMD-Backup-20987500-000000"
 
 invalid_backup="$restore_home/Documents/WormsWMD-Backup-20985000-000000"
 mkdir -p "$invalid_backup/Frameworks" "$invalid_backup/PlugIns" "$invalid_backup/MacOS"
@@ -624,6 +651,7 @@ mkdir -p \
     "$gog_guidance_backup/Frameworks" \
     "$gog_guidance_backup/PlugIns"
 printf '#!/bin/bash\nexit 0\n' > "$gog_guidance_app/Contents/MacOS/Worms W.M.D"
+: > "$gog_guidance_app/Contents/MacOS/libGalaxy.dylib"
 chmod +x "$gog_guidance_app/Contents/MacOS/Worms W.M.D"
 printf 'current gog files\n' > "$gog_guidance_app/Contents/Frameworks/store-marker.txt"
 printf 'restored gog files\n' > "$gog_guidance_backup/Frameworks/store-marker.txt"

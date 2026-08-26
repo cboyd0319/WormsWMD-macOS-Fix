@@ -48,7 +48,9 @@ same change.
 
 The fix may modify files inside the selected `Worms W.M.D.app` bundle and may
 create user-owned backups, logs, cache files, and optional user LaunchAgents.
-It must not modify system directories or require elevated privileges.
+It must not modify system directories or require elevated privileges. Mutable
+bundle directories, including `Contents/MacOS`, must resolve inside the selected
+app rather than through a link to an external directory.
 
 The default app path is:
 
@@ -88,11 +90,12 @@ regular files; restore must never copy unmanifested additions from a current
 backup. Version 1 manifests remain readable as legacy manifests without symlink
 identity coverage.
 
-New backups are eligible for manual restore only when their recorded canonical
-source app matches the selected `GAME_APP`. Legacy backups without source
-metadata remain restorable when only one installation is detected; an
-ambiguous multi-install legacy restore must fail closed. A failed post-restore
-verification must not be reported as a successful rollback.
+New backups are eligible for automatic restore only when their recorded
+canonical source app and storefront identity match the selected `GAME_APP`.
+Legacy backups without source metadata remain restorable when only one
+installation is detected; an ambiguous multi-install legacy restore must fail
+closed. A failed post-restore verification must not be reported as a successful
+rollback.
 
 Backup creation may repair the fixer's own stale AGL framework symlink layout
 inside the backup copy before manifest validation. This self-heals repeated
@@ -140,9 +143,10 @@ read-only, but the game-bundle copies are mutable installer working files.
 `@rpath` is not an error by itself. Verification resolves run paths from the
 loading binary and main executable, accepts targets only inside the selected
 app bundle, and reports unresolved weak-load dependencies as optional warnings.
-Unresolved strong dependencies and external absolute dependencies remain
-errors. Intended `install_name_tool` mutations must fail with their underlying
-error instead of being silently ignored.
+The weak-load policy applies consistently to `@rpath`, `@executable_path`, and
+`@loader_path`. Unresolved strong dependencies and external absolute
+dependencies remain errors. Intended `install_name_tool` mutations must fail
+with their underlying error instead of being silently ignored.
 
 When multiple local Qt packages are present, scripts should choose the highest
 verified supported Qt 5.15.x version rather than the newest file by modification

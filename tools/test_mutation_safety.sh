@@ -45,6 +45,15 @@ if worms_validate_game_app_for_mutation "$malformed_app" 2>/dev/null; then
     fail "mutation validation accepted a non-directory DataOSX path"
 fi
 
+linked_macos_app="$tmp_dir/LinkedMacOS.app"
+outside_macos="$tmp_dir/outside-macos"
+make_game "$linked_macos_app"
+mv "$linked_macos_app/Contents/MacOS" "$outside_macos"
+ln -s "$outside_macos" "$linked_macos_app/Contents/MacOS"
+if worms_validate_game_app_for_mutation "$linked_macos_app" 2>/dev/null; then
+    fail "mutation validation accepted a MacOS directory linked outside the app"
+fi
+
 symlink_app="$tmp_dir/Symlink.app"
 outside_config="$tmp_dir/outside-config.txt"
 make_game "$symlink_app"
