@@ -271,6 +271,107 @@ worms_otool_dependencies() {
     otool -L "$bin" 2>/dev/null | worms_otool_dependencies_from_stdin || true
 }
 
+worms_macho_rpaths() {
+    local bin="$1"
+
+    otool -l "$bin" 2>/dev/null | awk '
+        $1 == "cmd" {
+            in_rpath = ($2 == "LC_RPATH")
+            next
+        }
+        in_rpath && $1 == "path" {
+            line = $0
+            sub(/^[[:space:]]*path[[:space:]]+/, "", line)
+            sub(/[[:space:]]+\(offset[[:space:]]+[0-9]+\)$/, "", line)
+            print line
+            in_rpath = 0
+        }
+    '
+}
+
+worms_macho_dependency_is_weak() {
+    local bin="$1"
+    local dependency="$2"
+
+    otool -l "$bin" 2>/dev/null | awk -v dependency="$dependency" '
+        $1 == "cmd" {
+            load_command = $2
+            next
+        }
+        $1 == "name" {
+            if ($2 == dependency && load_command == "LC_LOAD_WEAK_DYLIB") {
+                found = 1
+            }
+            load_command = ""
+        }
+        END { exit(found ? 0 : 1) }
+    '
+}
+
+worms_expand_macho_path() {
+    local path="$1"
+    local loader_bin="$2"
+    local game_exec="$3"
+
+    case "$path" in
+        @executable_path)
+            printf '%s\n' "$(dirname "$game_exec")"
+            ;;
+        @executable_path/*)
+            printf '%s%s\n' "$(dirname "$game_exec")" "${path#@executable_path}"
+            ;;
+        @loader_path)
+            printf '%s\n' "$(dirname "$loader_bin")"
+            ;;
+        @loader_path/*)
+            printf '%s%s\n' "$(dirname "$loader_bin")" "${path#@loader_path}"
+            ;;
+        /*)
+            printf '%s\n' "$path"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+worms_resolve_macho_rpath_dependency() {
+    local bin="$1"
+    local dependency="$2"
+    local game_exec="$3"
+    local game_app="$4"
+    local dependency_suffix
+    local rpath expanded candidate candidate_real rpath_bin
+
+    [[ "$dependency" == @rpath/* ]] || return 1
+    dependency_suffix=${dependency#@rpath/}
+
+    for rpath_bin in "$bin" "$game_exec"; do
+        [[ -f "$rpath_bin" ]] || continue
+        while IFS= read -r rpath; do
+            [[ -n "$rpath" ]] || continue
+            expanded=$(worms_expand_macho_path "$rpath" "$bin" "$game_exec" || true)
+            [[ -n "$expanded" ]] || continue
+            candidate="${expanded%/}/$dependency_suffix"
+            [[ -f "$candidate" ]] || continue
+            if [[ -L "$candidate" ]]; then
+                command -v realpath >/dev/null 2>&1 || continue
+                candidate_real=$(realpath "$candidate" 2>/dev/null || true)
+                [[ -n "$candidate_real" ]] || continue
+            else
+                candidate_real="$candidate"
+            fi
+            if worms_path_inside_root "$game_app/Contents" "$candidate_real"; then
+                printf '%s\n' "$candidate"
+                return 0
+            fi
+        done < <(worms_macho_rpaths "$rpath_bin")
+        [[ "$rpath_bin" == "$game_exec" ]] && break
+    done
+
+    return 1
+}
+
 worms_file_link_count() {
     local path="$1"
 
@@ -281,7 +382,7 @@ worms_has_control_chars() {
     local value="$1"
 
     case "$value" in
-        *$'\n'*|*$'\r'*)
+        *$'\n'*|*$'\r'*|*$'\t'*)
             return 0
             ;;
     esac
@@ -571,6 +672,28 @@ worms_validate_tar_entry_metadata() {
     done <<< "$listing"
 }
 
+worms_validate_tar_no_duplicate_entries() {
+    local archive="$1"
+    local duplicate
+
+    duplicate=$(tar -tzf "$archive" 2>/dev/null | awk '
+        {
+            entry = $0
+            sub(/^\.\//, "", entry)
+            while (sub(/\/$/, "", entry)) { }
+            if (entry == "") next
+            if (seen[entry]++) {
+                print entry
+                exit
+            }
+        }
+    ')
+    if [[ -n "$duplicate" ]]; then
+        echo "Archive contains duplicate entry: $duplicate" >&2
+        return 1
+    fi
+}
+
 worms_write_manifest() {
     local root_dir="$1"
     local manifest_file="$2"
@@ -616,13 +739,15 @@ worms_verify_manifest() {
     local root_dir="$1"
     local manifest_file="$2"
     local expected_hash expected_size rel_path actual_size status=0
-    local paths_file expected_file actual_file hash_line actual_hash actual_path actual_extra
+    local paths_file expected_file actual_file tree_file hash_line actual_hash actual_path actual_extra
+    local root_real manifest_dir_real manifest_rel="" extra_path
 
     [[ -f "$manifest_file" ]] || return 1
 
     paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-paths.XXXXXX")
     expected_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-expected.XXXXXX")
     actual_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-actual.XXXXXX")
+    tree_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-tree.XXXXXX")
 
     while IFS=$'\t' read -r expected_hash expected_size rel_path extra; do
         [[ -n "${expected_hash:-}" ]] || continue
@@ -660,6 +785,28 @@ worms_verify_manifest() {
         printf '%s\t%s\n' "$expected_hash" "$rel_path" >> "$expected_file"
     done < "$manifest_file"
 
+    root_real=$(worms_real_dir "$root_dir") || status=1
+    manifest_dir_real=$(worms_real_dir "$(dirname "$manifest_file")" || true)
+    if [[ -n "$root_real" ]] && [[ "$manifest_dir_real" == "$root_real" ]]; then
+        manifest_rel=$(basename "$manifest_file")
+    elif [[ -n "$root_real" ]] && [[ "$manifest_dir_real" == "$root_real"/* ]]; then
+        manifest_rel="${manifest_dir_real#"$root_real"/}/$(basename "$manifest_file")"
+    fi
+
+    (
+        cd "$root_dir" || exit 1
+        find . -type f -print | sed 's#^\./##'
+    ) | while IFS= read -r actual_path; do
+        [[ -n "$actual_path" ]] || continue
+        [[ "$actual_path" == "$manifest_rel" ]] && continue
+        printf '%s\n' "$actual_path"
+    done > "$tree_file"
+    extra_path=$(awk 'NR == FNR {expected[$0]=1; next} !($0 in expected) {print; exit}' "$paths_file" "$tree_file")
+    if [[ -n "$extra_path" ]]; then
+        echo "Manifest contains unrecorded file: $extra_path" >&2
+        status=1
+    fi
+
     worms_manifest_hashes "$root_dir" "$paths_file" | while IFS= read -r hash_line; do
         [[ -n "$hash_line" ]] || continue
         actual_hash=${hash_line%% *}
@@ -686,7 +833,7 @@ worms_verify_manifest() {
     fi
     exec 3<&-
 
-    rm -f "$paths_file" "$expected_file" "$actual_file"
+    rm -f "$paths_file" "$expected_file" "$actual_file" "$tree_file"
 
     return "$status"
 }

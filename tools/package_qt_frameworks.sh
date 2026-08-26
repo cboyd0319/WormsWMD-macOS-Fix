@@ -233,6 +233,7 @@ create_reproducible_archive() {
 
         COPYFILE_DISABLE=1 tar \
             --format ustar \
+            --no-recursion \
             --uid 0 \
             --gid 0 \
             --uname root \
@@ -356,6 +357,9 @@ touch "$COPIED_DEPS_FILE"
 
 copy_deps() {
     local binary="$1"
+    local binary_name
+
+    binary_name=$(basename "$binary")
 
     while IFS= read -r dep; do
         # Only package external dylib dependencies that can travel with the app.
@@ -363,6 +367,11 @@ copy_deps() {
             [[ "$dep" == *.dylib ]] || continue
             local dep_name
             dep_name=$(basename "$dep")
+
+            # otool -L includes a dylib's own install ID. It is metadata, not a
+            # dependency, and copying it duplicated every Qt plugin at the
+            # Frameworks root in older packages.
+            [[ "$dep_name" == "$binary_name" ]] && continue
 
             # Skip if already copied
             if grep -Fqx -- "$dep_name" "$COPIED_DEPS_FILE"; then
@@ -411,6 +420,7 @@ done
 worms_print_step "Organizing dependencies..."
 mv "$DEPS_DIR"/* "$FRAMEWORKS_DIR/" 2>/dev/null || true
 rmdir "$DEPS_DIR" 2>/dev/null || true
+rm -f "$COPIED_DEPS_FILE"
 
 # Count what we packaged
 fw_count=$(find "$FRAMEWORKS_DIR" -name "*.framework" -type d | wc -l | tr -d ' ')

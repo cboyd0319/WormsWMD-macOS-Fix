@@ -37,7 +37,9 @@ it.
 
 - No `sudo`, administrator password, kernel extension, or system-wide installer.
 - The default launcher has a dry-run preview option before applying changes.
-- Original game files are backed up before replacement and can be restored.
+- Covered original game files, including the main executable and existing
+  signature resources, are backed up before replacement. New backups are bound
+  to their source Steam or GOG app before restore.
 - Pre-built Qt packages are checked with SHA-256, metadata, safe archive paths,
   generated or archive-provided manifests, and x86_64 architecture validation
   before use.

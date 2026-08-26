@@ -130,8 +130,10 @@ The fix creates a timestamped backup before making changes.
 ```
 
 Automatic restore verifies the backup manifest when `BACKUP_MANIFEST.tsv` is
-present and cancels instead of restoring from a mismatched backup. Older backups
-without a manifest are treated as legacy backups and restored with a warning.
+present and cancels instead of restoring from a mismatched backup. New backups
+also record their source app in `BACKUP_METADATA.tsv`, so a Steam backup cannot
+be applied to GOG or vice versa. Older backups without source metadata are
+restored with a warning only when the selected installation is unambiguous.
 
 ### Restore manually
 
@@ -152,10 +154,34 @@ if [[ -f "$BACKUP_DIR/BACKUP_MANIFEST.tsv" ]]; then
   sed -n '1,20p' "$BACKUP_DIR/BACKUP_MANIFEST.tsv"
 fi
 
+# New backups must match the selected app.
+if [[ -f "$BACKUP_DIR/BACKUP_METADATA.tsv" ]]; then
+  BACKUP_GAME_APP=$(awk -F '\t' '$1 == "game_app_path" {sub(/^[^\t]*\t/, ""); print; exit}' "$BACKUP_DIR/BACKUP_METADATA.tsv")
+  SELECTED_GAME_APP=$(cd "$GAME_APP" && pwd -P)
+  [[ "$BACKUP_GAME_APP" == "$SELECTED_GAME_APP" ]] || {
+    echo "Backup belongs to a different game installation." >&2
+    exit 1
+  }
+fi
+
 rm -rf "$GAME_APP/Contents/Frameworks"
 rm -rf "$GAME_APP/Contents/PlugIns"
 cp -R "$BACKUP_DIR/Frameworks" "$GAME_APP/Contents/"
 cp -R "$BACKUP_DIR/PlugIns" "$GAME_APP/Contents/"
+
+# Restore the original main executable when present in a current backup.
+if [[ -f "$BACKUP_DIR/MacOS/Worms W.M.D" ]]; then
+  cp -p "$BACKUP_DIR/MacOS/Worms W.M.D" "$GAME_APP/Contents/MacOS/Worms W.M.D"
+fi
+
+# Restore or remove fixer-created signature resources according to metadata.
+if [[ -f "$BACKUP_DIR/BACKUP_METADATA.tsv" ]]; then
+  SIGNATURE_PRESENT=$(awk -F '\t' '$1 == "code_signature_present" {print $2; exit}' "$BACKUP_DIR/BACKUP_METADATA.tsv")
+  rm -rf "$GAME_APP/Contents/_CodeSignature"
+  if [[ "$SIGNATURE_PRESENT" == "true" && -d "$BACKUP_DIR/_CodeSignature" ]]; then
+    cp -R "$BACKUP_DIR/_CodeSignature" "$GAME_APP/Contents/"
+  fi
+fi
 
 # Restore Info.plist (if backed up)
 if [[ -f "$BACKUP_DIR/Info.plist" ]]; then

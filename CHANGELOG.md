@@ -4,7 +4,32 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
-No user-facing changes yet.
+### Changed
+
+- Support bundles now stay bound to the Steam or GOG installation selected in
+  the friendly launcher, report Mach-O run-path resolution, label backup source
+  metadata, remove ANSI fragments, and include only one copy of identical
+  backup manifests.
+- The Qt 5.15.19 package now contains 15 actual runtime dependency dylibs
+  without duplicate plugin entries or duplicate tar members.
+- Optional quarantine removal, ad-hoc signing, and Qt geometry reset now happen
+  only after hard runtime verification succeeds.
+
+### Fixed
+
+- Fixed issue #20 verification for GOG executables by resolving `@rpath`
+  dependencies through `LC_RPATH` and allowing unresolved weak-load
+  dependencies as warnings. Required unresolved dependencies still fail.
+- Fixed game-bundle backup and rollback coverage for the main executable and
+  existing code-signature resources.
+- Bound new backups to their canonical source app and prevented an automatic
+  restore from applying a GOG backup to Steam, or a Steam backup to GOG.
+- Made install-name rewrite failures and AGL compiler failures actionable
+  instead of suppressing their underlying errors.
+- Stopped rollback from claiming success when restored-file verification
+  fails.
+- Made manifest verification reject unrecorded extra files and Qt archive
+  validation reject duplicate members before extraction.
 
 ## Mainline maintenance after 1.7.5 (2026-08-11)
 

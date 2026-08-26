@@ -32,6 +32,10 @@ make_game() {
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-mutation-safety.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
 
+if worms_reject_control_chars $'unsafe\tpath' "tabbed test path" 2>/dev/null; then
+    fail "control-character validation accepted a tab-delimited path"
+fi
+
 malformed_app="$tmp_dir/Malformed.app"
 make_game "$malformed_app"
 rm -rf "$malformed_app/Contents/Resources/DataOSX"

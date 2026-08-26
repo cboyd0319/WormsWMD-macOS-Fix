@@ -32,7 +32,13 @@ source "$REPO_DIR/scripts/common.sh"
 source "$REPO_DIR/scripts/ui.sh"
 
 DEFAULT_GAME_PATH="$(worms_default_game_app)"
+GAME_APP_EXPLICIT=false
+if [[ -n "${GAME_APP:-}" ]]; then
+    GAME_APP_EXPLICIT=true
+fi
 GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
+GAME_APP_AMBIGUOUS=false
+DETECTED_GAME_APPS=()
 OUTPUT_FILE=""
 FULL_MODE=false
 COPY_TO_CLIPBOARD=false
@@ -95,7 +101,9 @@ sanitize_report() {
     local output="$2"
 
     awk -v home="$HOME" '
+        BEGIN { ansi = sprintf("%c", 27) "\\[[0-9;]*[[:alpha:]]" }
         {
+            gsub(ansi, "")
             gsub(home, "~")
             gsub(/\/Users\/[^\/[:space:]]+/, "/Users/[redacted-user]")
             gsub(/\/Volumes\/[^"<>]*/, "[redacted-path]")
@@ -133,7 +141,8 @@ infer_log_outcome() {
     local line outcome="unknown"
 
     while IFS= read -r line; do
-        if [[ "$line" == *"Rolled back to original state."* ]]; then
+        if [[ "$line" == *"Rolled back to original state."* ]] \
+            || [[ "$line" == *"Rolled back to original game files."* ]]; then
             outcome="failure: rollback completed"
         elif [[ "$line" == *"ERROR:"* || "$line" == *"✗"* ]]; then
             outcome="failure or warning: inspect timeline"
@@ -279,10 +288,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "$GAME_APP" == "$DEFAULT_GAME_PATH" ]] && [[ ! -d "$GAME_APP" ]]; then
-    detected_game=$(worms_first_detected_game_app || true)
-    if [[ -n "$detected_game" ]]; then
-        GAME_APP="$detected_game"
+if ! $GAME_APP_EXPLICIT; then
+    while IFS= read -r -d '' detected_game; do
+        DETECTED_GAME_APPS+=("$detected_game")
+    done < <(worms_find_game_apps)
+
+    if [[ ${#DETECTED_GAME_APPS[@]} -eq 1 ]]; then
+        GAME_APP="${DETECTED_GAME_APPS[0]}"
+    elif [[ ${#DETECTED_GAME_APPS[@]} -gt 1 ]]; then
+        GAME_APP=""
+        GAME_APP_AMBIGUOUS=true
     fi
 fi
 
@@ -392,7 +407,13 @@ collect_diagnostics() {
     # ================================================================
 
     subsection "Game Location"
-    if [[ -d "$GAME_APP" ]]; then
+    if $GAME_APP_AMBIGUOUS; then
+        warn "Multiple installations detected; set GAME_APP to the installation being diagnosed."
+        local detected_game
+        for detected_game in "${DETECTED_GAME_APPS[@]}"; do
+            info "Detected: $detected_game"
+        done
+    elif [[ -d "$GAME_APP" ]]; then
         ok "Found: $GAME_APP"
 
         local game_exec="$GAME_APP/Contents/MacOS/Worms W.M.D"
@@ -573,18 +594,38 @@ collect_diagnostics() {
     # ================================================================
 
     if [[ -d "$GAME_APP" ]]; then
-        subsection "Unresolved Dependencies"
+        subsection "Executable Dependency Resolution"
         local game_exec="$GAME_APP/Contents/MacOS/Worms W.M.D"
         if [[ -f "$game_exec" ]]; then
-            local unresolved
-            unresolved=$(otool -L "$game_exec" 2>/dev/null | grep -E "@rpath|/usr/local" | grep -v "^$game_exec" || echo "")
-            if [[ -z "$unresolved" ]]; then
-                ok "No unresolved @rpath or /usr/local references in executable"
-            else
-                warn "Unresolved references found:"
-                echo "$unresolved" | while read -r line; do
-                    info "  $line"
-                done
+            local dep resolved rpath dependency_issues=0
+
+            while IFS= read -r rpath; do
+                [[ -n "$rpath" ]] && info "LC_RPATH: $rpath"
+            done < <(worms_macho_rpaths "$game_exec")
+
+            while IFS= read -r dep; do
+                case "$dep" in
+                    @rpath/*)
+                        resolved=$(worms_resolve_macho_rpath_dependency "$game_exec" "$dep" "$game_exec" "$GAME_APP" || true)
+                        if [[ -n "$resolved" ]]; then
+                            ok "$dep resolves to ${resolved#"$GAME_APP"/}"
+                        elif worms_macho_dependency_is_weak "$game_exec" "$dep"; then
+                            warn "$dep is optional and unresolved"
+                            dependency_issues=$((dependency_issues + 1))
+                        else
+                            fail "$dep is required and unresolved"
+                            dependency_issues=$((dependency_issues + 1))
+                        fi
+                        ;;
+                    /usr/local/*)
+                        warn "External dependency: $dep"
+                        dependency_issues=$((dependency_issues + 1))
+                        ;;
+                esac
+            done < <(worms_otool_dependencies "$game_exec")
+
+            if [[ "$dependency_issues" -eq 0 ]]; then
+                ok "No unresolved or external executable dependencies"
             fi
         fi
 
@@ -867,9 +908,8 @@ write_install_summary() {
                 echo "Size bytes: $log_size"
                 echo "Inferred outcome: $outcome"
                 echo "Step timeline:"
-                grep -E '^(==>|.*(Log file:|ERROR:|SUCCESS:|Rolled back|Rolling back|Backup created|Backup manifest|All checks passed|Installation verification failed|Copying dependencies failed|AGL stub built successfully|Qt frameworks installed|Dependencies bundled|FIX COMPLETE|Dry run complete|Pre-flight checks|Creating backup|Building AGL|Replacing Qt|Copying dependencies|Fixing library paths|Applying enhancements|Applying finishing touches|Verifying installation))' "$log_file" \
-                    | tail -80 \
-                    | sed 's/[[:cntrl:]]//g' || true
+                grep -E '^(==>|.*(Log file:|Game found:|ERROR:|SUCCESS:|Rolled back|Rolling back|Backup created|Backup manifest|All checks passed|Installation verification failed|Copying dependencies failed|AGL stub built successfully|Qt frameworks installed|Bundled dependencies verified|Dependencies copied|Dependencies prepared|FIX COMPLETE|Dry run complete|Pre-flight checks|Creating backup|Building AGL|Replacing Qt|Copying dependencies|Fixing library paths|Applying enhancements|Applying finishing touches|Verifying installation))' "$log_file" \
+                    | tail -80 || true
             done < "$logs_list_file"
         fi
         rm -f "$logs_list_file"
@@ -978,7 +1018,8 @@ write_backup_summary() {
     local bundle_dir="$1"
     local raw_file="$bundle_dir/backup-summary.raw.txt"
     local summary_file="$bundle_dir/backup-summary.txt"
-    local backup_count=0 backup manifest mtime symlink_status manifest_status
+    local backup_count=0 backup manifest metadata mtime symlink_status manifest_status
+    local game_source game_app_path executable_hash
 
     {
         echo "Backup integrity summary"
@@ -1020,8 +1061,23 @@ write_backup_summary() {
                     echo ""
                     echo "Backup: $(basename "$backup")"
                     echo "Modified: $mtime"
+                    metadata="$backup/BACKUP_METADATA.tsv"
+                    if [[ -f "$metadata" ]]; then
+                        game_source=$(awk -F '\t' '$1 == "game_source" {print $2; exit}' "$metadata")
+                        game_app_path=$(awk -F '\t' '$1 == "game_app_path" {sub(/^[^\t]*\t/, ""); print; exit}' "$metadata")
+                        executable_hash=$(awk -F '\t' '$1 == "game_executable_sha256" {print $2; exit}' "$metadata")
+                        echo "Game source: ${game_source:-unknown}"
+                        echo "Game app: ${game_app_path:-unknown}"
+                        echo "Executable SHA-256: ${executable_hash:-unknown}"
+                    else
+                        echo "Game source: unknown (legacy backup)"
+                        echo "Game app: unknown (legacy backup)"
+                    fi
                     echo "Symlink validation: $symlink_status"
-                    echo "Manifest validation: $manifest_status"
+                        echo "Manifest validation: $manifest_status"
+                        if [[ -f "$manifest" ]]; then
+                            echo "Manifest SHA-256: $(worms_file_sha256 "$manifest")"
+                        fi
                     if [[ -d "$backup/Frameworks/AGL.framework" ]]; then
                         echo "Looks already fixed: yes (AGL.framework present)"
                     else
@@ -1039,18 +1095,35 @@ copy_backup_manifests() {
     local bundle_dir="$1"
     local manifests_dir="$bundle_dir/backup-manifests"
     local copied=0
-    local backup manifest target_name
+    local backup manifest target_name manifest_hash
+    local backups_file seen_hashes_file
 
     mkdir -p "$manifests_dir"
     if [[ -d "$HOME/Documents" ]]; then
-        while IFS= read -r -d '' backup; do
+        backups_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-support-backups.XXXXXX")
+        seen_hashes_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-support-hashes.XXXXXX")
+        find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null \
+            | while IFS= read -r -d '' backup; do
+                printf '%s\t%s\n' "$(stat -f '%m' "$backup" 2>/dev/null || echo 0)" "$backup"
+            done \
+            | sort -nr \
+            | awk -F '\t' 'NR <= 5 { sub(/^[^\t]*\t/, ""); print }' \
+            > "$backups_file"
+
+        while IFS= read -r backup; do
             manifest="$backup/BACKUP_MANIFEST.tsv"
             if [[ -f "$manifest" ]]; then
-                target_name=$(printf 'backup-manifest-%02d.tsv' "$((copied + 1))")
+                manifest_hash=$(worms_file_sha256 "$manifest")
+                if grep -Fqx "$manifest_hash" "$seen_hashes_file"; then
+                    continue
+                fi
+                printf '%s\n' "$manifest_hash" >> "$seen_hashes_file"
+                target_name="$(basename "$backup")-manifest.tsv"
                 sanitize_report "$manifest" "$manifests_dir/$target_name"
                 copied=$((copied + 1))
             fi
-        done < <(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null)
+        done < "$backups_file"
+        rm -f "$backups_file" "$seen_hashes_file"
     fi
 
     if [[ "$copied" -eq 0 ]]; then

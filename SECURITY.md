@@ -36,6 +36,8 @@ This fix is designed to be safe against:
 | `Contents/Frameworks/AGL.framework/` | Add stub library | Satisfy removed AGL dependency |
 | `Contents/Frameworks/*.dylib` | Add dependency libraries | Bundle required runtime libraries |
 | `Contents/PlugIns/` | Replace Qt plugins | Update platform and image plugins |
+| `Contents/MacOS/Worms W.M.D` | Rewrite matching install names and ad-hoc sign | Keep runtime references portable |
+| `Contents/_CodeSignature/` | Replace signature resources | Match the ad-hoc signed bundle |
 | `Contents/Info.plist` | Update metadata | Add bundle ID, HiDPI flags, min version |
 | `Contents/Resources/DataOSX/*.txt` | Update URLs | Use HTTPS, disable internal staging URLs |
 | `Contents/Resources/CommonData/*.txt` | Update URLs | Use HTTPS for analytics/HTTP config |
@@ -222,7 +224,7 @@ All interactive prompts:
 
 ## Security audit checklist
 
-Last audit: 2026-06-22
+Last audit: 2026-08-26
 
 | Category | Status | Notes |
 |----------|--------|-------|
@@ -239,7 +241,7 @@ Last audit: 2026-06-22
 | Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
-| Backup restore | Pass | Game backups validate manifests and safe symlinks; save archives reject links and special files before restore; legacy backups are flagged |
+| Backup restore | Pass | Game backups cover the executable, bind new backups to the source app, reject unrecorded files, validate safe symlinks, and refuse ambiguous cross-install legacy restore |
 | Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
 
 ## Verifying the fix
@@ -315,9 +317,13 @@ The fix automatically creates a backup before making changes:
 **Backup contents**:
 - `Frameworks/` - Original Qt frameworks and libraries
 - `PlugIns/` - Original Qt plugins
+- `MacOS/Worms W.M.D` - Original main executable
+- `_CodeSignature/` - Original signature resources when present
 - `Info.plist` - Original app metadata
 - `DataOSX/` - Original configuration files
 - `CommonData/` - Original shared configuration files
+- `BACKUP_METADATA.tsv` - Canonical source app, storefront, executable identity,
+  and signature-presence metadata
 - `BACKUP_MANIFEST.tsv` - SHA256 and size manifest for backup verification
 
 **Restore command**:
@@ -371,7 +377,10 @@ Qt package supply-chain process:
 
 3. **Ad-hoc code signature**: The app is signed with an ad-hoc signature, not a Developer ID. This may trigger Gatekeeper warnings on some systems.
 
-4. **Legacy backups cannot be fully verified**: Backups created before manifest support can still be restored, but the scripts warn that they lack checksum manifests.
+4. **Legacy backups cannot be fully identified or verified**: Backups created
+   before manifest or source-metadata support can still be restored with an
+   explicit warning when one installation is present. Ambiguous multi-install
+   legacy restore is refused.
 
 5. **Game config secrets**: The original game ships with confirmed API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
 

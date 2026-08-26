@@ -109,10 +109,16 @@ email addresses, and common secret-like key/value strings. Support bundles
 contain diagnostics, macOS version, Rosetta package version when available,
 x86_64 execution status, sanitized installer history, runtime invariant status,
 pre-built Qt package verification details, backup integrity status, and
-available backup manifests; they do not include raw logs, crash logs, save
-files, game binaries, or private config file contents. The support-bundle
+deduplicated backup manifests. They also report the selected installation,
+Mach-O run paths, resolved or optional executable dependencies, and backup
+storefront metadata. They do not include raw logs, crash logs, save files, game
+binaries, or private config file contents. The support-bundle
 archive also normalizes tar owner and group metadata so it does not expose the
 local macOS account name.
+
+If more than one installation is detected, direct diagnostics require
+`GAME_APP`. The friendly launcher prompts once and preserves that selection for
+apply, verify, support, and launch actions.
 
 ## Enhanced launcher
 

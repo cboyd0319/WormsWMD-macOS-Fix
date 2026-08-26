@@ -37,6 +37,10 @@ The main installer runs the fix scripts in this logical order:
 7. `scripts/05_verify_installation.sh` - verify framework, plugin, dependency,
    metadata, code-signing, quarantine, and config URL state.
 
+Hard runtime verification runs before optional quarantine removal, ad-hoc
+signing, and Qt window-geometry reset. A failure before that boundary must roll
+back the covered game files.
+
 Do not reorder these steps unless the verification contract is updated in the
 same change.
 
@@ -53,9 +57,10 @@ $HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.ap
 ```
 
 `GAME_APP` may point elsewhere. Always quote it because the bundle path contains
-spaces. When `GAME_APP` is not set and the default Steam path is absent, user
-entrypoints may auto-detect common Steam library, GOG, `/Applications`,
-`$HOME/Applications`, and `$HOME/Games` app-bundle locations.
+spaces. When `GAME_APP` is not set, user entrypoints enumerate common Steam
+library, GOG, `/Applications`, `$HOME/Applications`, and `$HOME/Games`
+app-bundle locations. Multiple installations require an explicit or interactive
+selection and must not silently fall back to Steam.
 
 ## Backup And Restore Contract
 
@@ -64,15 +69,27 @@ Before destructive bundle changes, the fix creates a timestamped backup under
 
 - `Contents/Frameworks/`
 - `Contents/PlugIns/`
+- `Contents/MacOS/Worms W.M.D`
+- `Contents/_CodeSignature/` when it existed before the fix
 - `Contents/Info.plist` when backed up
 - DataOSX config files when backed up
 - CommonData config files when backed up
+- `BACKUP_METADATA.tsv` with source-app and executable identity
 - `BACKUP_MANIFEST.tsv` for checksum and size verification of new backups
 
 When a game-bundle backup includes `BACKUP_MANIFEST.tsv`, restore and rollback
 must verify it before copying files back and must verify the restored files
 afterward. Backups without a manifest are legacy backups and may be restored
 only with an explicit warning.
+
+Manifest verification must reject missing, changed, and unrecorded extra files;
+restore must never copy unmanifested additions from a current backup.
+
+New backups are eligible for manual restore only when their recorded canonical
+source app matches the selected `GAME_APP`. Legacy backups without source
+metadata remain restorable when only one installation is detected; an
+ambiguous multi-install legacy restore must fail closed. A failed post-restore
+verification must not be reported as a successful rollback.
 
 Backup creation may repair the fixer's own stale AGL framework symlink layout
 inside the backup copy before manifest validation. This self-heals repeated
@@ -91,8 +108,9 @@ archives that do not include a manifest.
 
 The preferred Qt source is the prebuilt archive in `dist/` plus its `.sha256`
 file. Archive extraction must reject unsafe layouts, traversal paths, unsafe
-symlink targets, hardlinks, and special files. Remote fallback must use a pinned
-commit for `dist/` contents. If a legacy archive lacks `MANIFEST.txt`, the
+symlink targets, hardlinks, special files, and duplicate archive members.
+Remote fallback must use a pinned commit for `dist/` contents. If a legacy
+archive lacks `MANIFEST.txt`, the
 downloader must generate and verify a cache-local manifest before installer use.
 Homebrew is a fallback, not the primary happy path.
 
@@ -115,6 +133,13 @@ where possible, and post-backup failures must trigger rollback.
 Copied Qt framework binaries must be made owner-writable before
 `install_name_tool` rewrites them. Package inputs may intentionally be
 read-only, but the game-bundle copies are mutable installer working files.
+
+`@rpath` is not an error by itself. Verification resolves run paths from the
+loading binary and main executable, accepts targets only inside the selected
+app bundle, and reports unresolved weak-load dependencies as optional warnings.
+Unresolved strong dependencies and external absolute dependencies remain
+errors. Intended `install_name_tool` mutations must fail with their underlying
+error instead of being silently ignored.
 
 When multiple local Qt packages are present, scripts should choose the highest
 verified supported Qt 5.15.x version rather than the newest file by modification
@@ -179,7 +204,11 @@ must not include raw `.log`, `.trace`, crash-log, save, game-binary, or private
 config-file contents. Support-bundle archives should normalize tar owner/group
 metadata so archive listings do not expose local account names.
 The friendly launcher's support option should delegate to
-`tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop`.
+`tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop` while
+preserving the selected `GAME_APP`. Direct diagnostics with multiple detected
+installations and no explicit target must report ambiguity instead of choosing
+one. Support bundles should include sanitized run-path resolution, backup source
+metadata, and one copy of byte-identical backup manifests.
 
 ## Validation Contract
 

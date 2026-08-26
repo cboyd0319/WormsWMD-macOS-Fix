@@ -23,6 +23,12 @@ grep -Fq 'Launch Worms W.M.D now? [Y/n]' "$launcher" \
     || fail "launcher does not offer to launch after applying the fix"
 grep -Fq 'run_launch_readiness_check' "$launcher" \
     || fail "launcher does not have a launch-readiness check"
+readiness_block=$(awk '/^run_launch_readiness_check\(\)/ {inside=1} inside {print} /^}/ && inside {exit}' "$launcher")
+grep -Fq 'select_game_app_if_needed' <<< "$readiness_block" \
+    || fail "launcher readiness check does not preserve the selected installation"
+launch_block=$(awk '/^launch_game\(\)/ {inside=1} inside {print} /^}/ && inside {exit}' "$launcher")
+grep -Fq 'select_game_app_if_needed' <<< "$launch_block" \
+    || fail "launcher launch action does not preserve the selected installation"
 grep -Fq 'tools/preflight_check.sh" --quick' "$launcher" \
     || fail "launcher readiness check does not run quick preflight"
 grep -Fq 'fix_worms_wmd.sh" --verify' "$launcher" \
@@ -152,6 +158,28 @@ HOME="$crash_home" \
     || fail "enhanced launcher failed a normal launch while crash reporting was disabled"
 [[ ! -e "$crash_home/Library/OutsideCrash" ]] \
     || fail "enhanced launcher created a crash directory while crash reporting was disabled"
+
+multi_home="$tmp_dir/multi-home"
+multi_steam_app="$multi_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+multi_gog_app="$multi_home/GOG Games/Worms W.M.D/Worms W.M.D.app"
+mkdir -p \
+    "$multi_home/Desktop" \
+    "$multi_steam_app/Contents/MacOS" \
+    "$multi_gog_app/Contents/MacOS"
+printf '#!/bin/bash\nexit 0\n' > "$multi_steam_app/Contents/MacOS/Worms W.M.D"
+printf '#!/bin/bash\nexit 0\n' > "$multi_gog_app/Contents/MacOS/Worms W.M.D"
+chmod +x \
+    "$multi_steam_app/Contents/MacOS/Worms W.M.D" \
+    "$multi_gog_app/Contents/MacOS/Worms W.M.D"
+
+printf '5\n2\n\nq\nq\n' | HOME="$multi_home" bash "$launcher" > "$tmp_dir/multi-menu.out" 2>&1 \
+    || fail "launcher did not create support for a selected GOG installation"
+multi_bundle=$(find "$multi_home/Desktop" -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
+[[ -n "$multi_bundle" ]] || fail "multi-install launcher did not create a support bundle"
+mkdir -p "$tmp_dir/multi-extracted"
+tar -xzf "$multi_bundle" -C "$tmp_dir/multi-extracted"
+grep -Fq 'Found: ~/GOG Games/Worms W.M.D/Worms W.M.D.app' "$tmp_dir/multi-extracted/diagnostics.txt" \
+    || fail "support bundle inspected Steam instead of the selected GOG installation"
 
 printf 'q\n' | bash "$launcher" > "$tmp_dir/menu.out" 2>&1 \
     || fail "launcher did not accept piped menu input"

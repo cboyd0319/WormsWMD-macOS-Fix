@@ -30,7 +30,8 @@ include checksum and provenance verification. See `SECURITY.md` and
 
 Yes. Use `Worms W.M.D Fix.command` option 4, run
 `./fix_worms_wmd.sh --restore`, or uninstall/reinstall the game. New backups
-include `BACKUP_MANIFEST.tsv`, which restore verifies before copying files
+include `BACKUP_MANIFEST.tsv` and `BACKUP_METADATA.tsv`, which restore verifies
+and matches to the selected Steam or GOG app before copying files
 back. Steam "Verify integrity" does not remove extra files from prior fixes.
 
 ## Technical

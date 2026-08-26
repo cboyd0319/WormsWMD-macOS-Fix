@@ -36,6 +36,28 @@ if worms_verify_manifest "$tmp_dir" "$manifest" 2>/dev/null; then
     fail "manifest verification did not detect file corruption"
 fi
 
+printf 'alpha\n' > "$tmp_dir/Frameworks/Qt Core.framework/file one"
+worms_write_manifest "$tmp_dir" "$manifest" Frameworks PlugIns Info.plist
+printf 'unrecorded\n' > "$tmp_dir/Frameworks/Qt Core.framework/unrecorded file"
+if worms_verify_manifest "$tmp_dir" "$manifest" 2>/dev/null; then
+    fail "manifest verification did not reject an unrecorded extra file"
+fi
+
+duplicate_root="$tmp_dir/duplicate-archive"
+duplicate_archive="$tmp_dir/duplicate.tar.gz"
+mkdir -p "$duplicate_root/Frameworks"
+printf 'duplicate\n' > "$duplicate_root/Frameworks/libduplicate.dylib"
+(
+    cd "$duplicate_root"
+    tar -czf "$duplicate_archive" Frameworks/libduplicate.dylib Frameworks/libduplicate.dylib
+)
+if ! declare -F worms_validate_tar_no_duplicate_entries >/dev/null; then
+    fail "shared archive validation does not detect duplicate members"
+fi
+if worms_validate_tar_no_duplicate_entries "$duplicate_archive" 2>/dev/null; then
+    fail "archive validation accepted duplicate members"
+fi
+
 agl_root="$tmp_dir/agl-root"
 mkdir -p "$agl_root/Frameworks/AGL.framework/Versions/A/Resources"
 printf 'fake agl\n' > "$agl_root/Frameworks/AGL.framework/Versions/A/AGL"

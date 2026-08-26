@@ -104,6 +104,11 @@ validate_tar_layout() {
         return 1
     fi
 
+    if ! worms_validate_tar_no_duplicate_entries "$archive"; then
+        echo -e "${RED}ERROR:${NC} Archive contains duplicate members."
+        return 1
+    fi
+
     while IFS= read -r raw_entry; do
         [[ -z "$raw_entry" ]] && continue
         entry="${raw_entry#./}"

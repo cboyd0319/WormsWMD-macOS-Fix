@@ -68,6 +68,21 @@ grep -Fq 'SOURCE_PROVENANCE.tsv' "$ROOT_DIR/scripts/download_qt_frameworks.sh" \
 [[ -x "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" ]] \
     || fail "Homebrew bottle provenance fetcher is missing or not executable"
 
+committed_package="$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.tar.gz"
+if tar -tzf "$committed_package" \
+    | awk -F/ '$1 == "Frameworks" && NF == 2 && $2 ~ /^libq.*[.]dylib$/ { found=1 } END { exit(found ? 0 : 1) }'; then
+    fail "committed Qt package duplicates plugin self-references as framework dependencies"
+fi
+metadata_dependency_count=$(tar -xOzf "$committed_package" METADATA.txt \
+    | awk -F': ' '/^- Dependencies:/ {print $2; exit}')
+archive_dependency_count=$(tar -tzf "$committed_package" \
+    | awk -F/ '$1 == "Frameworks" && NF == 2 && $2 ~ /[.]dylib$/ {seen[$2]=1} END {for (name in seen) count++; print count+0}')
+[[ "$metadata_dependency_count" == "$archive_dependency_count" ]] \
+    || fail "Qt package metadata dependency count does not match the archive"
+duplicate_archive_entry=$(tar -tzf "$committed_package" | LC_ALL=C sort | uniq -d | head -1)
+[[ -z "$duplicate_archive_entry" ]] \
+    || fail "Qt package contains duplicate archive entry: $duplicate_archive_entry"
+
 if "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" \
     --output "$tmp_dir/provenance-prefix" \
     --write-lock "$tmp_dir/provenance.tsv" >"$tmp_dir/provenance.out" 2>&1; then

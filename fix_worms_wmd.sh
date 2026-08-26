@@ -62,6 +62,7 @@ QT_PREFIX=""
 QT_VERSION_DISPLAY=""
 QT_SOURCE_DISPLAY=""
 BACKUP_MANIFEST_NAME="BACKUP_MANIFEST.tsv"
+BACKUP_METADATA_NAME="BACKUP_METADATA.tsv"
 
 # Colors for output (with fallback for non-color terminals)
 if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
@@ -415,6 +416,80 @@ cleanup() {
     fi
 }
 
+game_source_for_backup() {
+    local game_app="$1"
+    local game_exec="$game_app/Contents/MacOS/Worms W.M.D"
+
+    if worms_otool_dependencies "$game_exec" | grep -Fqi 'libGalaxy.dylib'; then
+        echo "gog"
+    elif [[ -f "$game_app/Contents/Frameworks/libsteam_api.dylib" ]] \
+        || worms_otool_dependencies "$game_exec" | grep -Fqi 'libsteam_api.dylib'; then
+        echo "steam"
+    else
+        echo "unknown"
+    fi
+}
+
+write_game_backup_metadata() {
+    local backup_dir="$1"
+    local game_exec="$GAME_APP/Contents/MacOS/Worms W.M.D"
+    local game_app_real source executable_hash executable_size
+
+    game_app_real=$(worms_real_dir "$GAME_APP")
+    source=$(game_source_for_backup "$GAME_APP")
+    executable_hash=$(worms_file_sha256 "$game_exec")
+    executable_size=$(worms_file_size "$game_exec")
+
+    {
+        printf '%s\n' '# WormsWMD backup metadata v1'
+        printf 'game_app_path\t%s\n' "$game_app_real"
+        printf 'game_source\t%s\n' "$source"
+        printf 'game_executable_sha256\t%s\n' "$executable_hash"
+        printf 'game_executable_size\t%s\n' "$executable_size"
+        if [[ -d "$GAME_APP/Contents/_CodeSignature" ]]; then
+            printf 'code_signature_present\ttrue\n'
+        else
+            printf 'code_signature_present\tfalse\n'
+        fi
+    } > "$backup_dir/$BACKUP_METADATA_NAME"
+}
+
+backup_metadata_value() {
+    local backup_dir="$1"
+    local key="$2"
+    local metadata="$backup_dir/$BACKUP_METADATA_NAME"
+
+    [[ -f "$metadata" ]] || return 1
+    awk -F '\t' -v key="$key" '$1 == key { sub(/^[^\t]*\t/, ""); print; exit }' "$metadata"
+}
+
+backup_metadata_is_manifested() {
+    local backup_dir="$1"
+
+    [[ -f "$backup_dir/$BACKUP_METADATA_NAME" ]] \
+        && [[ -f "$backup_dir/$BACKUP_MANIFEST_NAME" ]] \
+        && awk -F '\t' -v metadata="$BACKUP_METADATA_NAME" \
+            '$3 == metadata {found=1} END {exit(found ? 0 : 1)}' \
+            "$backup_dir/$BACKUP_MANIFEST_NAME"
+}
+
+backup_targets_game_app() {
+    local backup_dir="$1"
+    local game_app="$2"
+    local recorded_path game_app_real
+
+    if ! backup_metadata_is_manifested "$backup_dir"; then
+        return 2
+    fi
+
+    recorded_path=$(backup_metadata_value "$backup_dir" "game_app_path" || true)
+    [[ -n "$recorded_path" ]] || return 2
+    worms_reject_control_chars "$recorded_path" "backup game_app_path" || return 1
+    [[ "$recorded_path" == /* ]] || return 1
+    game_app_real=$(worms_real_dir "$game_app") || return 1
+    [[ "$recorded_path" == "$game_app_real" ]]
+}
+
 write_game_backup_manifest() {
     local backup_dir="$1"
 
@@ -423,9 +498,12 @@ write_game_backup_manifest() {
     worms_write_manifest "$backup_dir" "$backup_dir/$BACKUP_MANIFEST_NAME" \
         Frameworks \
         PlugIns \
+        MacOS \
+        _CodeSignature \
         Info.plist \
         DataOSX \
-        CommonData
+        CommonData \
+        "$BACKUP_METADATA_NAME"
 }
 
 verify_game_backup_manifest() {
@@ -458,11 +536,21 @@ backup_appears_already_fixed() {
 }
 
 latest_original_game_backup() {
-    local backup
+    local game_app="$1"
+    local allow_legacy="${2:-false}"
+    local original_only="${3:-true}"
+    local backup target_status
 
     while IFS= read -r backup; do
         [[ -n "$backup" ]] || continue
-        if ! backup_appears_already_fixed "$backup"; then
+        target_status=0
+        backup_targets_game_app "$backup" "$game_app" || target_status=$?
+        if [[ "$target_status" -eq 2 ]]; then
+            $allow_legacy || continue
+        elif [[ "$target_status" -ne 0 ]]; then
+            continue
+        fi
+        if ! $original_only || ! backup_appears_already_fixed "$backup"; then
             echo "$backup"
             return 0
         fi
@@ -481,9 +569,47 @@ latest_original_game_backup() {
 
 restore_game_backup_files() {
     local backup_dir="$1"
+    local signature_present
 
     worms_validate_tree_symlinks "$backup_dir"
     worms_validate_game_app_for_mutation "$GAME_APP"
+
+    signature_present=""
+    if backup_metadata_is_manifested "$backup_dir"; then
+        signature_present=$(backup_metadata_value "$backup_dir" "code_signature_present" || true)
+    fi
+    case "$signature_present" in
+        true)
+            [[ -d "$backup_dir/_CodeSignature" ]] || {
+                echo "Backup metadata requires missing _CodeSignature resources." >&2
+                return 1
+            }
+            ;;
+        false|"")
+            ;;
+        *)
+            echo "Invalid code_signature_present value in backup metadata." >&2
+            return 1
+            ;;
+    esac
+
+    if [[ -f "$backup_dir/MacOS/Worms W.M.D" ]]; then
+        worms_refuse_linked_file_for_mutation \
+            "$GAME_APP/Contents/MacOS/Worms W.M.D" "game executable"
+        cp -p "$backup_dir/MacOS/Worms W.M.D" "$GAME_APP/Contents/MacOS/Worms W.M.D"
+    fi
+
+    case "$signature_present" in
+        true)
+            rm -rf "$GAME_APP/Contents/_CodeSignature"
+            cp -R "$backup_dir/_CodeSignature" "$GAME_APP/Contents/"
+            ;;
+        false)
+            rm -rf "$GAME_APP/Contents/_CodeSignature"
+            ;;
+        "")
+            ;;
+    esac
 
     if [[ -d "$backup_dir/Frameworks" ]]; then
         rm -rf "$GAME_APP/Contents/Frameworks"
@@ -514,7 +640,10 @@ game_path_for_backup_relpath() {
     local rel_path="$1"
 
     case "$rel_path" in
-        Frameworks/*|PlugIns/*)
+        MacOS/Worms\ W.M.D)
+            echo "$GAME_APP/Contents/MacOS/Worms W.M.D"
+            ;;
+        Frameworks/*|PlugIns/*|_CodeSignature/*)
             echo "$GAME_APP/Contents/$rel_path"
             ;;
         Info.plist)
@@ -549,6 +678,9 @@ verify_restored_game_backup() {
         [[ "$expected_hash" == \#* ]] && continue
         if [[ -n "${extra:-}" ]] || [[ -z "${rel_path:-}" ]]; then
             status=1
+            continue
+        fi
+        if [[ "$rel_path" == "$BACKUP_METADATA_NAME" ]]; then
             continue
         fi
         target=$(game_path_for_backup_relpath "$rel_path" || true)
@@ -628,12 +760,13 @@ rollback() {
         start_spinner "Verifying restored files..."
         if ! verify_restored_game_backup "$BACKUP_DIR"; then
             stop_spinner
-            print_warning "Rollback completed, but restored files could not be fully verified."
+            print_error "Rollback restoration verification failed."
+            print_warning "Some files were copied back, but the original state could not be proven."
         else
             stop_spinner
+            print_success "Rolled back to original game files."
         fi
 
-        print_success "Rolled back to original state."
         print_info "Backup preserved at: $BACKUP_DIR"
     fi
 
@@ -705,6 +838,11 @@ validate_game_app() {
         print_error "Game bundle contains unsafe linked mutation paths."
         echo ""
         echo "Refusing to modify a bundle whose writable subpaths resolve outside Contents."
+        exit 1
+    fi
+    if ! worms_refuse_linked_file_for_mutation \
+        "$GAME_APP/Contents/MacOS/Worms W.M.D" "game executable"; then
+        print_error "Game executable is not safe to modify."
         exit 1
     fi
 }
@@ -949,8 +1087,13 @@ EOF
 # ============================================================
 
 do_restore() {
+    local detected_game detected_real game_app_real target_seen=false
+    local installation_count=0 allow_legacy=false
+
     init_logging "fix_worms_wmd"
     print_header
+    validate_game_app
+
     echo "Looking for backups..."
     echo ""
 
@@ -967,14 +1110,41 @@ do_restore() {
     echo "$backups"
     echo ""
 
-    # Use the most recent backup
-    latest=$(latest_original_game_backup || true)
+    game_app_real=$(worms_real_dir "$GAME_APP")
+    while IFS= read -r -d '' detected_game; do
+        installation_count=$((installation_count + 1))
+        detected_real=$(worms_real_dir "$detected_game" || true)
+        [[ "$detected_real" == "$game_app_real" ]] && target_seen=true
+    done < <(worms_find_game_apps)
+    if ! $target_seen; then
+        installation_count=$((installation_count + 1))
+    fi
+    if [[ "$installation_count" -le 1 ]]; then
+        allow_legacy=true
+    fi
+
+    # Use the most recent original backup bound to this installation.
+    latest=$(latest_original_game_backup "$GAME_APP" "$allow_legacy" || true)
     if [[ -z "$latest" ]]; then
-        latest=$(worms_latest_path_by_mtime "$HOME/Documents" "WormsWMD-Backup-*" "d")
+        latest=$(latest_original_game_backup "$GAME_APP" "$allow_legacy" false || true)
+    fi
+    if [[ -n "$latest" ]] && backup_appears_already_fixed "$latest"; then
         print_warning "Every backup found appears to already include the fix."
-        print_warning "Restoring the most recent backup may not undo the fix."
+        print_warning "Restoring the most recent compatible backup may not undo the fix."
+    fi
+    if [[ -z "$latest" ]]; then
+        print_error "No compatible backup found for: $GAME_APP"
+        echo ""
+        echo "Backups created for another Steam or GOG installation will not be applied here."
+        if [[ "$installation_count" -gt 1 ]]; then
+            echo "Choose the installation that created the backup and try restore again."
+        fi
+        exit 1
     fi
     echo "Selected backup: $latest"
+    if [[ ! -f "$latest/$BACKUP_METADATA_NAME" ]]; then
+        print_warning "This legacy backup has no source-app identity metadata."
+    fi
     echo ""
 
     if ! $FORCE; then
@@ -985,8 +1155,6 @@ do_restore() {
             exit 0
         fi
     fi
-
-    validate_game_app
 
     if [[ -f "$latest/$BACKUP_MANIFEST_NAME" ]]; then
         print_step "Verifying backup manifest (this can take a few minutes)..."
@@ -1020,7 +1188,7 @@ do_restore() {
     stop_spinner
 
     echo ""
-    print_success "Game restored to original state."
+    print_success "Game restored to original game files."
     echo ""
     echo "You may want to verify game files in Steam:"
     echo "  Right-click Worms W.M.D → Properties → Local Files → Verify integrity"
@@ -1105,7 +1273,8 @@ do_dry_run() {
     print_step "Changes that would be made..."
     echo ""
 
-    print_dry_run "Create backup at: ~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS/"
+    print_dry_run "Create a target-bound backup at: ~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS/"
+    print_dry_run "  (frameworks, plugins, main executable, metadata, and existing signature resources)"
     echo ""
 
     print_dry_run "Build AGL stub library (universal x86_64 + arm64)"
@@ -1125,11 +1294,12 @@ do_dry_run() {
     fi
     echo ""
 
-    print_dry_run "Update library paths to use @executable_path"
+    print_dry_run "Update portable library paths and validate bundled @rpath references"
     print_dry_run "Replace platform plugin: libqcocoa.dylib"
     print_dry_run "Update image format plugins"
     print_dry_run "Update Info.plist metadata (bundle ID, HiDPI, min version)"
     print_dry_run "Secure config URLs (HTTP→HTTPS, disable internal URLs)"
+    print_dry_run "Verify the complete runtime before optional finishing touches"
     print_dry_run "Remove quarantine flags (xattr -rd com.apple.quarantine)"
     print_dry_run "Apply ad-hoc code signature (codesign --deep --sign -)"
     print_dry_run "Reset incompatible Qt window geometry (if present)"
@@ -1272,6 +1442,13 @@ do_fix() {
     cp -R "$GAME_APP/Contents/PlugIns" "$BACKUP_DIR/"
     stop_spinner
 
+    mkdir -p "$BACKUP_DIR/MacOS"
+    cp -p "$GAME_APP/Contents/MacOS/Worms W.M.D" "$BACKUP_DIR/MacOS/Worms W.M.D"
+
+    if [[ -d "$GAME_APP/Contents/_CodeSignature" ]]; then
+        cp -R "$GAME_APP/Contents/_CodeSignature" "$BACKUP_DIR/"
+    fi
+
     if [[ -f "$GAME_APP/Contents/Info.plist" ]]; then
         cp "$GAME_APP/Contents/Info.plist" "$BACKUP_DIR/Info.plist"
     fi
@@ -1295,6 +1472,8 @@ do_fix() {
             fi
         done < <(worms_commondata_config_files)
     fi
+
+    write_game_backup_metadata "$BACKUP_DIR"
 
     print_substep "Creating backup manifest (this can take a few minutes)..."
     start_spinner "Creating backup manifest (this can take a few minutes)..."
@@ -1378,14 +1557,17 @@ do_fix() {
     fi
     stop_spinner
 
-    local copied missing
+    local copied bundled missing
     copied=$(echo "$copy_output" | awk -F= '/^COPIED_LIBS=/{print $2}' | tail -1)
+    bundled=$(echo "$copy_output" | awk -F= '/^BUNDLED_LIBS=/{print $2}' | tail -1)
     missing=$(echo "$copy_output" | awk -F= '/^MISSING_LIBS=/{print $2}' | tail -1)
 
-    if [[ -n "$copied" ]]; then
-        print_substep "Dependencies bundled: $copied"
+    if [[ -n "$bundled" ]]; then
+        print_substep "Bundled dependencies verified: $bundled"
+    elif [[ -n "$copied" ]]; then
+        print_substep "Dependencies copied: $copied"
     else
-        print_substep "Dependencies bundled"
+        print_substep "Dependencies prepared"
     fi
 
     if [[ -n "$missing" ]] && [[ "$missing" =~ ^[0-9]+$ ]] && [[ "$missing" -gt 0 ]]; then
@@ -1399,9 +1581,15 @@ do_fix() {
     print_step "Fixing library paths..."
     chmod +x "$SCRIPTS_DIR/04_fix_library_paths.sh"
     start_spinner "Updating install names..."
-    "$SCRIPTS_DIR/04_fix_library_paths.sh" > /dev/null
+    local path_fix_output
+    if ! path_fix_output=$("$SCRIPTS_DIR/04_fix_library_paths.sh" 2>&1); then
+        stop_spinner
+        print_error "Fixing library paths failed"
+        [[ -n "$path_fix_output" ]] && echo "$path_fix_output"
+        return 1
+    fi
     stop_spinner
-    print_substep "All paths updated to @executable_path"
+    print_substep "Library paths validated and portable references updated"
 
     # ============================================================
     # Apply enhancements
@@ -1437,36 +1625,6 @@ do_fix() {
             done || true
             return 1
         fi
-    fi
-
-    # ============================================================
-    # Post-fix: Code signing and quarantine removal
-    # ============================================================
-    echo ""
-    print_step "Applying finishing touches..."
-
-    # Remove quarantine flags
-    xattr -rd com.apple.quarantine "$GAME_APP" 2>/dev/null || true
-    if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
-        print_warning "Quarantine flag still present (may cause Gatekeeper warnings)"
-    else
-        print_substep "No quarantine flags present"
-    fi
-
-    # Apply ad-hoc code signature
-    # This reduces Gatekeeper friction without requiring a Developer ID
-    if codesign --force --deep --sign - "$GAME_APP" 2>/dev/null; then
-        print_substep "Ad-hoc code signature applied"
-    else
-        print_warning "Could not apply ad-hoc signature (game will still work)"
-    fi
-
-    # Reset Qt window geometry (old Qt 5.3 settings are incompatible with 5.15)
-    # This prevents the "small window" issue on first launch after the fix
-    if defaults read "com.team17.Worms W.M.D" "QtSystem_GameWindow.geometry" &>/dev/null; then
-        defaults delete "com.team17.Worms W.M.D" "QtSystem_GameWindow.geometry" 2>/dev/null || true
-        defaults delete "com.team17.Worms W.M.D" "QtSystem_GameWindow.windowState" 2>/dev/null || true
-        print_substep "Reset incompatible Qt window geometry"
     fi
 
     # ============================================================
@@ -1509,7 +1667,35 @@ do_fix() {
         return "$verify_status"
     fi
 
-    CLEANUP_NEEDED=false  # Success - don't rollback on exit
+    # Core bundle mutations are now verified. Optional finishing touches happen
+    # after the rollback boundary so a verifier failure cannot leave preferences
+    # or quarantine state changed outside the backup.
+    CLEANUP_NEEDED=false
+
+    # ============================================================
+    # Post-fix: Code signing and quarantine removal
+    # ============================================================
+    echo ""
+    print_step "Applying finishing touches..."
+
+    xattr -rd com.apple.quarantine "$GAME_APP" 2>/dev/null || true
+    if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
+        print_warning "Quarantine flag still present (may cause Gatekeeper warnings)"
+    else
+        print_substep "No quarantine flags present"
+    fi
+
+    if codesign --force --deep --sign - "$GAME_APP" 2>/dev/null; then
+        print_substep "Ad-hoc code signature applied"
+    else
+        print_warning "Could not apply ad-hoc signature (game will still work)"
+    fi
+
+    if defaults read "com.team17.Worms W.M.D" "QtSystem_GameWindow.geometry" &>/dev/null; then
+        defaults delete "com.team17.Worms W.M.D" "QtSystem_GameWindow.geometry" 2>/dev/null || true
+        defaults delete "com.team17.Worms W.M.D" "QtSystem_GameWindow.windowState" 2>/dev/null || true
+        print_substep "Reset incompatible Qt window geometry"
+    fi
 
     # ============================================================
     # Offer optional extras

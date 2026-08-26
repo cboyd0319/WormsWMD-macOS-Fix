@@ -62,6 +62,22 @@ if grep -Eq 'Private Drive|privateperson@example\.com|/Volumes/Private' "$extern
     fail "external volume path with spaces was not redacted"
 fi
 
+ambiguous_home="$tmp_dir/ambiguous-home"
+ambiguous_steam="$ambiguous_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+ambiguous_gog="$ambiguous_home/GOG Games/Worms W.M.D/Worms W.M.D.app"
+mkdir -p "$ambiguous_steam/Contents/MacOS" "$ambiguous_gog/Contents/MacOS"
+printf '#!/bin/bash\nexit 0\n' > "$ambiguous_steam/Contents/MacOS/Worms W.M.D"
+printf '#!/bin/bash\nexit 0\n' > "$ambiguous_gog/Contents/MacOS/Worms W.M.D"
+chmod +x \
+    "$ambiguous_steam/Contents/MacOS/Worms W.M.D" \
+    "$ambiguous_gog/Contents/MacOS/Worms W.M.D"
+HOME="$ambiguous_home" "$diagnostics_script" > "$tmp_dir/ambiguous.txt"
+grep -Fq 'Multiple installations detected; set GAME_APP to the installation being diagnosed.' "$tmp_dir/ambiguous.txt" \
+    || fail "direct diagnostics silently selected one of multiple installations"
+if grep -Fq 'Found: ~/Library/Application Support/Steam' "$tmp_dir/ambiguous.txt"; then
+    fail "direct diagnostics inspected Steam despite an ambiguous multi-install state"
+fi
+
 GAME_APP="$fake_game" "$diagnostics_script" --output "$tmp_dir/output.txt" >/dev/null
 assert_sanitized "$tmp_dir/output.txt"
 
@@ -82,8 +98,11 @@ cat > "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000001.log" <
 ==> Verifying installation...
 SUCCESS: All checks passed!
 ERROR: Post-verify failure
-Rolled back to original state.
 LOG
+printf '\033[0;31mERROR: Colored failure detail\033[0m\n' \
+    >> "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000001.log"
+printf 'Rolled back to original state.\n' \
+    >> "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000001.log"
 
 mkdir -p "$test_home/Documents/WormsWMD-Backup-20260101-000000"
 cat > "$test_home/Documents/WormsWMD-Backup-20260101-000000/BACKUP_MANIFEST.tsv" <<'TSV'
@@ -91,6 +110,13 @@ sha256	size	path
 hash	1	Frameworks/privateperson@example.com
 hash	1	Frameworks/API_KEY=api-key-value
 TSV
+printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tgog\n' \
+    "$fake_game" > "$test_home/Documents/WormsWMD-Backup-20260101-000000/BACKUP_METADATA.tsv"
+mkdir -p "$test_home/Documents/WormsWMD-Backup-20260101-000001"
+cp "$test_home/Documents/WormsWMD-Backup-20260101-000000/BACKUP_MANIFEST.tsv" \
+    "$test_home/Documents/WormsWMD-Backup-20260101-000001/BACKUP_MANIFEST.tsv"
+cp "$test_home/Documents/WormsWMD-Backup-20260101-000000/BACKUP_METADATA.tsv" \
+    "$test_home/Documents/WormsWMD-Backup-20260101-000001/BACKUP_METADATA.tsv"
 
 HOME="$test_home" GAME_APP="$fake_game" "$diagnostics_script" --bundle --bundle-output "$bundle_dir" >/dev/null
 bundle_path=$(find "$bundle_dir" -mindepth 1 -maxdepth 1 -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
@@ -111,6 +137,9 @@ grep -Fq "Inferred outcome:" "$extract_dir/install-summary.txt" \
     || fail "install summary does not include inferred outcome"
 grep -Fq "Inferred outcome: failure: rollback completed" "$extract_dir/install-summary.txt" \
     || fail "install summary misclassified a mixed success/error rollback log"
+if grep -Eq '\[[0-9;]+m' "$extract_dir/install-summary.txt"; then
+    fail "install summary contains visible ANSI escape fragments"
+fi
 grep -Fq "Required runtime invariant matrix" "$extract_dir/runtime-invariants.txt" \
     || fail "runtime invariant matrix is missing"
 grep -Fq "Backup integrity summary" "$extract_dir/backup-summary.txt" \
@@ -123,9 +152,14 @@ if ! grep -Fq "Local package: none" "$extract_dir/qt-package.txt"; then
     grep -Eq "(PASS plugin:|FAIL plugin missing:) PlugIns/platforms/libqcocoa[.]dylib" "$extract_dir/qt-package.txt" \
         || fail "Qt package summary does not report required platform plugin status"
 fi
-[[ -f "$extract_dir/backup-manifests/backup-manifest-01.tsv" ]] \
-    || fail "support bundle did not include a sanitized backup manifest"
-assert_sanitized "$extract_dir/backup-manifests/backup-manifest-01.tsv"
+manifest_count=$(find "$extract_dir/backup-manifests" -type f -name '*.tsv' ! -name 'index.tsv' -print | wc -l | tr -d ' ')
+[[ "$manifest_count" == "1" ]] \
+    || fail "support bundle did not deduplicate identical backup manifests"
+bundled_manifest=$(find "$extract_dir/backup-manifests" -type f -name '*.tsv' ! -name 'index.tsv' -print -quit)
+[[ -n "$bundled_manifest" ]] || fail "support bundle did not include a sanitized backup manifest"
+assert_sanitized "$bundled_manifest"
+grep -Fq "Game source: gog" "$extract_dir/backup-summary.txt" \
+    || fail "backup summary does not identify the source storefront"
 
 if ! tar -tvzf "$bundle_path" | awk '{ if ($3 != "root" || $4 != "wheel") exit 1 }'; then
     fail "support bundle archive leaks local owner or group metadata"

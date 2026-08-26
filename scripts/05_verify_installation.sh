@@ -153,15 +153,20 @@ check_missing_deps() {
 check_unsafe_deps() {
     local bin="$1"
     local label="$2"
-    local dep
+    local dep resolved
 
     while IFS= read -r dep; do
         case "$dep" in
             @executable_path/*|@loader_path/*)
                 ;;
             @rpath/*)
-                if [[ "$dep" == "@rpath/libsharpyuv.0.dylib" ]] && [[ "$label" == libwebp*.dylib ]]; then
-                    echo "WARNING: $label has optional unresolved WebP dependency: $dep"
+                resolved=$(worms_resolve_macho_rpath_dependency "$bin" "$dep" "$GAME_EXEC" "$GAME_APP" || true)
+                if [[ -n "$resolved" ]]; then
+                    if $VERBOSE; then
+                        echo "RPATH: $label -> $dep -> ${resolved#"$GAME_APP"/}"
+                    fi
+                elif worms_macho_dependency_is_weak "$bin" "$dep"; then
+                    echo "WARNING: $label has optional unresolved @rpath dependency: $dep"
                     ((warnings++))
                 else
                     echo "ERROR: $label has unresolved @rpath dependency: $dep"

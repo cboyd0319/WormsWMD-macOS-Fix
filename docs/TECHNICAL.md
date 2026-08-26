@@ -22,7 +22,7 @@ These limitations exist because the game is closed-source.
 | Missing AGL framework | Stub library that satisfies the dynamic linker |
 | Outdated Qt 5.3.2 | Replace with Qt 5.15 (pre-built or Homebrew) |
 | Missing Qt frameworks | Bundle QtDBus and QtSvg |
-| Hardcoded library paths | Rewrite to @executable_path |
+| Hardcoded library paths | Rewrite to bundle-relative paths and validate bundled `@rpath` targets |
 | HTTP config URLs | Upgrade to HTTPS (DataOSX and CommonData) |
 
 ### What this fix doesn't change
@@ -47,6 +47,7 @@ The fix replaces Qt frameworks bundled with the game (commonly QtCore, QtGui, Qt
 | Info.plist | Missing identifiers and HiDPI flags | Adds CFBundleIdentifier, HiDPI flags, graphics switching, updates minimum version |
 | DataOSX configs | HTTP/internal URLs | HTTPS for known URLs; internal URLs commented out |
 | CommonData configs | HTTP URLs | HTTPS in AnalyticsConfig.txt and HttpConfig.txt |
+| Main executable install names | Original game references | Portable references when a matching bundled framework or dylib exists |
 
 ## Libraries added
 
@@ -60,6 +61,18 @@ The fix bundles dylibs required by Qt frameworks and plugins (detected with `oto
 - **WebP:** libwebp.7.dylib, libwebpdemux.2.dylib, libwebpmux.3.dylib, libsharpyuv.0.dylib
 
 The exact list varies by Qt version and plugin set.
+
+The committed Qt 5.15.19 archive contains 15 top-level runtime dependency
+dylibs. Qt plugins live only under `PlugIns/`; their Mach-O self install IDs are
+not copied again into `Frameworks/`, and archive members are unique.
+
+## Mach-O run-path verification
+
+The verifier parses `LC_RPATH` and dependency load commands with `otool`.
+`@executable_path` is expanded from the game executable, `@loader_path` from the
+binary being inspected, and resolved `@rpath` targets must remain inside the
+selected app bundle. An unresolved `LC_LOAD_WEAK_DYLIB` is optional; an
+unresolved strong load remains an installation error.
 
 ## Plugins updated
 
