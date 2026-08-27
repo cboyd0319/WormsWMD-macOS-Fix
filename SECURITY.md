@@ -238,15 +238,16 @@ Last audit: 2026-08-26
 | Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
 | Symlink attacks | Pass | Main installer uses per-run staging, whole-bundle symlink/hardlink checks, mutation-directory containment, and archive link rejection |
 | Race conditions | Pass | Atomic operations where possible |
-| Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
+| Secret exposure | Follow-up | Current-tree redacted scan is clean and GitHub push protection is enabled; historical generic-key patterns in the redacted vendor report still require credential-owner validity/rotation confirmation |
 | Support bundle privacy | Pass | Sanitized bundles include OS, Rosetta, installer-history, runtime-invariant, Qt-package, and backup-integrity context without raw logs, saves, game binaries, or private config contents |
 | Dependency security | Pass | Checksums, metadata, canonical manifests, complete closure checks, and readable x86_64 slices for pre-built Qt |
-| CI pinning | Pass | GitHub Actions use full commit SHAs, explicit stable runner labels, and a pinned ShellCheck binary version |
+| CI pinning | Pass | GitHub Actions use verified full commit SHAs, explicit stable runner labels, a pinned ShellCheck binary version, disabled checkout credential persistence, job-scoped permissions, concurrency limits, and timeouts |
+| Workflow security | Pass | Local policy regression plus path-scoped, version-pinned Zizmor scanning reject mutable Actions, dangerous triggers, direct run-expression expansion, and missing workflow boundaries |
 | Code signing | Pass | Ad-hoc signature applied and strictly verified inside the rollback boundary; quarantine cleared afterward |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
 | Backup restore | Pass | Verified staged v2 backups exactly replace `MacOS`, bind to app/storefront identity, use atomic collision-resistant publication, reject invalid metadata/unrecorded entries, and preserve v1 merge behavior |
-| Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
+| Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations; publication stages a resumable draft and refuses to overwrite a published release |
 
 ## Verifying the fix
 
@@ -389,11 +390,31 @@ Qt package supply-chain process:
 
 5. **Game config secrets**: The original game ships with confirmed API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
 
+6. **Historical credential patterns**: Redacted history scanning identifies six
+   generic-key patterns in older `TEAM17_DEVELOPER_REPORT.md` revisions. The
+   current tree is clean. Only the credential owner can confirm whether those
+   values were real, remain valid, or were rotated; do not copy them into
+   issues, logs, prompts, or new commits.
+
+7. **Dependency inventory format**: The Qt runtime closure has a deterministic,
+   checksum-locked `SOURCE_PROVENANCE.tsv`, but releases do not yet publish a
+   standard SPDX or CycloneDX SBOM. The GitHub dependency graph therefore
+   reports no package components for this shell/C repository.
+
+8. **Solo-maintainer branch bypass**: `main` requires status checks, one
+   CODEOWNER approval, stale-review dismissal, and conversation resolution,
+   but administrator enforcement remains disabled. Enabling it before a second
+   trusted reviewer exists would prevent the sole maintainer from satisfying
+   the review requirement.
+
 ## Reporting security issues
 
 **Do not open a public issue for security vulnerabilities.**
 
-Instead, email the maintainer directly with:
+Prefer a [private GitHub vulnerability
+report](https://github.com/cboyd0319/WormsWMD-macOS-Fix/security/advisories/new).
+If GitHub private reporting is unavailable, email the maintainer directly with:
+
 - Description of the vulnerability
 - Steps to reproduce
 - Potential impact

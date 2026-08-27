@@ -299,6 +299,7 @@ check_harness_line_caps() {
     check_line_cap "docs/exec-plans/README.md" 160
     check_line_cap "tools/validate_harness.sh" 520
     check_line_cap ".github/workflows/ci.yml" 180
+    check_line_cap ".github/workflows/github-security.yml" 120
     check_line_cap ".github/workflows/release.yml" 140
 }
 
@@ -316,6 +317,7 @@ check_ci_and_ownership_gates() {
 
     for required_ci_check in \
         "./tools/validate_harness.sh" \
+        "./tools/test_github_security.sh" \
         "./tools/test_bootstrap_installer_safety.sh" \
         "./tools/test_issue_10_regression.sh" \
         "./tools/test_issue_11_game_detection.sh" \
@@ -405,6 +407,7 @@ require_file ".agents/rules/wormswmd-maintenance.md"
 require_file ".github/CODEOWNERS"
 require_file ".github/copilot-instructions.md"
 require_file ".github/workflows/ci.yml"
+require_file ".github/workflows/github-security.yml"
 require_file ".github/workflows/release.yml"
 require_file "docs/README.md"
 require_file "docs/design/runtime-contracts.md"
@@ -412,6 +415,8 @@ require_file "docs/runbooks/agent-session.md"
 require_file "docs/style/agent-harness.md"
 require_file "docs/exec-plans/README.md"
 require_file "docs/exec-plans/TEMPLATE.md"
+require_file "tools/extract_release_notes.sh"
+require_file "tools/test_github_security.sh"
 
 check_harness_markers
 check_harness_line_caps

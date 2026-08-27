@@ -6,17 +6,25 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   shellcheck:
     name: ShellCheck
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Run ShellCheck
         # ludeeus/action-shellcheck 2.0.0
@@ -31,10 +39,15 @@ jobs:
   validate-scripts:
     name: Validate Scripts
     runs-on: macos-26-intel
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Check bash syntax
         run: |
@@ -49,6 +62,9 @@ jobs:
 
       - name: Validate agent harness docs
         run: ./tools/validate_harness.sh
+
+      - name: Test GitHub security policy
+        run: ./tools/test_github_security.sh
 
       - name: Test bootstrap installer safety
         run: ./tools/test_bootstrap_installer_safety.sh
@@ -106,10 +122,15 @@ jobs:
   validate-c-code:
     name: Validate C Code
     runs-on: macos-26-intel
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Check AGL stub compiles
         run: |

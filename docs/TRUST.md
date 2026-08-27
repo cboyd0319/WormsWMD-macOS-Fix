@@ -50,6 +50,14 @@ it.
   `.github/CODEOWNERS`.
 - GitHub Actions validates shell syntax, ShellCheck, harness docs, release
   packaging, and the AGL stub compile.
+- GitHub workflows use job-scoped permissions, bounded execution, disabled
+  checkout credential persistence, immutable Action SHAs, and a seven-day
+  update cooldown.
+- A path-scoped Zizmor job and the local GitHub policy regression validate
+  workflow changes before they reach release automation.
+- Release publication uploads assets and notes to a draft first, refuses to
+  replace a published release, and publishes only after checksum assets and
+  attestations exist.
 
 ## What it can still do
 

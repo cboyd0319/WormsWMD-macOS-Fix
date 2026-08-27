@@ -15,6 +15,8 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Agent instructions](../AGENTS.md) - short map for coding agents.
 - [Copilot instructions](../.github/copilot-instructions.md) - thin loader for
   Copilot-style agents.
+- [Pull request template](../.github/pull_request_template.md) - focused scope,
+  trust-impact, verification, and sensitive-data review checklist.
 - [Contributing](../CONTRIBUTING.md) - development setup, validation, and PR
   expectations.
 - [Security](../SECURITY.md) - threat model, audit checklist, network policy,
@@ -64,6 +66,9 @@ current when adding, moving, renaming, or deleting Markdown files.
   - completed fix for missing AGL and required Qt runtime partial installs.
 - [Issue 19 QtCore bad file descriptor plan](exec-plans/2026-08-11-issue-19-qtcore-bad-fd.md)
   - completed fix for read-only copied Qt framework binaries on macOS 26.6.
+- [GitHub security deep dive](exec-plans/2026-08-26-github-security-deep-dive.md)
+  - active hardening of Actions, releases, hosted controls, secrets, and
+    supply-chain evidence using local OWASP guidance as reference.
 - [Open pull request resolution](exec-plans/2026-08-26-open-pr-resolution.md)
   - completed cleanup of the superseded GOG fix and current GitHub Actions pins.
 - [Issue 20 GOG rpath and rollback hardening plan](exec-plans/2026-08-26-issue-20-gog-rpath-rollback.md)

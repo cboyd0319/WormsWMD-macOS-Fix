@@ -8,6 +8,15 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 - Updated the immutable `actions/checkout` pin to the verified v7.0.1 tag.
 - Updated the immutable `actions/attest` pin to the verified v4.2.2 tag.
+- Added deny-by-default, job-scoped workflow permissions, checkout credential
+  isolation, concurrency cancellation, and bounded job timeouts.
+- Added a path-scoped, version-pinned Zizmor workflow and a local GitHub policy
+  regression check.
+- Added a seven-day Dependabot cooldown for new GitHub Actions releases.
+- Made release publication draft-first and resumable without allowing a
+  published release or its assets to be overwritten.
+- Made future GitHub release notes come from the matching changelog section and
+  limited workflow artifact retention to 14 days.
 
 ## Mainline maintenance after 1.7.6 (2026-08-26)
 

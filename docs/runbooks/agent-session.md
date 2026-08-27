@@ -26,6 +26,14 @@ Harness or documentation topology:
 ./tools/validate_harness.sh
 ```
 
+GitHub workflow or release automation:
+
+```bash
+./tools/test_github_security.sh
+actionlint .github/workflows/*.yml
+zizmor --persona=pedantic --no-ignores --no-progress .github
+```
+
 Shell scripts:
 
 ```bash
@@ -51,6 +59,7 @@ Release publication:
 
 ```bash
 ./tools/validate_harness.sh
+./tools/test_github_security.sh
 ./tools/test_bootstrap_installer_safety.sh
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
@@ -68,13 +77,17 @@ shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.co
 for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --dry-run
 ./tools/build_release_bundle.sh --version vX.Y.Z --skip-zip
+./tools/extract_release_notes.sh X.Y.Z
 ```
 
 When cutting a release, bump `VERSION`, `CHANGELOG.md`, release examples, and
 the bootstrap default tag together. If bootstrap exact-commit verification is
 used, the release commit cannot contain its own hash. Cut and push the tag
 first, verify the release workflow, then add a follow-up `main` commit pinning
-the bootstrap commit guard to the tag target.
+the bootstrap commit guard to the tag target. The workflow creates or resumes a
+draft, uploads and attests every asset, applies the matching `CHANGELOG.md`
+section as release notes, and only then publishes the immutable release. It
+must refuse to overwrite an already-published release.
 
 After the tag workflow publishes assets, verify:
 
