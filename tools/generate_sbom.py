@@ -89,7 +89,7 @@ def require_sha256(value: str, field: str) -> str:
     return value
 
 
-def read_checksum(path: Path, expected_suffix: str, label: str) -> str:
+def read_checksum(path: Path, expected_filename: str, label: str) -> str:
     checksum_bytes = read_bounded_file(
         path, MAX_CHECKSUM_BYTES, f"{label} checksum file"
     )
@@ -99,9 +99,9 @@ def read_checksum(path: Path, expected_suffix: str, label: str) -> str:
     if len(lines) != 1:
         raise SbomError(f"{label} checksum file must contain exactly one record")
     fields = lines[0].split()
-    if len(fields) != 2 or not fields[1].endswith(expected_suffix):
+    if len(fields) != 2 or fields[1] != expected_filename:
         raise SbomError(
-            f"Checksum record must contain SHA-256 and {expected_suffix} filename"
+            f"{label} checksum record must name {expected_filename} exactly"
         )
     return require_sha256(fields[0], f"{label} checksum")
 
@@ -270,7 +270,7 @@ def load_component_inventory(
     checksum_path: Path,
     policy_path: Path,
 ) -> tuple[str, list[dict[str, str]], list[dict[str, Any]], list[dict[str, Any]]]:
-    archive_sha256 = read_checksum(checksum_path, ".tar.gz", "Qt archive")
+    archive_sha256 = read_checksum(checksum_path, archive_path.name, "Qt archive")
     rows, provenance = read_provenance(provenance_path)
     archive_members = verify_archive_provenance(
         archive_path, archive_sha256, provenance
@@ -325,7 +325,9 @@ def build_sbom(
     if not VERSION_RE.fullmatch(version):
         raise SbomError("Version must use the form vX.Y.Z")
     normalized_timestamp = normalize_timestamp(timestamp)
-    release_sha256 = read_checksum(release_checksum_path, ".zip", "Release zip")
+    release_sha256 = read_checksum(
+        release_checksum_path, release_archive_path.name, "Release zip"
+    )
     archive_sha256, rows, components, build_components = load_component_inventory(
         provenance_path, archive_path, checksum_path, policy_path
     )

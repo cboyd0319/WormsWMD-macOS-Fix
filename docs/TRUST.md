@@ -33,6 +33,18 @@ The checksum proves the downloaded zip matches the release asset. The
 attestation links the release asset to the GitHub Actions workflow that built
 it.
 
+Manual dispatch can only build and upload a read-only workflow artifact. For a
+tag, a second read-only job proves protected-main ancestry and rechecks checksum,
+ZIP manifest, every packaged file and mode against a deterministic source
+rebuild, three-way Qt provenance, and regenerated SBOM. Only then can the
+`release` environment publish job receive write/attestation scopes and download
+the exact verified current-run inventory. It rechecks the live tag object before
+publication. A required environment reviewer must be configured first.
+The publish job checks those rules through GitHub's environment API and fails
+closed when the environment is absent or has no required reviewer. The current
+sole-maintainer model permits self-review until a second trusted maintainer can
+provide independent approval.
+
 ## What makes this lower risk
 
 - No `sudo`, administrator password, kernel extension, or system-wide installer.

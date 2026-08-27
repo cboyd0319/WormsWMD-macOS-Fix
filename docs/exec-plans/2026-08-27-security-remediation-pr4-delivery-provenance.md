@@ -38,7 +38,7 @@ releases, unrelated dependency versions, and independent-builder claims.
 - [x] Normalize Mach-O paths, compare artifacts deeply, and prove TIFF runtime.
 - [x] Add protected exact-main two-build nonpublishing rebuild evidence.
 - [x] Refresh only the reviewed libtiff 4.7.2 lock input.
-- [ ] Split release privilege and add incident recovery.
+- [x] Split release privilege and add incident recovery.
 - [ ] Run full local/adversarial gates, merge one reviewed PR, and record PR 5 base.
 
 ## Verification
@@ -87,6 +87,25 @@ git status --short
   provenance. A full isolated 17-bottle fetch exposed and fixed staging-path
   relocation plus safe contained soname aliases. Local candidate `90c0d19e...`
   is x86_64, canonical, embeds the curated lock, and passes comparison/TIFF.
+- 2026-08-27: Manual release dispatch is read-only. A second read-only tag job
+  proves ancestry and checksum/ZIP-manifest/three-way-provenance/SBOM evidence.
+  Only then does the `release` environment job receive scoped write/attestation
+  permissions. Incident recovery covers signed tags, keys, rules, workflow
+  disablement, evidence, withdrawal, corrective notice, and publication.
+- 2026-08-27: Adversarial review added the policy-parser scan trigger, moved all
+  verification into a read-only middle job before publish scopes exist, made
+  absent/unreviewed release environment settings fail closed while preserving
+  the approved sole-maintainer approval path, requires exact source-rebuilt
+  release content/modes and artifact inventory, bounds comparator evidence,
+  rechecks the live tag object, and rejects extra resumed-draft assets. Scanner
+  classification now covers every transitive implementation dependency.
+- 2026-08-27: Fresh complete local verification passed, including all Python,
+  shell, Ruby, harness, workflow, archive, cache, runtime, comparison, TIFF,
+  Kingfisher, Semgrep, ShellCheck, Actionlint, Zizmor, and x86_64 compile gates.
+  Two scans again produced SBOM `ba5880d...` and report `a204b087...`, with 12
+  mapped runtime components and four report-only libtiff matches. The source-only
+  dist guard passed. Steam passes strict verification; the installed GOG copy is
+  preserved as an unfixed baseline for PR 5's protected-artifact runtime gate.
 
 ## Surprises & Discoveries
 
@@ -112,6 +131,8 @@ git status --short
 - No tag may be created between the PR 4 lock transition and PR 5 artifact merge.
 - Current formula resolution is evidence, not authority; dependency/tap churn
   is rejected unless the refreshed bottle requires it for compatibility.
+- Release uses three jobs rather than two so write/attestation scopes do not
+  exist until a read-only verification job has succeeded.
 
 ## Outcomes & Retrospective
 

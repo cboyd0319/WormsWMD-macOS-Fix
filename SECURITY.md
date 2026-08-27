@@ -223,9 +223,23 @@ For future tags, the release workflow:
    archive, then generates deterministic CycloneDX 1.6 JSON from it.
 5. Hashes the built release zip, verifies its checksum file, and uses that
    verified digest as the SBOM root hash.
-6. Attests build assets and separately binds the SBOM to the zip.
-7. Uploads notes/assets to a resumable draft, then publishes it immutably.
-8. Refuses to overwrite any published release.
+6. Uploads a read-only build artifact; manual dispatch stops here.
+7. For an annotated tag only, a second read-only job proves the tag commit is on
+   `origin/main`, downloads only this workflow's build artifact, rebuilds the
+   expected source tree deterministically, and compares exact packaged content,
+   safe modes, checksum, ZIP manifest, three-way Qt provenance, and SBOM.
+8. Only after verification, an environment-approved publish job receives
+   release/attestation scopes and downloads that verified workflow artifact.
+9. It rechecks the checksum, attests assets/SBOM, uploads only the exact asset
+   inventory to a resumable draft, rechecks the live tag object, then publishes
+   immutably and refuses to overwrite a published release.
+
+The `release` environment must have a required reviewer configured before the
+next tag; PR4 references but does not mutate that repository setting. The
+current sole-maintainer model permits self-review so releases remain possible;
+enable prevention after adding a second trusted maintainer. Publication fails
+closed if the environment API shows no reviewer. Incident response follows
+[`docs/runbooks/release-incident.md`](docs/runbooks/release-incident.md).
 
 The SBOM lists the release plus 12 shipped runtime components as required
 dependencies. Five non-shipped bottle inputs remain explicit CycloneDX

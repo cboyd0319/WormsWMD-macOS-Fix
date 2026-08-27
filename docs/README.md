@@ -50,6 +50,8 @@ current when adding, moving, renaming, or deleting Markdown files.
   network, and runtime invariants.
 - [Agent session runbook](runbooks/agent-session.md) - startup, validation,
   diagnostic collection, handoff, and clean-state workflow.
+- [Release incident runbook](runbooks/release-incident.md) - signed-tag
+  preflight, containment, evidence preservation, withdrawal, and recovery.
 - [Agent harness style](style/agent-harness.md) - repo-local harness engineering
   standard.
 - [Execution plans](exec-plans/README.md) - plan lifecycle and required shape.

@@ -12,7 +12,13 @@ while IFS= read -r -d '' path; do
         dist/*|packaging/*)
             exit 0
             ;;
-        tools/generate_sbom.py|tools/scan_qt_sbom.sh)
+        scripts/common.sh)
+            exit 0
+            ;;
+        tools/ci_changed_paths.sh|tools/ci_requires_qt_scan.sh)
+            exit 0
+            ;;
+        tools/generate_sbom.py|tools/inspect_archive.py|tools/qt_component_policy.py|tools/scan_qt_sbom.sh)
             exit 0
             ;;
         tools/test_generate_sbom.py|tools/test_qt_vulnerability_policy.py)

@@ -67,6 +67,7 @@ python3 tools/test_generate_sbom.py
 /usr/bin/python3 tools/test_qt_vulnerability_policy.py
 ./tools/scan_qt_sbom.sh --local-report
 /usr/bin/python3 tools/test_normalize_macho_uuid.py
+/usr/bin/python3 tools/test_verify_release_zip.py
 ./tools/test_qt_artifact_comparison.sh
 ./tools/test_qt_tiff_runtime.sh
 /usr/bin/python3 tools/test_archive_inspector.py

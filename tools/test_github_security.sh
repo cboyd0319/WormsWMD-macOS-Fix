@@ -179,6 +179,7 @@ for required_file in \
     "$ROOT_DIR/tools/qt_component_policy.py" \
     "$ROOT_DIR/tools/qt_artifact_evidence.py" \
     "$ROOT_DIR/tools/normalize_macho_uuid.py" \
+    "$ROOT_DIR/tools/verify_release_zip.py" \
     "$ROOT_DIR/tools/normalize_qt_macho_tree.sh" \
     "$ROOT_DIR/tools/compare_qt_artifacts.sh" \
     "$ROOT_DIR/tools/inspect_archive.py" \
@@ -189,6 +190,7 @@ for required_file in \
     "$ROOT_DIR/tools/test_generate_sbom.py" \
     "$ROOT_DIR/tools/test_qt_vulnerability_policy.py" \
     "$ROOT_DIR/tools/test_normalize_macho_uuid.py" \
+    "$ROOT_DIR/tools/test_verify_release_zip.py" \
     "$ROOT_DIR/tools/test_qt_artifact_comparison.sh" \
     "$ROOT_DIR/tools/test_qt_tiff_runtime.sh" \
     "$ROOT_DIR/tools/scan_qt_sbom.sh" \
@@ -220,6 +222,7 @@ for marker in \
     '/usr/bin/python3 tools/test_archive_inspector.py' \
     '/usr/bin/python3 tools/test_qt_vulnerability_policy.py' \
     '/usr/bin/python3 tools/test_normalize_macho_uuid.py' \
+    '/usr/bin/python3 tools/test_verify_release_zip.py' \
     'ruby tools/test_fetch_qt_homebrew_bottles.rb' \
     'name: Compile AGL stub'; do
     if ! grep -Fq "$marker" "$ci_workflow"; then
@@ -253,11 +256,101 @@ for marker in \
     'build/release/*.cdx.json' \
     'gh release create "$GITHUB_REF_NAME" --draft' \
     'gh release edit "$GITHUB_REF_NAME" --draft=false' \
-    'Refusing to overwrite published release'; do
+    'Refusing to overwrite published release' \
+    'Unexpected release asset; refusing publication' \
+    'needs: build-release' \
+    'environment: release' \
+    'actions: read' \
+    'required_reviewers' \
+    'fetch-depth: 0' \
+    'git merge-base --is-ancestor' \
+    'tag-object: ${{ steps.tag_evidence.outputs.object }}' \
+    'tag-commit: ${{ steps.tag_evidence.outputs.commit }}' \
+    'git/ref/tags/$GITHUB_REF_NAME' \
+    'Tag moved after verification; refusing publication' \
+    'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c' \
+    './tools/verify_release_artifacts.sh' \
+    'release_version=$(sed -nE' \
+    '[[ "$ref_name" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]' \
+    '[[ "$ref_name" == "v$release_version" ]]' \
+    'build/release/RELEASE_NOTES.md'; do
     if ! grep -Fq -- "$marker" "$release_workflow"; then
         fail "release workflow is missing safe publication marker: $marker"
     fi
 done
+build_release_block=$(awk '
+    /^  build-release:/ {inside=1}
+    /^  publish-release:/ {inside=0}
+    inside {print}
+' "$release_workflow")
+if grep -Eq 'contents:[[:space:]]+write|id-token:[[:space:]]+write|attestations:[[:space:]]+write|gh release|actions/attest@' \
+    <<< "$build_release_block"; then
+    fail "manual/read-only release build job has publication or attestation authority"
+fi
+verify_release_block=$(awk '
+    /^  verify-release:/ {inside=1}
+    /^  publish-release:/ {inside=0}
+    inside {print}
+' "$release_workflow")
+for marker in \
+    'needs: build-release' \
+    'contents: read' \
+    './tools/verify_release_artifacts.sh'; do
+    if ! grep -Fq -- "$marker" <<< "$verify_release_block"; then
+        fail "read-only release verification job is missing marker: $marker"
+    fi
+done
+if grep -Eq 'contents:[[:space:]]+write|id-token:[[:space:]]+write|attestations:[[:space:]]+write|gh release|actions/attest@' \
+    <<< "$verify_release_block"; then
+    fail "release verification job has publication or attestation authority"
+fi
+publish_release_block=$(awk '/^  publish-release:/ {inside=1} inside {print}' \
+    "$release_workflow")
+if grep -Eq '^[[:space:]]+(run-id|repository|github-token):' \
+    <<< "$publish_release_block"; then
+    fail "publish job downloads an artifact outside its own workflow run"
+fi
+for marker in \
+    'contents: write' \
+    'id-token: write' \
+    'attestations: write' \
+    'if: startsWith(github.ref,'; do
+    if ! grep -Fq "$marker" <<< "$publish_release_block"; then
+        fail "tag publish job is missing scoped publication marker: $marker"
+    fi
+done
+grep -Fq 'needs: verify-release' <<< "$publish_release_block" \
+    || fail "publish job does not wait for read-only release verification"
+if grep -Fq 'not rule.get("prevent_self_review")' <<< "$publish_release_block"; then
+    fail "publish job blocks the approved sole-maintainer release path"
+fi
+
+release_verifier="$ROOT_DIR/tools/verify_release_artifacts.sh"
+if [[ ! -x "$release_verifier" ]]; then
+    fail "release artifact verifier is required and must be executable"
+else
+    # These are literal script source markers, not shell expressions.
+    # shellcheck disable=SC2016
+    for marker in \
+        'worms_verify_exact_sha256_file' \
+        '/usr/bin/python3 "$ROOT_DIR/tools/verify_release_zip.py"' \
+        'Unexpected release artifact; refusing verification' \
+        'RELEASE_NOTES.md' \
+        'regenerated-release-notes.md' \
+        'cmp -s "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" "$standalone"' \
+        'cmp -s "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" "$embedded"' \
+        'cmp -s "$work_dir/regenerated.cdx.json" "$release_sbom"'; do
+        if ! grep -Fq -- "$marker" "$release_verifier"; then
+            fail "release artifact verifier is missing marker: $marker"
+        fi
+    done
+    if "$release_verifier" >/dev/null 2>&1; then
+        fail "release artifact verifier accepted missing arguments"
+    fi
+    if "$release_verifier" unsafe timestamp /tmp >/dev/null 2>&1; then
+        fail "release artifact verifier accepted an unsafe version"
+    fi
+fi
 
 if [[ ! -x "$ROOT_DIR/tools/extract_release_notes.sh" ]]; then
     fail "tools/extract_release_notes.sh is required and must be executable"

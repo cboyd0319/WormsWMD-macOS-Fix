@@ -459,7 +459,7 @@ check_harness_line_caps() {
     check_line_cap ".github/workflows/ci.yml" 200
     check_line_cap ".github/workflows/github-security.yml" 180
     check_line_cap ".github/workflows/rebuild-qt.yml" 220
-    check_line_cap ".github/workflows/release.yml" 140
+    check_line_cap ".github/workflows/release.yml" 260
 }
 
 check_ci_and_ownership_gates() {
@@ -484,6 +484,7 @@ check_ci_and_ownership_gates() {
         "python3 tools/test_generate_sbom.py" \
         "/usr/bin/python3 tools/test_qt_vulnerability_policy.py" \
         "/usr/bin/python3 tools/test_normalize_macho_uuid.py" \
+        "/usr/bin/python3 tools/test_verify_release_zip.py" \
         "/usr/bin/python3 tools/test_archive_inspector.py" \
         "ruby tools/test_fetch_qt_homebrew_bottles.rb" \
         "./tools/test_git_hooks.sh" \
@@ -598,6 +599,7 @@ require_file ".github/workflows/release.yml"
 require_file "docs/README.md"
 require_file "docs/design/runtime-contracts.md"
 require_file "docs/runbooks/agent-session.md"
+require_file "docs/runbooks/release-incident.md"
 require_file "docs/style/agent-harness.md"
 require_file "docs/exec-plans/README.md"
 require_file "docs/exec-plans/TEMPLATE.md"
@@ -613,6 +615,7 @@ require_file "tools/scan_qt_sbom.sh"
 require_file "tools/compare_qt_artifacts.sh"
 require_file "tools/normalize_qt_macho_tree.sh"
 require_file "tools/normalize_macho_uuid.py"
+require_file "tools/verify_release_zip.py"
 require_file "tools/qt_artifact_evidence.py"
 require_file "tools/inspect_archive.py"
 require_file "tools/install_git_hooks.sh"
@@ -622,6 +625,7 @@ require_file "tools/test_ci_change_classification.sh"
 require_file "tools/test_generate_sbom.py"
 require_file "tools/test_qt_vulnerability_policy.py"
 require_file "tools/test_normalize_macho_uuid.py"
+require_file "tools/test_verify_release_zip.py"
 require_file "tools/test_qt_artifact_comparison.sh"
 require_file "tools/test_qt_tiff_runtime.sh"
 require_file "tools/test_archive_inspector.py"

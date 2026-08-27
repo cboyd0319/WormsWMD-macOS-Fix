@@ -86,6 +86,7 @@ python3 tools/test_generate_sbom.py
 /usr/bin/python3 tools/test_qt_vulnerability_policy.py
 ./tools/scan_qt_sbom.sh --local-report
 /usr/bin/python3 tools/test_normalize_macho_uuid.py
+/usr/bin/python3 tools/test_verify_release_zip.py
 ./tools/test_qt_artifact_comparison.sh
 ./tools/test_qt_tiff_runtime.sh
 /usr/bin/python3 tools/test_archive_inspector.py
@@ -168,6 +169,10 @@ the bootstrap commit guard to the tag target. The workflow creates or resumes a
 draft, uploads and attests every asset, applies the matching `CHANGELOG.md`
 section as release notes, and only then publishes the immutable release. It
 must refuse to overwrite an already-published release.
+Configure required reviewers on the GitHub `release` environment before the
+next tag. For signing-key loss, workflow compromise, ruleset break-glass, asset
+withdrawal, or corrective publication, follow
+[`release-incident.md`](release-incident.md).
 
 After the tag workflow publishes assets, verify:
 

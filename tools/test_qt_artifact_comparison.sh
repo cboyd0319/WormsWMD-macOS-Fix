@@ -18,6 +18,19 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 [[ -x "$ROOT_DIR/tools/normalize_qt_macho_tree.sh" ]] \
     || fail "tools/normalize_qt_macho_tree.sh is required and executable"
+
+oversized_evidence="$tmp_dir/oversized-evidence"
+mkdir -p "$oversized_evidence"
+dd if=/dev/zero of="$oversized_evidence/METADATA.txt" \
+    bs=1048576 count=5 2>/dev/null
+: > "$oversized_evidence/SOURCE_PROVENANCE.tsv"
+: > "$oversized_evidence/MANIFEST.txt"
+if /usr/bin/python3 "$ROOT_DIR/tools/qt_artifact_evidence.py" collect \
+    "$oversized_evidence" --output "$tmp_dir/oversized.json" \
+    >/dev/null 2>&1; then
+    fail "artifact evidence collector accepted oversized metadata"
+fi
+
 mkdir -p "$tmp_dir/empty/Frameworks" "$tmp_dir/empty/PlugIns"
 if "$ROOT_DIR/tools/normalize_qt_macho_tree.sh" "$tmp_dir/empty" \
     >/dev/null 2>&1; then

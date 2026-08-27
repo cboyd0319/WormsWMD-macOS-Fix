@@ -36,6 +36,18 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def read_bounded_text(path: Path, label: str) -> str:
+    path_stat = path.lstat()
+    if not stat.S_ISREG(path_stat.st_mode) or path.is_symlink() \
+        or path_stat.st_nlink != 1 or path_stat.st_size > MAX_OUTPUT_BYTES:
+        raise EvidenceError(f"{label} must be a bounded regular file: {path}")
+    with path.open("rb") as source:
+        data = source.read(MAX_OUTPUT_BYTES + 1)
+    if len(data) > MAX_OUTPUT_BYTES:
+        raise EvidenceError(f"{label} exceeds its size limit: {path}")
+    return data.decode("utf-8")
+
+
 def run_tool(arguments: list[str], allow_failure: bool = False) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         arguments,
@@ -190,7 +202,9 @@ def collect_tree(root: Path) -> dict[str, Any]:
             raise EvidenceError(f"Artifact evidence file is missing: {required.name}")
     provenance_lines = [
         line
-        for line in provenance_path.read_text(encoding="utf-8").splitlines()
+        for line in read_bounded_text(
+            provenance_path, "Artifact provenance"
+        ).splitlines()
         if line and not line.startswith("#")
     ]
     provenance = list(csv.DictReader(provenance_lines, delimiter="\t"))
@@ -198,8 +212,12 @@ def collect_tree(root: Path) -> dict[str, Any]:
         "inventory": inventory,
         "files": files,
         "macho": macho,
-        "manifest": manifest_path.read_text(encoding="utf-8").splitlines(),
-        "metadata": metadata_path.read_text(encoding="utf-8").splitlines(),
+        "manifest": read_bounded_text(
+            manifest_path, "Artifact manifest"
+        ).splitlines(),
+        "metadata": read_bounded_text(
+            metadata_path, "Artifact metadata"
+        ).splitlines(),
         "provenance": provenance,
     }
 
@@ -287,10 +305,7 @@ def atomic_write(path: Path, document: dict[str, Any]) -> None:
 
 
 def read_evidence(path: Path) -> dict[str, Any]:
-    if not path.is_file() or path.is_symlink() \
-        or path.stat().st_size > MAX_OUTPUT_BYTES:
-        raise EvidenceError(f"Evidence input must be a bounded regular file: {path}")
-    document = json.loads(path.read_text(encoding="utf-8"))
+    document = json.loads(read_bounded_text(path, "Evidence input"))
     if not isinstance(document, dict):
         raise EvidenceError("Evidence input must contain a JSON object")
     return document

@@ -46,6 +46,7 @@ new_fixture() {
         docs/exec-plans/2026-08-27-security-remediation-pr2-archive-bottle-safety.md \
         docs/exec-plans/2026-08-27-security-remediation-pr4-delivery-provenance.md \
         docs/runbooks/agent-session.md \
+        docs/runbooks/release-incident.md \
         docs/style/agent-harness.md \
         packaging/qt-component-policy.tsv \
         packaging/qt-homebrew-lock.tsv \
@@ -55,6 +56,7 @@ new_fixture() {
         tools/qt_component_policy.py \
         tools/qt_artifact_evidence.py \
         tools/normalize_macho_uuid.py \
+        tools/verify_release_zip.py \
         tools/normalize_qt_macho_tree.sh \
         tools/compare_qt_artifacts.sh \
         tools/ci_requires_qt_scan.sh \
@@ -66,6 +68,7 @@ new_fixture() {
         tools/test_qt_cache_integrity.sh \
         tools/test_qt_vulnerability_policy.py \
         tools/test_normalize_macho_uuid.py \
+        tools/test_verify_release_zip.py \
         tools/test_qt_artifact_comparison.sh \
         tools/test_qt_tiff_runtime.sh \
         tools/test_signature_verification.sh \

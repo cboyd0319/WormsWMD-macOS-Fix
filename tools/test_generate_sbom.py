@@ -289,6 +289,43 @@ class GenerateSbomTests(unittest.TestCase):
             self.assertIn("Release zip does not match", result.stderr)
             self.assertFalse(output.exists())
 
+    def test_rejects_checksum_for_a_different_release_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temp = Path(temporary_directory)
+            output = temp / "bad.cdx.json"
+            release_archive = temp / "release.zip"
+            release_checksum = temp / "release.zip.sha256"
+            release_archive.write_bytes(b"release contents\n")
+            digest = hashlib.sha256(release_archive.read_bytes()).hexdigest()
+            release_checksum.write_text(
+                digest + "  different-release.zip\n", encoding="utf-8"
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GENERATOR),
+                    "--version",
+                    "v1.7.6",
+                    "--timestamp",
+                    TIMESTAMP,
+                    "--output",
+                    str(output),
+                    "--release-archive",
+                    str(release_archive),
+                    "--release-checksum",
+                    str(release_checksum),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("checksum record", result.stderr.lower())
+            self.assertFalse(output.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
