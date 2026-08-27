@@ -137,6 +137,12 @@ fi
 if grep -Fq 'Target: /Contents/' <<< "$multi_dry_run_output"; then
     fail "noninteractive dry-run printed an empty-root mutation target: $multi_dry_run_output"
 fi
+dry_sign_line=$(grep -nF 'Apply ad-hoc code signature' <<< "$multi_dry_run_output" | cut -d: -f1)
+dry_verify_sign_line=$(grep -nF 'Strictly verify the ad-hoc signature' <<< "$multi_dry_run_output" | cut -d: -f1)
+if [[ -z "$dry_sign_line" ]] || [[ -z "$dry_verify_sign_line" ]] \
+    || [[ "$dry_sign_line" -ge "$dry_verify_sign_line" ]]; then
+    fail "dry-run does not show signature application before verification: $multi_dry_run_output"
+fi
 
 verify_link_home="$tmp_dir/verify-link-home"
 verify_link_app="$verify_link_home/Applications/Worms W.M.D.app"

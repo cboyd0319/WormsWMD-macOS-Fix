@@ -588,6 +588,7 @@ mkdir -p \
     "$gog_backup/Frameworks" \
     "$gog_backup/PlugIns"
 printf '#!/bin/bash\nexit 0\n' > "$restore_steam_app/Contents/MacOS/Worms W.M.D"
+printf 'unexpected current MacOS file\n' > "$restore_steam_app/Contents/MacOS/unexpected-current.dylib"
 printf '#!/bin/bash\nexit 0\n' > "$restore_gog_app/Contents/MacOS/Worms W.M.D"
 chmod +x \
     "$restore_steam_app/Contents/MacOS/Worms W.M.D" \
@@ -738,13 +739,14 @@ mkdir -p \
     "$steam_backup/MacOS" \
     "$steam_backup/_CodeSignature"
 printf 'steam restored\n' > "$steam_backup/Frameworks/store-marker.txt"
+: > "$steam_backup/Frameworks/libsteam_api.dylib"
 printf '#!/bin/bash\nexit 7\n' > "$steam_backup/MacOS/Worms W.M.D"
 chmod +x "$steam_backup/MacOS/Worms W.M.D"
 steam_backup_exec_hash=$(shasum -a 256 "$steam_backup/MacOS/Worms W.M.D" | awk '{print $1}')
 steam_backup_exec_size=$(stat -f%z "$steam_backup/MacOS/Worms W.M.D")
 printf 'original signature\n' > "$steam_backup/_CodeSignature/CodeResources"
 printf '<plist version="1.0"><dict></dict></plist>\n' > "$steam_backup/Info.plist"
-printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tsteam\ngame_executable_sha256\t%s\ngame_executable_size\t%s\ncode_signature_present\ttrue\n' \
+printf '# WormsWMD backup metadata v2\ngame_app_path\t%s\ngame_source\tsteam\ngame_executable_sha256\t%s\ngame_executable_size\t%s\nmacos_tree_complete\ttrue\ncode_signature_present\ttrue\n' \
     "$restore_steam_real" "$steam_backup_exec_hash" "$steam_backup_exec_size" \
     > "$steam_backup/BACKUP_METADATA.tsv"
 (
@@ -764,6 +766,8 @@ grep -Fxq 'original signature' "$restore_steam_app/Contents/_CodeSignature/CodeR
     || fail "restore did not restore original signature resources"
 grep -Fq 'exit 7' "$restore_steam_app/Contents/MacOS/Worms W.M.D" \
     || fail "restore did not restore the original main executable"
+[[ ! -e "$restore_steam_app/Contents/MacOS/unexpected-current.dylib" ]] \
+    || fail "current v2 restore left a MacOS file absent from the backup"
 
 custom_restore_home="$tmp_dir/custom-restore-home"
 custom_default_app="$custom_restore_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
@@ -816,12 +820,13 @@ printf '#!/bin/bash\nexit 0\n' > "$gog_guidance_app/Contents/MacOS/Worms W.M.D"
 : > "$gog_guidance_app/Contents/MacOS/libGalaxy.dylib"
 chmod +x "$gog_guidance_app/Contents/MacOS/Worms W.M.D"
 cp "$gog_guidance_app/Contents/MacOS/Worms W.M.D" "$gog_guidance_backup/MacOS/Worms W.M.D"
+cp "$gog_guidance_app/Contents/MacOS/libGalaxy.dylib" "$gog_guidance_backup/MacOS/libGalaxy.dylib"
 printf 'current gog files\n' > "$gog_guidance_app/Contents/Frameworks/store-marker.txt"
 printf 'restored gog files\n' > "$gog_guidance_backup/Frameworks/store-marker.txt"
 gog_guidance_real=$(cd "$gog_guidance_app" && pwd -P)
 gog_guidance_exec_hash=$(shasum -a 256 "$gog_guidance_backup/MacOS/Worms W.M.D" | awk '{print $1}')
 gog_guidance_exec_size=$(stat -f%z "$gog_guidance_backup/MacOS/Worms W.M.D")
-printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tgog\ngame_executable_sha256\t%s\ngame_executable_size\t%s\ncode_signature_present\tfalse\n' \
+printf '# WormsWMD backup metadata v2\ngame_app_path\t%s\ngame_source\tgog\ngame_executable_sha256\t%s\ngame_executable_size\t%s\nmacos_tree_complete\ttrue\ncode_signature_present\tfalse\n' \
     "$gog_guidance_real" "$gog_guidance_exec_hash" "$gog_guidance_exec_size" \
     > "$gog_guidance_backup/BACKUP_METADATA.tsv"
 (

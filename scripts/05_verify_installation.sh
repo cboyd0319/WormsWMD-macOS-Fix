@@ -328,6 +328,10 @@ echo "OK: Library dependencies checked"
 # Check plugins
 echo ""
 echo "--- Checking plugins ---"
+while IFS= read -r -d '' plugin_link; do
+    echo "ERROR: Linked Qt plugin entry is not supported: ${plugin_link#"$GAME_APP/Contents/"}"
+    ((errors++))
+done < <(find "$GAME_PLUGINS" -type l -print0 2>/dev/null)
 if [ ! -f "$GAME_PLUGINS/platforms/libqcocoa.dylib" ]; then
     echo "ERROR: Required platform plugin missing: platforms/libqcocoa.dylib"
     ((errors++))

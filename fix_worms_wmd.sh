@@ -476,11 +476,12 @@ write_game_backup_metadata() {
     executable_size=$(worms_file_size "$game_exec")
 
     {
-        printf '%s\n' '# WormsWMD backup metadata v1'
+        printf '%s\n' '# WormsWMD backup metadata v2'
         printf 'game_app_path\t%s\n' "$game_app_real"
         printf 'game_source\t%s\n' "$source"
         printf 'game_executable_sha256\t%s\n' "$executable_hash"
         printf 'game_executable_size\t%s\n' "$executable_size"
+        printf 'macos_tree_complete\ttrue\n'
         if [[ -d "$GAME_APP/Contents/_CodeSignature" ]]; then
             printf 'code_signature_present\ttrue\n'
         else
@@ -518,14 +519,22 @@ backup_metadata_key_count() {
         "$backup_dir/$BACKUP_METADATA_NAME"
 }
 
+backup_metadata_version() {
+    local backup_dir="$1"
+
+    sed -n 's/^# WormsWMD backup metadata v\([0-9][0-9]*\)$/\1/p' \
+        "$backup_dir/$BACKUP_METADATA_NAME" | head -1
+}
+
 validate_game_backup_metadata() {
     local backup_dir="$1"
     local metadata="$backup_dir/$BACKUP_METADATA_NAME"
-    local key recorded_path recorded_source executable_hash executable_size signature_present
+    local key metadata_version recorded_path recorded_source executable_hash executable_size signature_present
 
     [[ -f "$metadata" ]] || return 1
     [[ ! -L "$metadata" ]] || return 1
-    [[ "$(sed -n '1p' "$metadata")" == '# WormsWMD backup metadata v1' ]] || return 1
+    metadata_version=$(backup_metadata_version "$backup_dir")
+    [[ "$metadata_version" == "1" || "$metadata_version" == "2" ]] || return 1
 
     for key in \
         game_app_path \
@@ -548,6 +557,13 @@ validate_game_backup_metadata() {
     [[ "$executable_hash" =~ ^[a-fA-F0-9]{64}$ ]] || return 1
     [[ "$executable_size" =~ ^[0-9]+$ ]] || return 1
     [[ "$signature_present" == "true" || "$signature_present" == "false" ]] || return 1
+
+    if [[ "$metadata_version" == "2" ]]; then
+        [[ "$(backup_metadata_key_count "$backup_dir" "macos_tree_complete")" == "1" ]] || return 1
+        [[ "$(backup_metadata_value "$backup_dir" "macos_tree_complete" || true)" == "true" ]] || return 1
+    else
+        [[ "$(backup_metadata_key_count "$backup_dir" "macos_tree_complete")" == "0" ]] || return 1
+    fi
 }
 
 backup_targets_game_app() {
@@ -609,7 +625,7 @@ write_game_backup_manifest() {
 
 verify_game_backup_manifest() {
     local backup_dir="$1"
-    local recorded_hash recorded_size executable
+    local recorded_hash recorded_size recorded_source executable
 
     [[ -f "$backup_dir/$BACKUP_MANIFEST_NAME" ]] || return 2
     worms_validate_tree_symlinks "$backup_dir" || return 1
@@ -625,6 +641,21 @@ verify_game_backup_manifest() {
         recorded_size=$(backup_metadata_value "$backup_dir" "game_executable_size")
         [[ "$(worms_file_sha256 "$executable")" == "$recorded_hash" ]] || return 1
         [[ "$(worms_file_size "$executable")" == "$recorded_size" ]] || return 1
+        recorded_source=$(backup_metadata_value "$backup_dir" "game_source")
+        case "$recorded_source" in
+            gog)
+                if [[ ! -f "$backup_dir/MacOS/libGalaxy.dylib" ]] \
+                    || [[ -L "$backup_dir/MacOS/libGalaxy.dylib" ]]; then
+                    return 1
+                fi
+                ;;
+            steam)
+                if [[ ! -f "$backup_dir/Frameworks/libsteam_api.dylib" ]] \
+                    || [[ -L "$backup_dir/Frameworks/libsteam_api.dylib" ]]; then
+                    return 1
+                fi
+                ;;
+        esac
     fi
 }
 
@@ -684,9 +715,38 @@ latest_original_game_backup() {
     return 1
 }
 
+replace_game_macos_tree() {
+    local backup_dir="$1"
+    local contents="$GAME_APP/Contents"
+    local target="$contents/MacOS"
+    local staging_root previous
+
+    staging_root=$(mktemp -d "$contents/.MacOS.restore.XXXXXX")
+    if ! cp -R "$backup_dir/MacOS" "$staging_root/MacOS"; then
+        rm -rf "$staging_root"
+        return 1
+    fi
+
+    previous=$(worms_unique_path "$contents/.MacOS.previous")
+    if ! mv "$target" "$previous"; then
+        rm -rf "$staging_root"
+        return 1
+    fi
+    if ! mv "$staging_root/MacOS" "$target"; then
+        if ! mv "$previous" "$target"; then
+            echo "Failed to recover the prior MacOS directory after a staged restore error." >&2
+        fi
+        rm -rf "$staging_root"
+        return 1
+    fi
+
+    rm -rf "$previous"
+    rmdir "$staging_root"
+}
+
 restore_game_backup_files() {
     local backup_dir="$1"
-    local signature_present component
+    local signature_present component metadata_version=""
 
     worms_validate_tree_paths "$backup_dir"
     worms_validate_tree_entry_types "$backup_dir"
@@ -714,6 +774,7 @@ restore_game_backup_files() {
         backup_metadata_is_manifested "$backup_dir" || return 1
         validate_game_backup_metadata "$backup_dir" || return 1
         signature_present=$(backup_metadata_value "$backup_dir" "code_signature_present" || true)
+        metadata_version=$(backup_metadata_version "$backup_dir")
     fi
     case "$signature_present" in
         true)
@@ -733,7 +794,11 @@ restore_game_backup_files() {
     if [[ -d "$backup_dir/MacOS" ]]; then
         worms_refuse_linked_file_for_mutation \
             "$GAME_APP/Contents/MacOS/Worms W.M.D" "game executable"
-        cp -R "$backup_dir/MacOS/." "$GAME_APP/Contents/MacOS/"
+        if [[ "$metadata_version" == "2" ]]; then
+            replace_game_macos_tree "$backup_dir"
+        else
+            cp -R "$backup_dir/MacOS/." "$GAME_APP/Contents/MacOS/"
+        fi
     fi
 
     case "$signature_present" in
@@ -1474,8 +1539,9 @@ do_dry_run() {
     print_dry_run "Update image format plugins"
     print_dry_run "Update Info.plist metadata (bundle ID, HiDPI, min version)"
     print_dry_run "Secure config URLs (HTTP→HTTPS, disable internal URLs)"
-    print_dry_run "Verify the complete runtime and ad-hoc signature before committing"
+    print_dry_run "Verify the complete runtime"
     print_dry_run "Apply ad-hoc code signature (codesign --deep --sign -)"
+    print_dry_run "Strictly verify the ad-hoc signature before committing"
     print_dry_run "Remove quarantine flags (xattr -rd com.apple.quarantine)"
     print_dry_run "Reset incompatible Qt window geometry (if present)"
     echo ""

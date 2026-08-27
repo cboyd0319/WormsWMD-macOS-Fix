@@ -419,14 +419,9 @@ worms_file_link_count() {
 
 worms_has_control_chars() {
     local value="$1"
+    local LC_ALL=C
 
-    case "$value" in
-        *$'\n'*|*$'\r'*|*$'\t'*)
-            return 0
-            ;;
-    esac
-
-    return 1
+    [[ "$value" =~ [[:cntrl:]] ]]
 }
 
 worms_reject_control_chars() {

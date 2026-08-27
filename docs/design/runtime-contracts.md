@@ -89,17 +89,13 @@ missing, malformed, duplicated, or not bound into its manifest is invalid, not
 legacy.
 
 Manifest verification must reject missing, changed, duplicate, unsupported,
-control-character, and unrecorded non-directory entries. Version 2 manifests
-record symlink paths and target digests in addition to regular files; restore
-must never copy unmanifested non-directory additions. Version 1 manifests remain
-readable as legacy manifests without symlink identity coverage.
+control-character, and unrecorded non-directory entries. Version 2 records
+symlink paths/targets; version 1 remains readable without symlink identity.
 
-New backups are eligible for automatic restore only when their recorded
-canonical source app and storefront identity match the selected `GAME_APP`.
-Legacy backups without source metadata remain restorable when only one
-installation is detected; an ambiguous multi-install legacy restore must fail
-closed. A failed post-restore verification must not be reported as a successful
-rollback.
+New automatic restores require a matching canonical app and storefront.
+Metadata v2 requires a complete `MacOS` tree and staged replacement; v1 keeps
+historical merge behavior. Legacy backups without source metadata require one
+unambiguous installation. Failed verification is never reported as rollback.
 
 Backup creation may repair the fixer's own stale AGL framework symlink layout
 inside the backup copy before manifest validation. This self-heals repeated

@@ -137,6 +137,10 @@ Metadata that is missing from its manifest or malformed is rejected. Older
 backups without source metadata are restored with a warning only when the
 selected installation is unambiguous.
 
+Current metadata v2 backups replace `Contents/MacOS` through a staged swap so
+extra files cannot survive restore. Older metadata v1 backups retain the prior
+merge behavior for compatibility.
+
 ### Restore manually
 
 Prefer automatic restore when possible because it performs manifest validation.

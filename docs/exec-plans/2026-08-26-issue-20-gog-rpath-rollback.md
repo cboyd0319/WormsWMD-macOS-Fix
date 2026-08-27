@@ -180,6 +180,15 @@ disposable copy is created first.
   default Steam path. Detection now clears ambiguous targets and dry-run uses a
   safe placeholder instead of `/Contents`; read-only verification failures no
   longer print a mutating-installer rollback error.
+- 2026-08-26: The next Copilot pass found four valid residuals. Full C-locale
+  control bytes are now rejected; metadata v2 marks complete `MacOS` backups and
+  restore uses a staged swap that removes extras; dry-run shows runtime verify,
+  sign, then strict signature verify in the actual order; and linked plugin
+  entries fail instead of bypassing traversal. Metadata v1 keeps its prior merge
+  behavior for compatibility.
+- 2026-08-26: Repeated the live GOG apply/restore path with metadata v2 and an
+  injected post-fix `MacOS` dylib. The staged swap removed the extra entry and
+  again reproduced the 3,097-record baseline plus both original GOG hashes.
 
 ## Surprises & Discoveries
 

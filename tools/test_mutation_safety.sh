@@ -35,6 +35,11 @@ trap 'rm -rf "$tmp_dir"' EXIT
 if worms_reject_control_chars $'unsafe\tpath' "tabbed test path" 2>/dev/null; then
     fail "control-character validation accepted a tab-delimited path"
 fi
+for control_path in $'unsafe\033path' $'unsafe\apath' $'unsafe\bpath' $'unsafe\177path'; do
+    if worms_reject_control_chars "$control_path" "control-byte test path" 2>/dev/null; then
+        fail "control-character validation accepted a non-whitespace control byte"
+    fi
+done
 
 malformed_app="$tmp_dir/Malformed.app"
 make_game "$malformed_app"

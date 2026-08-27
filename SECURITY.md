@@ -244,7 +244,7 @@ Last audit: 2026-08-26
 | Code signing | Pass | Ad-hoc signature applied and strictly verified inside the rollback boundary; quarantine cleared afterward |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
-| Backup restore | Pass | Verified staged backups cover all `MacOS` files, bind to canonical app/storefront identity, reject invalid metadata and unrecorded non-directory entries, and refuse ambiguous legacy restore |
+| Backup restore | Pass | Verified staged v2 backups cover and exactly replace all `MacOS` files, bind to canonical app/storefront identity, reject invalid metadata/unrecorded entries, and preserve v1 legacy merge behavior |
 | Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
 
 ## Verifying the fix
@@ -327,7 +327,7 @@ hidden staging backup passes metadata and manifest verification
 - `DataOSX/` - Original configuration files
 - `CommonData/` - Original shared configuration files
 - `BACKUP_METADATA.tsv` - Canonical source app, storefront, executable identity,
-  and signature-presence metadata
+  complete-MacOS marker, and signature-presence metadata
 - `BACKUP_MANIFEST.tsv` - SHA256 and size manifest for backup verification
 
 **Restore command**:

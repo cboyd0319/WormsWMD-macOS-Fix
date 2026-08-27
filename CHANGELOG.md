@@ -27,14 +27,17 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   directory, including GOG's `libGalaxy.dylib`, and existing signature resources.
 - Build and verify backups under a hidden staging name before publishing them
   for restore, preventing interrupted backups from being selected as legacy.
+- Version 2 backup metadata marks complete `MacOS` coverage so restore performs
+  a staged directory swap and removes files absent from the backup; version 1
+  metadata remains readable with its prior merge behavior.
 - Bound new backups to their canonical source app and prevented an automatic
   restore from applying a GOG backup to Steam, or a Steam backup to GOG.
 - Required both canonical path and storefront identity to match before an
   automatic restore, including when different installations reuse a path.
 - Rejected game bundles whose mutable `Contents/MacOS` directory resolves
   outside the selected app.
-- Rejected nested bundle symlinks, hardlinks, special entries, and control-byte
-  paths that recursive signing or mutation could otherwise follow.
+- Rejected nested bundle symlinks, hardlinks, special entries, and all C-locale
+  control-byte paths that recursive signing or mutation could otherwise follow.
 - Fixed friendly-launcher option 7 so an interactive Steam or GOG selection is
   used for the actual launch action.
 - Made install-name rewrite failures and AGL compiler failures actionable
@@ -56,6 +59,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   GOG libraries in `Contents/MacOS` and every installed Qt plugin category.
 - Removed stale Qt 5.3 accessibility and print-support plugins when installing
   Qt 5.15, and stopped GOG launch failures from falling back to Steam.
+- Rejected linked Qt plugin entries so presence checks cannot bypass dependency
+  and architecture traversal.
 - Made ad-hoc signing and signature verification transactional so partial
   signing failures restore all covered game binaries.
 

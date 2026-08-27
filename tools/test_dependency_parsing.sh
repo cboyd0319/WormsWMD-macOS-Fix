@@ -308,6 +308,22 @@ if grep -Fq "ERROR: Main executable has unresolved @rpath dependency: @rpath/lib
     fail "verifier rejected a Galaxy dependency resolved by LC_RPATH"
 fi
 
+ln -s libqsvg.dylib "$game_app/Contents/PlugIns/imageformats/liblinked.dylib"
+set +e
+linked_plugin_output=$(
+    PATH="$fake_bin:$PATH" \
+        GAME_APP="$game_app" \
+        "$ROOT_DIR/scripts/05_verify_installation.sh" 2>&1
+)
+linked_plugin_status=$?
+set -e
+rm -f "$game_app/Contents/PlugIns/imageformats/liblinked.dylib"
+if [[ "$linked_plugin_status" -eq 0 ]]; then
+    fail "verifier accepted a linked Qt plugin entry"
+fi
+grep -Fq 'Linked Qt plugin entry is not supported: PlugIns/imageformats/liblinked.dylib' <<< "$linked_plugin_output" \
+    || fail "verifier did not report the linked plugin entry: $linked_plugin_output"
+
 : > "$tmp_dir/outside-direct.dylib"
 set +e
 direct_escape_output=$(
