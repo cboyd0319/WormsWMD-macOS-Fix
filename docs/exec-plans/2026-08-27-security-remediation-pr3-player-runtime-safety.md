@@ -1,6 +1,6 @@
 # Security Remediation PR 3: Player And Runtime Safety
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -34,7 +34,7 @@ settings, tags, release publication, and PR 4 delivery/provenance work.
 - [x] Classify strict signatures and recursive quarantine.
 - [x] Bind update downloads to exact checksums and atomic publish.
 - [x] Harden traces, diagnostics, crashes, and LaunchAgent updates.
-- [ ] Run local and adversarial gates, merge one reviewed PR, and record PR 4 base.
+- [x] Run local and adversarial gates, merge one reviewed PR, and record PR 4 base.
 
 ## Verification
 
@@ -106,6 +106,10 @@ git status --short
 - 2026-08-27: The one requested Copilot review identified duplicated update
   target validation. The checker now calls the shared exact-string validator;
   its focused test and the affected local gates pass before the corrective push.
+- 2026-08-27: [PR #27](https://github.com/cboyd0319/WormsWMD-macOS-Fix/pull/27)
+  merged after GitHub Security run 17 and CI run 116 passed on corrected head
+  `33968c6e737f7d974d12962165fb5d52871a1c47`. Merge commit
+  `7b10f3eb9e487fe8a7ec88499735ae093870e189` is the exact PR 4 base.
 
 ## Surprises & Discoveries
 
@@ -137,5 +141,9 @@ git status --short
 
 ## Outcomes & Retrospective
 
-Implementation is in progress. Complete with PR URL, commits, local and hosted
-verification, rollback evidence, residual risks, and exact PR 4 base.
+Six planned commits merged through PR #27. Full local and hosted gates passed,
+one Copilot finding was fixed and resolved, and no real save was restored or
+mutated. Save and LaunchAgent failure fixtures prove retained-state rollback;
+cache and dependency fixtures prove authority and containment. Residual risk is
+limited to ordinary same-user races and final player compatibility checks. PR 4
+starts from `7b10f3eb9e487fe8a7ec88499735ae093870e189`.
