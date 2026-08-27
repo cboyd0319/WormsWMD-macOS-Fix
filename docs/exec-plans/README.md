@@ -31,6 +31,9 @@ the plan before continuing.
 
 ## Current Plans
 
+- [GitHub security deep dive](2026-08-26-github-security-deep-dive.md) - active
+  audit and hardening of Actions, releases, hosted controls, secrets, and
+  supply-chain evidence using the local OWASP cheat sheets as reference.
 - [Open pull request resolution](2026-08-26-open-pr-resolution.md) - completed
   resolution of the superseded GOG fix and current GitHub Actions updates.
 - [v1.7.6 release](2026-08-26-v1.7.6-release.md) - completed release preparation,

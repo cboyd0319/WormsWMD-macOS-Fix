@@ -1,0 +1,53 @@
+name: GitHub Security
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/**'
+      - 'tools/extract_release_notes.sh'
+      - 'tools/test_github_security.sh'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/**'
+      - 'tools/extract_release_notes.sh'
+      - 'tools/test_github_security.sh'
+  schedule:
+    - cron: '17 7 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: github-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: Zizmor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Test repository GitHub policy
+        run: ./tools/test_github_security.sh
+
+      - name: Run Zizmor
+        # zizmorcore/zizmor-action v0.6.2
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054
+        with:
+          advanced-security: false
+          annotations: true
+          inputs: .github
+          min-confidence: high
+          min-severity: high
+          persona: regular
+          version: 1.29.0

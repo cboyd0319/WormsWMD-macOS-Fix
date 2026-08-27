@@ -6,21 +6,30 @@ on:
     tags:
       - 'v*'
 
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-release:
     name: Build release bundle
     runs-on: macos-26-intel
+    timeout-minutes: 20
 
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
-      artifact-metadata: write
+      contents: write # Create the tagged GitHub release.
+      id-token: write # Request the short-lived attestation identity token.
+      attestations: write # Publish release artifact attestations.
+      artifact-metadata: write # Record artifact metadata with attestations.
 
     steps:
       - name: Checkout
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Make scripts executable
         run: chmod +x fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
@@ -50,7 +59,15 @@ jobs:
           echo "artifact=WormsWMD-macOS-Fix-$safe_ref" >> "$GITHUB_OUTPUT"
 
       - name: Build release zip
-        run: ./tools/build_release_bundle.sh --version "${{ steps.release_names.outputs.version }}"
+        env:
+          RELEASE_VERSION: ${{ steps.release_names.outputs.version }}
+        run: ./tools/build_release_bundle.sh --version "$RELEASE_VERSION"
+
+      - name: Prepare release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_VERSION: ${{ steps.release_names.outputs.version }}
+        run: ./tools/extract_release_notes.sh "${RELEASE_VERSION#v}" > build/release/RELEASE_NOTES.md
 
       - name: Attest release assets
         # actions/attest v4.2.2
@@ -65,6 +82,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ steps.release_names.outputs.artifact }}
+          retention-days: 14
           path: |
             build/release/WormsWMD-macOS-Fix-*.zip
             build/release/WormsWMD-macOS-Fix-*.zip.sha256
@@ -75,7 +93,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" build/release/*.zip build/release/*.zip.sha256 --clobber
+            if [[ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft')" != "true" ]]; then
+              echo "::error::Refusing to overwrite published release $GITHUB_REF_NAME."
+              exit 1
+            fi
+            gh release edit "$GITHUB_REF_NAME" --notes-file build/release/RELEASE_NOTES.md
           else
-            gh release create "$GITHUB_REF_NAME" build/release/*.zip build/release/*.zip.sha256 --verify-tag --generate-notes
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --notes-file build/release/RELEASE_NOTES.md
           fi
+          gh release upload "$GITHUB_REF_NAME" build/release/*.zip build/release/*.zip.sha256 --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false
