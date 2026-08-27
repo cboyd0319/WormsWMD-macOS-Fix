@@ -91,8 +91,43 @@ if grep -Fq 'Found: ~/Library/Application Support/Steam' "$tmp_dir/ambiguous.txt
     fail "direct diagnostics inspected Steam despite an ambiguous multi-install state"
 fi
 
-GAME_APP="$fake_game" "$diagnostics_script" --output "$tmp_dir/output.txt" >/dev/null
-assert_sanitized "$tmp_dir/output.txt"
+diagnostic_output="$tmp_dir/output.txt"
+printf 'replace me\n' > "$diagnostic_output"
+old_output_inode=$(stat -f '%i' "$diagnostic_output")
+GAME_APP="$fake_game" "$diagnostics_script" --output "$diagnostic_output" >/dev/null
+assert_sanitized "$diagnostic_output"
+[[ "$(stat -f '%i' "$diagnostic_output")" != "$old_output_inode" ]] \
+    || fail "diagnostics replaced a safe output in place instead of atomically"
+[[ "$(stat -f '%Lp' "$diagnostic_output")" == "600" ]] \
+    || fail "diagnostics output mode is not 0600"
+
+diagnostic_peer="$tmp_dir/diagnostic-peer.txt"
+hardlinked_output="$tmp_dir/hardlinked-output.txt"
+printf 'preserved diagnostic peer\n' > "$diagnostic_peer"
+ln "$diagnostic_peer" "$hardlinked_output"
+if GAME_APP="$fake_game" "$diagnostics_script" \
+    --output "$hardlinked_output" >/dev/null 2>&1; then
+    fail "diagnostics accepted a hardlinked output"
+fi
+grep -Fxq 'preserved diagnostic peer' "$diagnostic_peer" \
+    || fail "diagnostics modified a hardlinked peer"
+
+symlinked_output="$tmp_dir/symlinked-output.txt"
+ln -s "$diagnostic_peer" "$symlinked_output"
+if GAME_APP="$fake_game" "$diagnostics_script" \
+    --output "$symlinked_output" >/dev/null 2>&1; then
+    fail "diagnostics accepted a symlink output"
+fi
+grep -Fxq 'preserved diagnostic peer' "$diagnostic_peer" \
+    || fail "diagnostics modified a symlink target"
+
+fifo_output="$tmp_dir/fifo-output.txt"
+mkfifo "$fifo_output"
+if GAME_APP="$fake_game" "$diagnostics_script" \
+    --output "$fifo_output" >/dev/null 2>&1; then
+    fail "diagnostics accepted a FIFO output"
+fi
+[[ -p "$fifo_output" ]] || fail "diagnostics replaced a FIFO output"
 
 mkdir -p "$test_home/Library/Logs/WormsWMD-Fix"
 cat > "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000000.log" <<LOG
@@ -136,6 +171,8 @@ cp "$test_home/Documents/WormsWMD-Backup-20260101-000000/BACKUP_METADATA.tsv" \
 HOME="$test_home" GAME_APP="$fake_game" "$diagnostics_script" --bundle --bundle-output "$bundle_dir" >/dev/null
 bundle_path=$(find "$bundle_dir" -mindepth 1 -maxdepth 1 -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
 [[ -n "$bundle_path" ]] || fail "support bundle was not created"
+[[ "$(stat -f '%Lp' "$bundle_path")" == "600" ]] \
+    || fail "support bundle mode is not 0600"
 
 mkdir -p "$extract_dir"
 inspect_support_bundle "$bundle_path"

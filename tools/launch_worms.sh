@@ -66,6 +66,16 @@ ENABLE_LOGGING=false
 CHECK_FIX=false
 CRASH_REPORT=true
 STEAM_MODE=false
+CRASH_TEMP_FILE=""
+
+cleanup_launcher_output() {
+    if [[ -n "$CRASH_TEMP_FILE" ]] && [[ -f "$CRASH_TEMP_FILE" ]] \
+        && [[ ! -L "$CRASH_TEMP_FILE" ]]; then
+        rm -f -- "$CRASH_TEMP_FILE"
+    fi
+}
+
+trap cleanup_launcher_output EXIT
 
 print_help() {
     cat << 'EOF'
@@ -127,12 +137,11 @@ log_message() {
 
 prepare_logging_paths() {
     local logs_root="$HOME/Library/Logs"
-    local link_count
 
-    worms_reject_control_chars "$GAME_APP" "GAME_APP"
-    worms_reject_control_chars "$GAME_EXEC" "GAME_EXEC"
-    worms_reject_control_chars "$LOG_DIR" "LOG_DIR"
-    worms_reject_control_chars "$LOG_FILE" "LOG_FILE"
+    worms_reject_control_chars "$GAME_APP" "GAME_APP" || return 1
+    worms_reject_control_chars "$GAME_EXEC" "GAME_EXEC" || return 1
+    worms_reject_control_chars "$LOG_DIR" "LOG_DIR" || return 1
+    worms_reject_control_chars "$LOG_FILE" "LOG_FILE" || return 1
 
     mkdir -p "$logs_root"
     if ! worms_path_creatable_inside_root "$logs_root" "$LOG_DIR" \
@@ -142,31 +151,35 @@ prepare_logging_paths() {
     fi
     mkdir -p "$LOG_DIR"
 
-    if [[ -n "$LOG_FILE" ]]; then
-        case "$LOG_FILE" in
-            *.log)
-                ;;
-            *)
-                echo -e "${RED}--log-file must end with .log${NC}"
-                exit 1
-                ;;
-        esac
-        if ! worms_path_creatable_inside_root "$logs_root" "$LOG_FILE"; then
-            echo -e "${RED}--log-file must be inside $logs_root${NC}"
+    if [[ -z "$LOG_FILE" ]]; then
+        LOG_FILE=$(worms_unique_path \
+            "$LOG_DIR/worms-$(date '+%Y%m%d-%H%M%S')-$$" ".log")
+    fi
+
+    case "$LOG_FILE" in
+        *.log)
+            ;;
+        *)
+            echo -e "${RED}--log-file must end with .log${NC}"
             exit 1
-        fi
-        if [[ -L "$LOG_FILE" ]] || [[ -d "$LOG_FILE" ]] || { [[ -e "$LOG_FILE" ]] && [[ ! -f "$LOG_FILE" ]]; }; then
-            echo -e "${RED}--log-file must be a regular non-linked log file path${NC}"
-            exit 1
-        fi
-        if [[ -e "$LOG_FILE" ]]; then
-            link_count=$(worms_file_link_count "$LOG_FILE")
-            if [[ "$link_count" =~ ^[0-9]+$ ]] && [[ "$link_count" -gt 1 ]]; then
-                echo -e "${RED}--log-file must be a regular non-linked log file path${NC}"
-                exit 1
-            fi
-        fi
-        mkdir -p "$(dirname "$LOG_FILE")"
+            ;;
+    esac
+    if ! worms_path_creatable_inside_root "$logs_root" "$LOG_FILE"; then
+        echo -e "${RED}--log-file must be inside $logs_root${NC}"
+        exit 1
+    fi
+    if ! worms_validate_replaceable_regular_file "$LOG_FILE"; then
+        echo -e "${RED}--log-file must be a regular non-linked log file path${NC}"
+        exit 1
+    fi
+    mkdir -p "$(dirname "$LOG_FILE")"
+    if [[ ! -e "$LOG_FILE" ]]; then
+        local old_umask
+        old_umask=$(umask)
+        umask 077
+        : > "$LOG_FILE"
+        umask "$old_umask"
+        chmod 600 "$LOG_FILE"
     fi
 }
 
@@ -259,14 +272,6 @@ fi
 # Setup logging
 if [[ "$ENABLE_LOGGING" == true ]]; then
     prepare_logging_paths
-    if [[ -n "$LOG_FILE" ]]; then
-        mkdir -p "$(dirname "$LOG_FILE")"
-    else
-        mkdir -p "$LOG_DIR"
-    fi
-    if [[ -z "$LOG_FILE" ]]; then
-        LOG_FILE="$LOG_DIR/worms-$(date '+%Y%m%d-%H%M%S').log"
-    fi
     log_message "=== Worms W.M.D Diagnostic Launch ==="
     log_message "Game: $GAME_APP"
     log_message "macOS: $(sw_vers -productVersion 2>/dev/null || echo "unknown")"
@@ -341,17 +346,27 @@ fi
 # Create crash directory only when it can be used. LOG_DIR is validated in
 # logging setup above, and crash reports are only generated in logging mode.
 if [[ "$ENABLE_LOGGING" == true && "$CRASH_REPORT" == true ]]; then
+    logs_root="$HOME/Library/Logs"
+    if ! worms_path_creatable_inside_root "$logs_root" "$CRASH_DIR" \
+        || { [[ -e "$CRASH_DIR" ]] && { [[ ! -d "$CRASH_DIR" ]] || [[ -L "$CRASH_DIR" ]]; }; }; then
+        echo -e "${RED}Crash directory must be a non-linked directory under $logs_root${NC}" >&2
+        exit 1
+    fi
     mkdir -p "$CRASH_DIR"
 fi
 
 # Generate crash report function
 generate_crash_report() {
     local exit_code="$1"
-    local crash_time
+    local crash_time crash_file publish_attempt
     crash_time=$(date '+%Y%m%d-%H%M%S')
-    local crash_file="$CRASH_DIR/crash-$crash_time.txt"
+    crash_file=$(worms_unique_path "$CRASH_DIR/crash-$crash_time" ".txt")
+    CRASH_TEMP_FILE=$(worms_same_directory_temp_file "$crash_file") || {
+        echo -e "${RED}Could not create a secure crash-report staging file${NC}" >&2
+        return 1
+    }
 
-    {
+    if ! {
         echo "=== Worms W.M.D Crash Report ==="
         echo "Date: $(date)"
         echo "Exit Code: $exit_code"
@@ -361,7 +376,7 @@ generate_crash_report() {
         echo "Architecture: $(uname -m)"
         echo ""
         echo "=== Environment ==="
-        env | grep -E "^(QT_|LIBGL_|MESA_|DISPLAY)" || echo "(none)"
+        env | grep -E "^(QT_DEBUG_PLUGINS|QT_LOGGING_RULES|QT_QUICK_BACKEND|LIBGL_DEBUG|LIBGL_ALWAYS_SOFTWARE|MESA_DEBUG|DISPLAY)=" || echo "(none)"
         echo ""
         echo "=== Game Log (last 100 lines) ==="
         if [[ -f "$LOG_FILE" ]]; then
@@ -371,11 +386,30 @@ generate_crash_report() {
         fi
         echo ""
         echo "=== Recent System Crash Logs ==="
-        find "$HOME/Library/Logs/DiagnosticReports" -name "*Worms*" -mmin -10 2>/dev/null | head -3 | while read -r crash; do
+        while read -r crash; do
             echo "--- $(basename "$crash") ---"
             head -50 "$crash" 2>/dev/null || true
-        done
-    } > "$crash_file"
+        done < <(find "$HOME/Library/Logs/DiagnosticReports" \
+            -name "*Worms*" -mmin -10 2>/dev/null | head -3)
+    } > "$CRASH_TEMP_FILE"; then
+        echo -e "${RED}Could not write crash report${NC}" >&2
+        return 1
+    fi
+    chmod 600 "$CRASH_TEMP_FILE"
+    publish_attempt=0
+    while [[ "$publish_attempt" -lt 10 ]]; do
+        publish_attempt=$((publish_attempt + 1))
+        if mv -n -- "$CRASH_TEMP_FILE" "$crash_file" \
+            && [[ ! -e "$CRASH_TEMP_FILE" ]]; then
+            CRASH_TEMP_FILE=""
+            break
+        fi
+        crash_file=$(worms_unique_path "$CRASH_DIR/crash-$crash_time" ".txt")
+    done
+    if [[ -n "$CRASH_TEMP_FILE" ]]; then
+        echo -e "${RED}Could not publish a unique crash report${NC}" >&2
+        return 1
+    fi
 
     echo -e "${RED}Crash report saved: $crash_file${NC}"
 

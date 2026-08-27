@@ -149,8 +149,22 @@ For more detail:
 
 ```bash
 ./fix_worms_wmd.sh --debug
+./fix_worms_wmd.sh --trace-file /an/existing/safe/directory/worms-debug.trace
 ./fix_worms_wmd.sh --verify --verbose
 ```
+
+The default trace is a new mode-`0600` file beside the validated installer log.
+An environment `TRACE_FILE` must remain under `~/Library/Logs`; use the explicit
+`--trace-file` option for another existing, nonlinked directory. Trace paths
+must end in `.trace` and must not already exist. If one exists, choose the
+unique path suggested by the installer rather than appending to it.
+
+Standalone verification distinguishes an original/unfixed unsigned app from a
+complete fixed app with an invalid signature. Original state is repairable by
+applying the fix; a complete fixed app must pass `codesign --verify --deep
+--strict`. Quarantine inspection is recursive and reports only a bounded count,
+not potentially private filenames. Create a support bundle if either strict
+signature or recursive quarantine checks fail.
 
 ## Diagnostic game launcher
 
@@ -236,3 +250,7 @@ runtime invariant status, Qt package verification details, backup integrity
 status, and backup manifests when available. Do not upload raw `.log` or
 `.trace` files unless you have reviewed and redacted account names, private
 paths, tokens, and private config values.
+
+File output is written to a mode-`0600` staging file beside the destination and
+renamed only after sanitization completes. A safe regular file can be replaced;
+links, hardlinks, directories, and special files are refused.

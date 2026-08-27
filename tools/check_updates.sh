@@ -27,10 +27,57 @@ CURL_BASE=(--proto '=https' --tlsv1.2 --retry 3 --retry-delay 1 --retry-connrefu
 
 # shellcheck disable=SC1091
 source "$REPO_DIR/scripts/ui.sh"
+# shellcheck disable=SC1091
+source "$REPO_DIR/scripts/common.sh"
 worms_color_init
 
 QUIET=false
 DOWNLOAD=false
+DOWNLOAD_WORK_DIR=""
+DOWNLOAD_FILE=""
+CHECKSUM_FILE=""
+PUBLISHED_DOWNLOAD=false
+PUBLISHED_CHECKSUM=false
+PUBLISHING_DOWNLOAD=false
+
+cleanup_download_work() {
+    local rollback_failed=false
+
+    if $PUBLISHING_DOWNLOAD; then
+        if $PUBLISHED_DOWNLOAD || [[ ! -f "$DOWNLOAD_WORK_DIR/release.zip" ]]; then
+            rm -f -- "$DOWNLOAD_FILE"
+        fi
+        if $PUBLISHED_CHECKSUM || [[ ! -f "$DOWNLOAD_WORK_DIR/release.zip.sha256" ]]; then
+            rm -f -- "$CHECKSUM_FILE"
+        fi
+        if [[ -f "$DOWNLOAD_WORK_DIR/previous.zip" ]]; then
+            if ! mv -f -- "$DOWNLOAD_WORK_DIR/previous.zip" "$DOWNLOAD_FILE"; then
+                echo "Rollback failed; prior download retained in $DOWNLOAD_WORK_DIR" >&2
+                rollback_failed=true
+            fi
+        fi
+        if [[ -f "$DOWNLOAD_WORK_DIR/previous.sha256" ]]; then
+            if ! mv -f -- "$DOWNLOAD_WORK_DIR/previous.sha256" "$CHECKSUM_FILE"; then
+                echo "Rollback failed; prior checksum retained in $DOWNLOAD_WORK_DIR" >&2
+                rollback_failed=true
+            fi
+        fi
+    fi
+
+    $rollback_failed && return 1
+
+    if [[ -n "$DOWNLOAD_WORK_DIR" ]] && [[ -d "$DOWNLOAD_WORK_DIR" ]]; then
+        rm -f -- \
+            "$DOWNLOAD_WORK_DIR/release.zip" \
+            "$DOWNLOAD_WORK_DIR/release.zip.sha256" \
+            "$DOWNLOAD_WORK_DIR/previous.zip" \
+            "$DOWNLOAD_WORK_DIR/previous.sha256"
+        rmdir "$DOWNLOAD_WORK_DIR" 2>/dev/null || true
+    fi
+}
+
+trap cleanup_download_work EXIT
+trap 'exit 2' HUP INT TERM
 
 if ! command -v curl >/dev/null 2>&1; then
     echo -e "${RED}curl is required but not installed.${NC}"
@@ -111,6 +158,21 @@ get_checksum_url() {
         echo "$url"
     else
         return 1
+    fi
+}
+
+prepare_download_directory() {
+    local downloads_dir="$1"
+    local home_dir="${HOME:-}"
+
+    [[ -n "$home_dir" ]] && [[ "$home_dir" == /* ]] \
+        && ! worms_has_control_chars "$home_dir" || return 1
+    [[ -d "$home_dir" ]] && [[ ! -L "$home_dir" ]] || return 1
+
+    if [[ -e "$downloads_dir" ]] || [[ -L "$downloads_dir" ]]; then
+        [[ -d "$downloads_dir" ]] && [[ ! -L "$downloads_dir" ]] || return 1
+    else
+        mkdir "$downloads_dir" || return 1
     fi
 }
 
@@ -235,24 +297,63 @@ else
             exit 2
         fi
 
-        mkdir -p "$HOME/Downloads"
-        download_file="$HOME/Downloads/WormsWMD-macOS-Fix-${latest_tag}.zip"
-        checksum_file="$download_file.sha256"
-        if ! curl "${CURL_BASE[@]}" -L --max-time 120 -o "$download_file" "$download_url"; then
+        downloads_dir="$HOME/Downloads"
+        DOWNLOAD_FILE="$downloads_dir/WormsWMD-macOS-Fix-${latest_tag}.zip"
+        CHECKSUM_FILE="$DOWNLOAD_FILE.sha256"
+        if ! prepare_download_directory "$downloads_dir"; then
+            echo -e "${RED}Unsafe Downloads directory${NC}"
+            exit 2
+        fi
+        if ! worms_validate_replaceable_regular_file "$DOWNLOAD_FILE" \
+            || ! worms_validate_replaceable_regular_file "$CHECKSUM_FILE"; then
+            echo -e "${RED}Refusing an unsafe existing download target${NC}"
+            exit 2
+        fi
+
+        old_umask=$(umask)
+        umask 077
+        DOWNLOAD_WORK_DIR=$(mktemp -d "$downloads_dir/.wormswmd-update-XXXXXX")
+        umask "$old_umask"
+        staged_download="$DOWNLOAD_WORK_DIR/release.zip"
+        staged_checksum="$DOWNLOAD_WORK_DIR/release.zip.sha256"
+
+        if ! curl "${CURL_BASE[@]}" -L --max-time 120 -o "$staged_download" "$download_url"; then
             echo -e "${RED}Download failed${NC}"
             exit 2
         fi
-        if ! curl "${CURL_BASE[@]}" -L --max-time 30 -o "$checksum_file" "$checksum_url"; then
-            rm -f "$download_file" "$checksum_file"
+        if ! curl "${CURL_BASE[@]}" -L --max-time 30 -o "$staged_checksum" "$checksum_url"; then
             echo -e "${RED}Checksum download failed${NC}"
             exit 2
         fi
-        if ! (cd "$(dirname "$download_file")" && shasum -a 256 -c "$(basename "$checksum_file")"); then
-            rm -f "$download_file" "$checksum_file"
+        chmod 600 "$staged_download" "$staged_checksum"
+        if ! worms_verify_exact_sha256_file \
+            "$staged_download" "$staged_checksum" "$(basename "$DOWNLOAD_FILE")"; then
             echo -e "${RED}Checksum verification failed${NC}"
             exit 2
         fi
-        echo -e "${GREEN}Downloaded and verified: $download_file${NC}"
+
+        PUBLISHING_DOWNLOAD=true
+        if [[ -e "$DOWNLOAD_FILE" ]]; then
+            mv -- "$DOWNLOAD_FILE" "$DOWNLOAD_WORK_DIR/previous.zip"
+        fi
+        if [[ -e "$CHECKSUM_FILE" ]]; then
+            mv -- "$CHECKSUM_FILE" "$DOWNLOAD_WORK_DIR/previous.sha256"
+        fi
+        if ! mv -- "$staged_download" "$DOWNLOAD_FILE"; then
+            echo -e "${RED}Could not publish the verified download${NC}"
+            exit 2
+        fi
+        PUBLISHED_DOWNLOAD=true
+        if ! mv -- "$staged_checksum" "$CHECKSUM_FILE"; then
+            echo -e "${RED}Could not publish the verified checksum${NC}"
+            exit 2
+        fi
+        PUBLISHED_CHECKSUM=true
+        PUBLISHING_DOWNLOAD=false
+        cleanup_download_work
+        DOWNLOAD_WORK_DIR=""
+
+        echo -e "${GREEN}Downloaded and verified: $DOWNLOAD_FILE${NC}"
         echo ""
         echo "To install:"
         echo "  1. Extract the zip file"

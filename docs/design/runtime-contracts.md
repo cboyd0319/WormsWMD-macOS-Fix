@@ -37,9 +37,9 @@ The main installer runs the fix scripts in this logical order:
 7. `scripts/05_verify_installation.sh` - verify framework, plugin, dependency,
    metadata, code-signing, quarantine, and config URL state.
 
-Hard runtime verification runs before ad-hoc signing, and strict signature
-verification remains inside the rollback boundary. Only afterward may the
-installer clear quarantine, reset Qt window geometry, and commit.
+Strict signing remains inside rollback. Standalone checks use deep/strict state:
+invalid complete fixes fail, original apps remain repairable, and recursive
+quarantine summaries omit names. Only then may install finishing steps commit.
 
 Do not reorder these steps unless the verification contract is updated in the
 same change.
@@ -103,20 +103,20 @@ inside the backup copy before manifest validation. This self-heals repeated
 installs from older fixer versions without mutating save data or trusting
 symlinks that escape the backup root.
 
-Save-game restore requires Python 3.9+, inspects a bounded owner-only copy, and
-extracts only it. Expansion is at most 8 GiB and half of usable space, with a
-512 MiB reserve and staging/final-copy room; an override requires
-`--max-expanded-size K|M|G --yes`. Unsafe archives fail, manifests are verified,
-and help/list/location remain usable without Python.
+Save restore inspects one bounded copy, requires numeric Steam IDs, rejects
+intermediate user links, and defaults inside canonical userdata. An external
+`327030` target requires its exact canonical path plus `--yes`. Steam must be
+stopped. Every root stages on its target filesystem; old trees remain until all
+copies verify and roll back together. Expansion keeps the 8 GiB, half-free-space, and 512 MiB-reserve bounds.
 
 ## Qt Distribution Contract
 
-The preferred Qt source is `dist/` plus its `.sha256`. Consumers inspect and use
-one bounded owner-only copy. Profiles cap resources and reject unsafe archive
-structure. Mutation requires Python 3.9+; diagnostics degrade without parsing.
-Remote fallback must use a pinned commit for `dist/` contents. If a legacy
-archive lacks `MANIFEST.txt`, the downloader generates and verifies a cache-local manifest.
-Homebrew is a fallback, not the primary happy path.
+The preferred Qt source is `dist/` plus its `.sha256`. Consumers inspect one
+bounded copy. Extracted cache identity includes the full archive digest and
+reuse verifies the archive's manifest, never a cache-local authority. Legacy
+archives without manifests re-extract on every use. Cache publish is staged;
+validated version-only caches are retained, and only explicit marker-scoped
+prune deletes them. Mutation needs Python 3.9+; Homebrew remains the fallback.
 
 When replacing the Qt archive:
 
@@ -124,7 +124,7 @@ When replacing the Qt archive:
 - Validate the archive layout, package metadata, required frameworks/plugins,
   complete dependency closure, archive manifest when present, generated cache
   manifest, and readable x86_64 Mach-O slices.
-- Resolve dependency source symlinks before applying provenance-prefix policy.
+- Resolve dependencies through owning-image paths into canonical Qt, explicit dependency, or Intel Cellar roots; never basename-search.
 - Run the packaging or install verification relevant to the change.
 - Update user docs if the version, source, or fallback behavior changes.
 

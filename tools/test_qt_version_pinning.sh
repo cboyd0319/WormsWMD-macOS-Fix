@@ -88,7 +88,7 @@ latest=$(worms_latest_qt_package_by_version "$tmp_dir" false || true)
     || fail "did not choose the highest supported Qt 5.15 package"
 
 packager_functions="$tmp_dir/packager-functions.sh"
-extract_function dependency_path_allowed "$ROOT_DIR/tools/package_qt_frameworks.sh" > "$packager_functions"
+extract_function packaging_dependency_roots "$ROOT_DIR/tools/package_qt_frameworks.sh" > "$packager_functions"
 extract_function resolve_packaging_dependency "$ROOT_DIR/tools/package_qt_frameworks.sh" >> "$packager_functions"
 # shellcheck source=/dev/null
 source "$packager_functions"

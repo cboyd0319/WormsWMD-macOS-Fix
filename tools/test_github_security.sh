@@ -140,6 +140,10 @@ for required_file in \
     "$ROOT_DIR/tools/test_fetch_qt_homebrew_bottles.rb" \
     "$ROOT_DIR/tools/test_git_hooks.sh" \
     "$ROOT_DIR/tools/test_harness_security.sh" \
+    "$ROOT_DIR/tools/test_qt_cache_integrity.sh" \
+    "$ROOT_DIR/tools/test_signature_verification.sh" \
+    "$ROOT_DIR/tools/test_logging_safety.sh" \
+    "$ROOT_DIR/tools/test_update_download_safety.sh" \
     "$ROOT_DIR/tools/test_sensitive_change_report.sh"; do
     if [[ ! -f "$required_file" ]]; then
         fail "required GitHub security file is missing: ${required_file#"$ROOT_DIR"/}"

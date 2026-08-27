@@ -89,9 +89,49 @@ chmod +x "$custom_game_app/Contents/MacOS/Worms W.M.D"
 cat > "$watch_bin/launchctl" <<'STUB'
 #!/bin/bash
 printf '%s\n' "$*" >> "$WORMS_TEST_LAUNCHCTL_LOG"
+if [[ "${1:-}" == "print" ]]; then
+    [[ "${WORMS_TEST_AGENT_ACTIVE:-0}" == "1" ]]
+    exit
+fi
+if [[ "${1:-}" == "bootstrap" ]] \
+    && [[ "${WORMS_TEST_BOOTSTRAP_FAIL_ONCE:-0}" == "1" ]]; then
+    count=0
+    [[ -f "$WORMS_TEST_BOOTSTRAP_COUNT" ]] && read -r count < "$WORMS_TEST_BOOTSTRAP_COUNT"
+    count=$((count + 1))
+    printf '%s\n' "$count" > "$WORMS_TEST_BOOTSTRAP_COUNT"
+    [[ "$count" -gt 1 ]]
+    exit
+fi
 exit 0
 STUB
 chmod +x "$watch_bin/launchctl"
+cat > "$watch_bin/plutil" <<'STUB'
+#!/bin/bash
+[[ "${WORMS_TEST_PLUTIL_FAIL:-0}" != "1" ]] || exit 1
+if [[ "${1:-}" == "-extract" ]]; then
+    case "${2:-}" in
+        Label)
+            sed -n '/<key>Label<\/key>/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;q;}' "${@: -1}"
+            ;;
+        ProgramArguments.0)
+            sed -n '/<key>ProgramArguments<\/key>/{n;n;s/.*<string>\(.*\)<\/string>.*/\1/p;q;}' "${@: -1}"
+            ;;
+    esac
+fi
+exit 0
+STUB
+chmod +x "$watch_bin/plutil"
+
+control_watch_home="$tmp_dir/control"$'\n'"watch-home"
+mkdir -p "$control_watch_home"
+if HOME="$control_watch_home" GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$tmp_dir/control-watch-launchctl.log" \
+    PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --install >/dev/null 2>&1; then
+    fail "watcher install accepted a control-character HOME"
+fi
+[[ ! -e "$control_watch_home/Library/LaunchAgents" ]] \
+    || fail "watcher install mutated a control-character HOME"
 
 HOME="$watch_home" \
     GAME_APP="$custom_game_app" \
@@ -102,6 +142,16 @@ HOME="$watch_home" \
 
 watch_plist="$watch_home/Library/LaunchAgents/com.wormswmd.fix.watcher.plist"
 [[ -f "$watch_plist" ]] || fail "watcher install did not create a LaunchAgent plist"
+[[ "$(stat -f '%Lp' "$watch_plist")" == "600" ]] \
+    || fail "watcher LaunchAgent mode is not 0600"
+/usr/bin/plutil -lint "$watch_plist" >/dev/null \
+    || fail "watcher install did not produce a valid plist"
+[[ "$(/usr/bin/plutil -extract Label raw -o - "$watch_plist")" \
+    == "com.wormswmd.fix.watcher" ]] \
+    || fail "watcher LaunchAgent has the wrong parsed label"
+[[ "$(/usr/bin/plutil -extract ProgramArguments.0 raw -o - "$watch_plist")" \
+    == "$ROOT_DIR/tools/watch_for_updates.sh" ]] \
+    || fail "watcher LaunchAgent has the wrong parsed program"
 grep -Fq '<key>EnvironmentVariables</key>' "$watch_plist" \
     || fail "watcher LaunchAgent does not persist environment variables"
 grep -Fq '<key>GAME_APP</key>' "$watch_plist" \
@@ -110,6 +160,109 @@ grep -Fq '<string>'"$tmp_dir"'/Custom &amp; Path/Worms W.M.D.app</string>' "$wat
     || fail "watcher LaunchAgent does not XML-escape and persist the custom GAME_APP"
 grep -Fq "bootstrap gui/" "$watch_log" \
     || fail "watcher install did not attempt to bootstrap the LaunchAgent"
+
+linked_watch_home="$tmp_dir/linked-watch-home"
+linked_watch_victim="$tmp_dir/linked-watch-victim.plist"
+linked_watch_path="$linked_watch_home/Library/LaunchAgents/com.wormswmd.fix.watcher.plist"
+mkdir -p "$linked_watch_home/Library/LaunchAgents"
+printf 'linked victim\n' > "$linked_watch_victim"
+ln -s "$linked_watch_victim" "$linked_watch_path"
+if HOME="$linked_watch_home" GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$tmp_dir/linked-launchctl.log" \
+    PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --install >/dev/null 2>&1; then
+    fail "watcher install accepted a symlink LaunchAgent"
+fi
+grep -Fxq 'linked victim' "$linked_watch_victim" \
+    || fail "watcher install modified a linked LaunchAgent victim"
+
+linked_log_home="$tmp_dir/linked-log-watch-home"
+linked_log_victim="$tmp_dir/linked-log-victim"
+linked_log_path="$linked_log_home/Library/Logs/WormsWMD-Fix/watcher.log"
+mkdir -p "$linked_log_home/Library/Logs/WormsWMD-Fix"
+printf 'linked watcher log victim\n' > "$linked_log_victim"
+ln -s "$linked_log_victim" "$linked_log_path"
+if HOME="$linked_log_home" GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$tmp_dir/linked-log-launchctl.log" \
+    PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --install >/dev/null 2>&1; then
+    fail "watcher install accepted a symlink log target"
+fi
+grep -Fxq 'linked watcher log victim' "$linked_log_victim" \
+    || fail "watcher install modified a linked log victim"
+
+foreign_watch_home="$tmp_dir/foreign-watch-home"
+foreign_watch_path="$foreign_watch_home/Library/LaunchAgents/com.wormswmd.fix.watcher.plist"
+mkdir -p "$(dirname "$foreign_watch_path")"
+printf 'foreign plist\n' > "$foreign_watch_path"
+if HOME="$foreign_watch_home" GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$tmp_dir/foreign-launchctl.log" \
+    PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --install >/dev/null 2>&1; then
+    fail "watcher install accepted a foreign LaunchAgent"
+fi
+grep -Fxq 'foreign plist' "$foreign_watch_path" \
+    || fail "watcher install modified a foreign LaunchAgent"
+if HOME="$foreign_watch_home" GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$tmp_dir/foreign-uninstall-launchctl.log" \
+    PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --uninstall >/dev/null 2>&1; then
+    fail "watcher uninstall accepted a foreign LaunchAgent"
+fi
+grep -Fxq 'foreign plist' "$foreign_watch_path" \
+    || fail "watcher uninstall removed a foreign LaunchAgent"
+
+hardlink_watch_home="$tmp_dir/hardlink-watch-home"
+hardlink_watch_peer="$tmp_dir/hardlink-watch-peer.plist"
+hardlink_watch_path="$hardlink_watch_home/Library/LaunchAgents/com.wormswmd.fix.watcher.plist"
+mkdir -p "$(dirname "$hardlink_watch_path")"
+printf 'hardlink plist\n' > "$hardlink_watch_peer"
+ln "$hardlink_watch_peer" "$hardlink_watch_path"
+if HOME="$hardlink_watch_home" GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$tmp_dir/hardlink-launchctl.log" \
+    PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --install >/dev/null 2>&1; then
+    fail "watcher install accepted a hardlinked LaunchAgent"
+fi
+grep -Fxq 'hardlink plist' "$hardlink_watch_peer" \
+    || fail "watcher install modified a hardlinked LaunchAgent peer"
+
+prior_watch_plist="$tmp_dir/prior-watch.plist"
+cp "$watch_plist" "$prior_watch_plist"
+if HOME="$watch_home" GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$tmp_dir/invalid-plutil.log" \
+    WORMS_TEST_PLUTIL_FAIL=1 PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --install >/dev/null 2>&1; then
+    fail "watcher install accepted a plist that failed lint"
+fi
+cmp -s "$watch_plist" "$prior_watch_plist" \
+    || fail "failed plist lint modified the prior LaunchAgent"
+
+replacement_game_app="$tmp_dir/Replacement/Worms W.M.D.app"
+mkdir -p "$replacement_game_app/Contents/MacOS"
+printf '#!/bin/bash\nexit 0\n' > "$replacement_game_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$replacement_game_app/Contents/MacOS/Worms W.M.D"
+bootstrap_count="$tmp_dir/bootstrap-count"
+bootstrap_log="$tmp_dir/bootstrap-failure.log"
+if HOME="$watch_home" GAME_APP="$replacement_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$bootstrap_log" \
+    WORMS_TEST_AGENT_ACTIVE=1 WORMS_TEST_BOOTSTRAP_FAIL_ONCE=1 \
+    WORMS_TEST_BOOTSTRAP_COUNT="$bootstrap_count" PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --install >/dev/null 2>&1; then
+    fail "watcher install reported success after bootstrap failure"
+fi
+cmp -s "$watch_plist" "$prior_watch_plist" \
+    || fail "bootstrap failure did not restore the prior LaunchAgent"
+[[ "$(grep -c '^bootstrap ' "$bootstrap_log")" == "2" ]] \
+    || fail "bootstrap failure did not reactivate the prior LaunchAgent"
+uninstall_log="$tmp_dir/uninstall.log"
+HOME="$watch_home" GAME_APP="$custom_game_app" \
+    WORMS_TEST_LAUNCHCTL_LOG="$uninstall_log" PATH="$watch_bin:$PATH" \
+    "$ROOT_DIR/tools/watch_for_updates.sh" --uninstall >/dev/null \
+    || fail "watcher uninstall rejected its exact project-owned LaunchAgent"
+[[ ! -e "$watch_plist" ]] || fail "watcher uninstall left its LaunchAgent"
+grep -Eq '^bootout gui/[0-9]+/com[.]wormswmd[.]fix[.]watcher$' "$uninstall_log" \
+    || fail "watcher uninstall did not target the exact service label"
 
 log_home="$tmp_dir/log-home"
 bad_log="$log_home/Library/Logs/../OutsideLauncher/worms.log"
@@ -172,6 +325,39 @@ HOME="$crash_home" \
     || fail "enhanced launcher failed a normal launch while crash reporting was disabled"
 [[ ! -e "$crash_home/Library/OutsideCrash" ]] \
     || fail "enhanced launcher created a crash directory while crash reporting was disabled"
+
+crashing_game_app="$tmp_dir/Crashing/Worms W.M.D.app"
+crash_collision_home="$tmp_dir/crash-collision-home"
+crash_collision_bin="$tmp_dir/crash-collision-bin"
+mkdir -p \
+    "$crashing_game_app/Contents/MacOS" \
+    "$crash_collision_home/Library/Logs" \
+    "$crash_collision_bin"
+printf '#!/bin/bash\nexit 7\n' > "$crashing_game_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$crashing_game_app/Contents/MacOS/Worms W.M.D"
+cat > "$crash_collision_bin/date" <<'STUB'
+#!/bin/bash
+case "${1:-}" in
+    +%Y%m%d-%H%M%S) printf '20260827-120000\n' ;;
+    +%Y-%m-%d*) printf '2026-08-27 12:00:00\n' ;;
+    *) printf 'Thu Aug 27 12:00:00 MDT 2026\n' ;;
+esac
+STUB
+chmod +x "$crash_collision_bin/date"
+for attempt in 1 2; do
+    if HOME="$crash_collision_home" GAME_APP="$crashing_game_app" \
+        PATH="$crash_collision_bin:$PATH" \
+        "$ROOT_DIR/tools/launch_worms.sh" --log >/dev/null 2>&1; then
+        fail "crashing fixture unexpectedly exited successfully on attempt $attempt"
+    fi
+done
+crash_collision_dir="$crash_collision_home/Library/Logs/WormsWMD/crashes"
+[[ "$(find "$crash_collision_dir" -type f -name 'crash-*.txt' | wc -l | tr -d ' ')" == "2" ]] \
+    || fail "same-second crashes did not produce two unique reports"
+while IFS= read -r crash_report; do
+    [[ "$(stat -f '%Lp' "$crash_report")" == "600" ]] \
+        || fail "crash report mode is not 0600: $crash_report"
+done < <(find "$crash_collision_dir" -type f -name 'crash-*.txt')
 
 multi_home="$tmp_dir/multi-home"
 multi_steam_app="$multi_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"

@@ -36,15 +36,20 @@ TEMP_EXTRACT=""
 CHECKSUM_TMP=""
 TEMP_ARCHIVE_DIR=""
 INSPECTED_ARCHIVE=""
+ARCHIVE_MANIFEST_TMP=""
+ARCHIVE_HAS_MANIFEST=false
+QT_CACHE_MARKER_NAME=".wormswmd-qt-cache-v1"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/common.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/ui.sh"
 worms_color_init
+worms_reject_control_chars "$CACHE_DIR" "Qt cache root"
 
 FORCE=false
 CHECK_ONLY=false
+PRUNE_CACHE=false
 
 CURL_BASE=(--proto '=https' --tlsv1.2 --retry 3 --retry-delay 1 --retry-connrefused --max-filesize $((64 * 1024 * 1024)))
 
@@ -57,6 +62,9 @@ cleanup() {
     fi
     if [[ -n "$TEMP_ARCHIVE_DIR" ]] && [[ -d "$TEMP_ARCHIVE_DIR" ]]; then
         rm -rf "$TEMP_ARCHIVE_DIR"
+    fi
+    if [[ -n "$ARCHIVE_MANIFEST_TMP" ]] && [[ -f "$ARCHIVE_MANIFEST_TMP" ]]; then
+        rm -f "$ARCHIVE_MANIFEST_TMP"
     fi
 }
 
@@ -190,6 +198,7 @@ validate_macho_x86_64() {
 validate_extracted_package() {
     local extract_dir="$1"
     local expected_version="${2:-}"
+    local manifest_policy="${3:-internal}"
     local required_fw binary plugin dylib
     local required_frameworks=(
         QtCore
@@ -249,7 +258,7 @@ validate_extracted_package() {
         validate_macho_x86_64 "$dylib" || return 1
     done < <(find "$extract_dir/Frameworks" -maxdepth 1 -type f -name "*.dylib" -print0 2>/dev/null)
 
-    if [[ -f "$extract_dir/MANIFEST.txt" ]]; then
+    if [[ "$manifest_policy" == "internal" ]] && [[ -f "$extract_dir/MANIFEST.txt" ]]; then
         worms_verify_manifest "$extract_dir" "$extract_dir/MANIFEST.txt" || {
             echo -e "${RED}ERROR:${NC} Package manifest verification failed."
             return 1
@@ -273,6 +282,191 @@ ensure_extracted_manifest() {
         echo -e "${RED}ERROR:${NC} Package manifest verification failed."
         return 1
     }
+}
+
+qt_cache_mode() {
+    stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null
+}
+
+ensure_qt_cache_root() {
+    if [[ -L "$CACHE_DIR" ]] || { [[ -e "$CACHE_DIR" ]] && [[ ! -d "$CACHE_DIR" ]]; }; then
+        echo -e "${RED}ERROR:${NC} Qt cache root must be a real directory: $CACHE_DIR"
+        return 1
+    fi
+    mkdir -p "$CACHE_DIR"
+    chmod 0700 "$CACHE_DIR"
+}
+
+qt_cache_canonical_path() {
+    local path="$1"
+    local parent_real
+
+    parent_real=$(worms_real_dir "$(dirname "$path")") || return 1
+    printf '%s/%s\n' "$parent_real" "$(basename "$path")"
+}
+
+qt_cache_marker_content() {
+    local cache_path="$1"
+    local archive_sha256="$2"
+    local cache_kind="$3"
+    local canonical_path
+
+    canonical_path=$(qt_cache_canonical_path "$cache_path") || return 1
+    printf 'format=1\ncache_path=%s\narchive_sha256=%s\nkind=%s\n' \
+        "$canonical_path" "$archive_sha256" "$cache_kind"
+}
+
+write_qt_cache_marker() {
+    local directory="$1"
+    local published_path="$2"
+    local archive_sha256="$3"
+    local cache_kind="$4"
+    local marker="$directory/$QT_CACHE_MARKER_NAME"
+
+    [[ ! -e "$marker" ]] && [[ ! -L "$marker" ]] || return 1
+    qt_cache_marker_content "$published_path" "$archive_sha256" "$cache_kind" \
+        > "$marker"
+    chmod 0600 "$marker"
+}
+
+qt_cache_marker_valid() {
+    local directory="$1"
+    local published_path="$2"
+    local archive_sha256="$3"
+    local cache_kind="$4"
+    local marker="$directory/$QT_CACHE_MARKER_NAME"
+    local expected actual
+
+    [[ "$archive_sha256" =~ ^[a-fA-F0-9]{64}$ ]] || return 1
+    [[ -f "$marker" ]] && [[ ! -L "$marker" ]] \
+        && [[ "$(worms_file_link_count "$marker")" -eq 1 ]] \
+        && [[ "$(worms_file_size "$marker")" -le 1024 ]] \
+        && [[ "$(qt_cache_mode "$marker")" == "600" ]] || return 1
+    expected=$(qt_cache_marker_content "$published_path" "$archive_sha256" "$cache_kind") \
+        || return 1
+    actual=$(cat "$marker") || return 1
+    [[ "$actual" == "$expected" ]]
+}
+
+verify_marked_qt_cache() {
+    local cache_dir="$1"
+    local published_path="$2"
+    local archive_sha256="$3"
+    local cache_kind="$4"
+    local authority_manifest="${5:-}"
+
+    [[ -d "$cache_dir" ]] && [[ ! -L "$cache_dir" ]] || return 1
+    [[ "$(qt_cache_mode "$cache_dir")" == "700" ]] || return 1
+    qt_cache_marker_valid "$cache_dir" "$published_path" \
+        "$archive_sha256" "$cache_kind" || return 1
+    [[ -f "$cache_dir/MANIFEST.txt" ]] && [[ ! -L "$cache_dir/MANIFEST.txt" ]] \
+        || return 1
+    if [[ -n "$authority_manifest" ]]; then
+        cmp -s "$cache_dir/MANIFEST.txt" "$authority_manifest" || return 1
+    fi
+    validate_extracted_package "$cache_dir" "$QT_VERSION" external || return 1
+    worms_verify_manifest_with_extras "$cache_dir" "$cache_dir/MANIFEST.txt" \
+        "$QT_CACHE_MARKER_NAME"
+}
+
+verify_unmarked_legacy_cache() {
+    local cache_dir="$1"
+    local authority_manifest="$2"
+
+    [[ -d "$cache_dir" ]] && [[ ! -L "$cache_dir" ]] || return 1
+    [[ "$(qt_cache_mode "$cache_dir")" == "700" ]] || return 1
+    [[ ! -e "$cache_dir/$QT_CACHE_MARKER_NAME" ]] \
+        && [[ ! -L "$cache_dir/$QT_CACHE_MARKER_NAME" ]] || return 1
+    [[ -f "$cache_dir/MANIFEST.txt" ]] && [[ ! -L "$cache_dir/MANIFEST.txt" ]] \
+        || return 1
+    cmp -s "$cache_dir/MANIFEST.txt" "$authority_manifest" || return 1
+    validate_extracted_package "$cache_dir" "$QT_VERSION" || return 1
+    worms_verify_manifest "$cache_dir" "$cache_dir/MANIFEST.txt"
+}
+
+migrate_legacy_qt_cache() {
+    local legacy_dir="$CACHE_DIR/qt-frameworks-$QT_VERSION"
+    local retained_dir
+
+    [[ -e "$legacy_dir" ]] || [[ -L "$legacy_dir" ]] || return 0
+    $ARCHIVE_HAS_MANIFEST || {
+        echo -e "${RED}ERROR:${NC} Cannot authenticate version-only cache from a legacy archive: $legacy_dir"
+        return 1
+    }
+    verify_unmarked_legacy_cache "$legacy_dir" "$ARCHIVE_MANIFEST_TMP" || {
+        echo -e "${RED}ERROR:${NC} Refusing foreign or invalid version-only Qt cache: $legacy_dir"
+        return 1
+    }
+
+    retained_dir=$(worms_unique_path \
+        "$legacy_dir.legacy-$(date '+%Y%m%d-%H%M%S')-$$")
+    mv "$legacy_dir" "$retained_dir" || return 1
+    if ! write_qt_cache_marker "$retained_dir" "$retained_dir" \
+        "$expected_package_sha256" legacy \
+        || ! verify_marked_qt_cache "$retained_dir" "$retained_dir" \
+            "$expected_package_sha256" legacy "$ARCHIVE_MANIFEST_TMP"; then
+        mv "$retained_dir" "$legacy_dir" 2>/dev/null || true
+        echo -e "${RED}ERROR:${NC} Legacy Qt cache migration verification failed."
+        return 1
+    fi
+    echo "Legacy Qt cache retained at: $retained_dir"
+}
+
+prune_legacy_qt_caches() {
+    local candidate marker_sha
+
+    ensure_qt_cache_root || return 1
+    for candidate in "$CACHE_DIR"/qt-frameworks-*.legacy-*; do
+        [[ -e "$candidate" ]] || [[ -L "$candidate" ]] || continue
+        [[ -d "$candidate" ]] && [[ ! -L "$candidate" ]] || continue
+        marker_sha=$(awk -F= '$1 == "archive_sha256" {print $2; exit}' \
+            "$candidate/$QT_CACHE_MARKER_NAME" 2>/dev/null || true)
+        qt_cache_marker_valid "$candidate" "$candidate" "$marker_sha" legacy \
+            || continue
+        worms_path_inside_root "$CACHE_DIR" "$candidate" || continue
+        echo "Removing owned legacy Qt cache: $candidate"
+        rm -rf "$candidate"
+    done
+}
+
+publish_qt_cache() {
+    local staged_dir="$1"
+    local published_dir="$2"
+    local authority_manifest="${3:-}"
+    local previous_parent=""
+
+    if [[ -e "$published_dir" ]] || [[ -L "$published_dir" ]]; then
+        if [[ ! -d "$published_dir" ]] || [[ -L "$published_dir" ]] \
+            || ! qt_cache_marker_valid "$published_dir" "$published_dir" \
+                "$expected_package_sha256" published; then
+            echo -e "${RED}ERROR:${NC} Refusing to replace an unmarked Qt cache: $published_dir"
+            return 1
+        fi
+        previous_parent=$(mktemp -d \
+            "$CACHE_DIR/.$(basename "$published_dir").previous.XXXXXX")
+        chmod 0700 "$previous_parent"
+        mv "$published_dir" "$previous_parent/cache" || return 1
+    fi
+
+    if ! mv "$staged_dir" "$published_dir"; then
+        if [[ -n "$previous_parent" ]]; then
+            mv "$previous_parent/cache" "$published_dir" 2>/dev/null || true
+        fi
+        return 1
+    fi
+    TEMP_EXTRACT=""
+    if ! verify_marked_qt_cache "$published_dir" "$published_dir" \
+        "$expected_package_sha256" published "$authority_manifest"; then
+        if [[ -n "$previous_parent" ]]; then
+            mv "$published_dir" "$previous_parent/failed" 2>/dev/null || true
+            mv "$previous_parent/cache" "$published_dir" 2>/dev/null || true
+        else
+            rm -rf "$published_dir"
+        fi
+        echo -e "${RED}ERROR:${NC} Published Qt cache verification failed."
+        return 1
+    fi
+    [[ -z "$previous_parent" ]] || rm -rf "$previous_parent"
 }
 
 verify_local_package() {
@@ -388,14 +582,20 @@ while [[ $# -gt 0 ]]; do
             CHECK_ONLY=true
             shift
             ;;
+        --prune-cache)
+            PRUNE_CACHE=true
+            shift
+            ;;
         --help|-h)
-            echo "Usage: $0 [--force] [--check]"
+            echo "Usage: $0 [--force] [--check] [--prune-cache]"
             echo ""
             echo "Downloads pre-built Qt 5.15 x86_64 frameworks."
             echo ""
             echo "Options:"
             echo "  --force    Re-download even if cached"
             echo "  --check    Check if pre-built package is available"
+            echo "  --prune-cache"
+            echo "             Remove only marker-owned retained legacy caches"
             exit 0
             ;;
         *)
@@ -404,6 +604,15 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if $PRUNE_CACHE; then
+    if $FORCE || $CHECK_ONLY; then
+        echo -e "${RED}ERROR:${NC} --prune-cache cannot be combined with --force or --check."
+        exit 1
+    fi
+    prune_legacy_qt_caches
+    exit 0
+fi
 
 if $CHECK_ONLY; then
     if select_local_package; then
@@ -430,28 +639,10 @@ if ! select_local_package; then
     fi
 fi
 
-# Create cache directory
-mkdir -p "$CACHE_DIR"
+ensure_qt_cache_root || exit 1
 
 if [[ -z "$CACHED_PACKAGE" ]]; then
     CACHED_PACKAGE="$CACHE_DIR/$PACKAGE_NAME"
-fi
-if [[ -n "$QT_VERSION" ]]; then
-    EXTRACT_DIR="$CACHE_DIR/qt-frameworks-$QT_VERSION"
-else
-    EXTRACT_DIR="$CACHE_DIR/qt-frameworks"
-fi
-
-# Check if already cached and extracted
-if [[ -d "$EXTRACT_DIR/Frameworks" ]] && [[ -d "$EXTRACT_DIR/PlugIns" ]] && ! $FORCE; then
-    if validate_extracted_package "$EXTRACT_DIR" "$QT_VERSION" \
-        && ensure_extracted_manifest "$EXTRACT_DIR"; then
-        echo -e "${GREEN}Using cached Qt frameworks${NC}"
-        echo "$EXTRACT_DIR"
-        exit 0
-    fi
-    echo -e "${YELLOW}Cached Qt frameworks failed validation; refreshing cache.${NC}"
-    rm -rf "$EXTRACT_DIR"
 fi
 
 if $USE_LOCAL; then
@@ -485,17 +676,20 @@ else
 fi
 
 if $USE_LOCAL; then
-    checksum_path="${CACHED_PACKAGE}.sha256"
-    if [[ ! -f "$checksum_path" ]]; then
-        echo -e "${RED}ERROR:${NC} Missing checksum for local package: $checksum_path"
+    if [[ ! -f "${CACHED_PACKAGE}.sha256" ]]; then
+        echo -e "${RED}ERROR:${NC} Missing checksum for local package: ${CACHED_PACKAGE}.sha256"
         echo "FALLBACK_TO_HOMEBREW"
         exit 1
     fi
 else
-    if ! curl "${CURL_BASE[@]}" -sf --max-time 10 "$CHECKSUM_URL" -o "$CACHED_PACKAGE.sha256" 2>/dev/null; then
-        echo -e "${RED}ERROR:${NC} Could not download checksum."
-        echo "FALLBACK_TO_HOMEBREW"
-        exit 1
+    if [[ ! -f "$CACHED_PACKAGE.sha256" ]] || $FORCE \
+        || ! verify_checksum "$CACHED_PACKAGE" "$CACHED_PACKAGE.sha256"; then
+        if ! curl "${CURL_BASE[@]}" -sf --max-time 10 "$CHECKSUM_URL" \
+            -o "$CACHED_PACKAGE.sha256" 2>/dev/null; then
+            echo -e "${RED}ERROR:${NC} Could not download checksum."
+            echo "FALLBACK_TO_HOMEBREW"
+            exit 1
+        fi
     fi
 fi
 
@@ -538,13 +732,51 @@ if ! validate_archive_metadata "$INSPECTED_ARCHIVE" "$QT_VERSION"; then
     exit 1
 fi
 
-# Extract
+EXTRACT_DIR="$CACHE_DIR/qt-frameworks-$QT_VERSION-$expected_package_sha256"
+ARCHIVE_MANIFEST_TMP=$(mktemp "${TMPDIR:-/tmp}/wormswmd-qt-authority.XXXXXX")
+if tar -xOf "$INSPECTED_ARCHIVE" MANIFEST.txt > "$ARCHIVE_MANIFEST_TMP" 2>/dev/null; then
+    ARCHIVE_HAS_MANIFEST=true
+else
+    rm -f "$ARCHIVE_MANIFEST_TMP"
+    ARCHIVE_MANIFEST_TMP=""
+    ARCHIVE_HAS_MANIFEST=false
+fi
+
+migrate_legacy_qt_cache || exit 1
+
+if [[ -e "$EXTRACT_DIR" ]] || [[ -L "$EXTRACT_DIR" ]]; then
+    [[ -d "$EXTRACT_DIR" ]] && [[ ! -L "$EXTRACT_DIR" ]] || {
+        echo -e "${RED}ERROR:${NC} Refusing non-directory Qt cache path: $EXTRACT_DIR"
+        exit 1
+    }
+    qt_cache_marker_valid "$EXTRACT_DIR" "$EXTRACT_DIR" \
+        "$expected_package_sha256" published || {
+        echo -e "${RED}ERROR:${NC} Refusing unmarked foreign Qt cache: $EXTRACT_DIR"
+        exit 1
+    }
+    [[ "$(qt_cache_mode "$EXTRACT_DIR")" == "700" ]] || {
+        echo -e "${RED}ERROR:${NC} Qt cache directory mode must be 0700: $EXTRACT_DIR"
+        exit 1
+    }
+    if ! $FORCE && $ARCHIVE_HAS_MANIFEST \
+        && verify_marked_qt_cache "$EXTRACT_DIR" "$EXTRACT_DIR" \
+            "$expected_package_sha256" published "$ARCHIVE_MANIFEST_TMP"; then
+        echo -e "${GREEN}Using cached Qt frameworks${NC}"
+        echo "$EXTRACT_DIR"
+        exit 0
+    fi
+    if $ARCHIVE_HAS_MANIFEST; then
+        echo -e "${YELLOW}Cached Qt frameworks failed archive-authoritative validation; rebuilding.${NC}"
+    else
+        echo -e "${YELLOW}Legacy archive cache is regenerated on every use.${NC}"
+    fi
+fi
+
 echo "Extracting..."
-TEMP_EXTRACT=$(mktemp -d)
+TEMP_EXTRACT=$(mktemp -d "$CACHE_DIR/.$(basename "$EXTRACT_DIR").stage.XXXXXX")
+chmod 0700 "$TEMP_EXTRACT"
 tar -xzf "$INSPECTED_ARCHIVE" -C "$TEMP_EXTRACT"
 
-rm -rf "$EXTRACT_DIR"
-mkdir -p "$(dirname "$EXTRACT_DIR")"
 if ! validate_extracted_package "$TEMP_EXTRACT" "$QT_VERSION" \
     || ! ensure_extracted_manifest "$TEMP_EXTRACT"; then
     echo -e "${RED}ERROR:${NC} Extracted Qt package validation failed."
@@ -552,8 +784,23 @@ if ! validate_extracted_package "$TEMP_EXTRACT" "$QT_VERSION" \
     TEMP_EXTRACT=""
     exit 1
 fi
-mv "$TEMP_EXTRACT" "$EXTRACT_DIR"
-TEMP_EXTRACT=""
+if $ARCHIVE_HAS_MANIFEST \
+    && ! cmp -s "$TEMP_EXTRACT/MANIFEST.txt" "$ARCHIVE_MANIFEST_TMP"; then
+    echo -e "${RED}ERROR:${NC} Extracted Qt manifest differs from archive authority."
+    exit 1
+fi
+write_qt_cache_marker "$TEMP_EXTRACT" "$EXTRACT_DIR" \
+    "$expected_package_sha256" published || {
+    echo -e "${RED}ERROR:${NC} Unable to write Qt cache ownership marker."
+    exit 1
+}
+if ! verify_marked_qt_cache "$TEMP_EXTRACT" "$EXTRACT_DIR" \
+    "$expected_package_sha256" published "$ARCHIVE_MANIFEST_TMP"; then
+    echo -e "${RED}ERROR:${NC} Staged Qt cache verification failed."
+    exit 1
+fi
+publish_qt_cache "$TEMP_EXTRACT" "$EXTRACT_DIR" "$ARCHIVE_MANIFEST_TMP" \
+    || exit 1
 
 echo ""
 echo -e "${GREEN}Qt frameworks ready!${NC}"

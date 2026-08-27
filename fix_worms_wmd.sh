@@ -36,6 +36,7 @@ LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
 WORMSWMD_VERBOSE="${WORMSWMD_VERBOSE:-false}"
+TRACE_FILE_EXPLICIT=false
 
 # shellcheck source=./scripts/logging.sh
 source "$SCRIPTS_DIR/logging.sh"
@@ -136,7 +137,7 @@ init_logging() {
     local was_logging="${WORMSWMD_LOGGING_INITIALIZED:-}"
 
     worms_log_init "$script_name"
-    worms_debug_init
+    worms_debug_init "$TRACE_FILE_EXPLICIT"
     export WORMSWMD_DEBUG WORMSWMD_VERBOSE TRACE_FILE
 
     if [[ -z "$was_logging" ]]; then
@@ -1339,12 +1340,15 @@ ${BOLD}OPTIONS:${NC}
     --log-file PATH Write logs to a .log file under ~/Library/Logs
     --verbose       Show full verification output
     --debug         Enable debug tracing (writes a .trace log)
+    --trace-file PATH
+                    Write a new debug trace to an explicit .trace path
 
 ${BOLD}ENVIRONMENT VARIABLES:${NC}
     GAME_APP        Path to "Worms W.M.D.app" (for non-standard locations)
     LOG_FILE        Override log file path (.log under ~/Library/Logs)
     LOG_DIR         Override log directory (under ~/Library/Logs)
     WORMSWMD_DEBUG  Enable debug tracing (1/true/yes)
+    TRACE_FILE      Debug trace path under ~/Library/Logs
     WORMSWMD_VERBOSE Enable verbose output (1/true/yes)
 
 ${BOLD}EXAMPLES:${NC}
@@ -2088,6 +2092,17 @@ while [[ $# -gt 0 ]]; do
             WORMSWMD_DEBUG=1
             WORMSWMD_VERBOSE=1
             shift
+            ;;
+        --trace-file)
+            if [[ -z "${2:-}" ]] || [[ "$2" == -* ]]; then
+                print_error "--trace-file requires a path"
+                exit 1
+            fi
+            TRACE_FILE="$2"
+            TRACE_FILE_EXPLICIT=true
+            WORMSWMD_DEBUG=1
+            WORMSWMD_VERBOSE=1
+            shift 2
             ;;
         *)
             print_error "Unknown option: $1"

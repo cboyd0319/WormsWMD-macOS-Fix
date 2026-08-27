@@ -33,13 +33,20 @@ Back up and restore your save games, settings, and replays:
 ./tools/backup_saves.sh --location
 ./tools/backup_saves.sh --restore
 ./tools/backup_saves.sh --restore ~/Documents/WormsWMD-SaveBackups/saves-20251225-120000.tar.gz
+./tools/backup_saves.sh --restore --yes \
+  --allow-external-steam-root "$EXACT_EXTERNAL_327030_PATH"
 ```
 
 New save backups include a `MANIFEST.tsv` file. Restore rejects exact/canonical
 duplicate members, control-character paths, links, and special entries before
 use; it verifies the manifest, stages each save tree, replaces the backed-up
-roots, and checks that stale files did not survive. Older legacy backups that
-predate manifests restore with an explicit warning.
+roots on their target filesystems, and rolls every changed root back if copying
+or verification fails. Steam user IDs must be numeric and intermediate user
+links are refused. A deliberately relocated `327030` link requires the exact
+canonical target through `--allow-external-steam-root` together with explicit
+`--yes`; the decision is never saved. A detected running Steam process blocks
+unattended restore and must be closed and rechecked interactively. Older legacy
+backups that predate manifests restore with an explicit warning.
 
 ## Steam update watcher
 
@@ -55,7 +62,9 @@ Steam's **Verify integrity of game files** overwrites the fix. Use the watcher t
 The watcher uses the same common game discovery as the installer when
 `GAME_APP` is not set, so it can check common Steam, GOG, Applications, and
 Games-folder installs. When installed as a LaunchAgent, it persists the selected
-`GAME_APP` so automatic reapply targets the same bundle.
+`GAME_APP` so automatic reapply targets the same bundle. Installation replaces
+only a valid project-owned plist and restores the prior loaded agent if the new
+agent cannot bootstrap. Uninstall targets only the exact project label and path.
 
 ## Steam launch options integration
 
@@ -77,8 +86,10 @@ Check for new versions of the fix:
 ./tools/check_updates.sh --download
 ```
 
-`--download` retrieves the latest release zip and its matching `.sha256` file,
-then verifies the checksum before leaving the zip in `~/Downloads`.
+`--download` stages the release zip and checksum in an owner-only directory,
+accepts one exact text or binary SHA-256 record for that zip basename, and
+publishes both files to `~/Downloads` only after verification. Existing output
+must be a regular, nonlinked file; a failed update preserves safe prior files.
 
 ## Controller helper
 
@@ -116,6 +127,9 @@ binaries, or private config file contents. The support-bundle
 archive also normalizes tar owner and group metadata so it does not expose the
 local macOS account name. Terminal escape sequences and other C0/DEL controls
 are removed from support text while TSV tabs remain intact.
+Explicit `--output` files are staged beside their destination with mode `0600`
+and atomically published. Existing links, hardlinks, and special files are
+rejected; a safe regular output may be deliberately replaced.
 
 If more than one installation is detected, direct diagnostics require
 `GAME_APP`. The friendly launcher prompts once and preserves that selection for
@@ -135,7 +149,8 @@ Launch the game with extra logging and debug options:
 ```
 
 Log files must be regular `.log` files under `~/Library/Logs/`. Crash reports
-are saved to `~/Library/Logs/WormsWMD/crashes/`. When `GAME_APP` is not set,
+are uniquely staged and atomically saved with mode `0600` under
+`~/Library/Logs/WormsWMD/crashes/`. When `GAME_APP` is not set,
 the launcher auto-detects common Steam, GOG, Applications, and Games-folder
 installs before launching.
 
@@ -157,7 +172,10 @@ or docs-topology changes:
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh
 ./tools/test_preflight_regression.sh
+./tools/test_signature_verification.sh
+./tools/test_logging_safety.sh
 ./tools/test_manifest_regression.sh
+./tools/test_qt_cache_integrity.sh
 ./tools/test_qt_version_pinning.sh
 ./tools/test_github_security.sh
 ./tools/test_ci_changed_paths.sh
@@ -195,14 +213,19 @@ Check or refresh the pre-built Qt package used by the installer:
 ```bash
 ./scripts/download_qt_frameworks.sh --check
 ./scripts/download_qt_frameworks.sh --force
+./scripts/download_qt_frameworks.sh --prune-cache
 ```
 
 `scripts/download_qt_frameworks.sh --check` validates local package checksums,
 metadata, required files, safe tar layout, archive manifests when present, and
 x86_64 binary slices before reporting the pre-built Qt package as available.
-Before installer use, extracted cache directories have a verified manifest;
-legacy archives get one generated after extraction. Remote fallback checks the
-pinned release commit for `dist/` contents.
+Cache paths include the full verified archive digest and are mode `0700`.
+Every reuse checks the cache manifest against the inspected archive copy;
+cache-local regeneration cannot become authority. Archives without manifests
+re-extract on every use. Valid version-only caches are renamed to reported
+recoverable `.legacy-*` paths, and `--prune-cache` removes only exact
+marker-owned retained legacy caches. Remote fallback checks the pinned release
+commit for `dist/` contents.
 
 `tools/package_qt_frameworks.sh` accepts either Intel Homebrew `qt@5` or an
 explicit Qt prefix. It writes deterministic gzip archives using

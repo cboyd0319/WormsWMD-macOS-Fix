@@ -61,7 +61,6 @@ jobs:
         run: /usr/bin/python3 tools/test_archive_inspector.py
       - name: Test Homebrew bottle safety
         run: ruby tools/test_fetch_qt_homebrew_bottles.rb
-
       - name: Test enforced Git hooks
         run: ./tools/test_git_hooks.sh
 
@@ -125,10 +124,8 @@ jobs:
             src/agl_stub.c
           file /tmp/AGL_test
           rm /tmp/AGL_test
-
       - name: Test bootstrap installer safety
         run: ./tools/test_bootstrap_installer_safety.sh
-
       - name: Test dependency parsing
         run: ./tools/test_dependency_parsing.sh
 
@@ -158,23 +155,26 @@ jobs:
 
       - name: Test preflight regression
         run: ./tools/test_preflight_regression.sh
-
+      - name: Test signature verification
+        run: ./tools/test_signature_verification.sh
+      - name: Test logging safety
+        run: ./tools/test_logging_safety.sh
+      - name: Test update download safety
+        run: ./tools/test_update_download_safety.sh
       - name: Test manifest regression
         run: ./tools/test_manifest_regression.sh
-
+      - name: Test Qt cache integrity
+        run: ./tools/test_qt_cache_integrity.sh
       - name: Test Qt version pinning
         run: ./tools/test_qt_version_pinning.sh
-
       - name: Check script permissions
         run: |
           echo "Verifying scripts are executable..."
           chmod +x fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
           echo "Done!"
-
       - name: Test --help flag
         run: |
           ./fix_worms_wmd.sh --help
-
       - name: Build release bundle smoke test
         run: |
           ./tools/build_release_bundle.sh --version ci --skip-zip

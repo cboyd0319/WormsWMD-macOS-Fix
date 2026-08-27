@@ -243,6 +243,67 @@ worms_file_sha256() {
     shasum -a 256 "$path" | awk '{print $1}'
 }
 
+worms_read_exact_sha256_record() {
+    local checksum_file="$1"
+    local expected_basename="$2"
+    local line hash remainder line_count byte_dump link_count size
+
+    if [[ "$expected_basename" == */* ]] \
+        || worms_has_control_chars "$expected_basename" \
+        || [[ ! -f "$checksum_file" ]] || [[ -L "$checksum_file" ]]; then
+        return 1
+    fi
+    link_count=$(worms_file_link_count "$checksum_file") || return 1
+    [[ "$link_count" == "1" ]] || return 1
+    size=$(worms_file_size "$checksum_file") || return 1
+    if [[ ! "$size" =~ ^[0-9]+$ ]] || [[ "$size" -le 0 ]] \
+        || [[ "$size" -gt 4096 ]]; then
+        return 1
+    fi
+    byte_dump=$(LC_ALL=C od -An -v -tu1 "$checksum_file" 2>/dev/null) || return 1
+    if printf '%s\n' "$byte_dump" | awk '
+        {
+            for (field = 1; field <= NF; field++) {
+                if (($field < 32 && $field != 10) || $field == 127) {
+                    forbidden = 1
+                }
+            }
+        }
+        END {exit forbidden ? 0 : 1}
+    '; then
+        return 1
+    fi
+    line_count=$(awk 'END {print NR}' "$checksum_file" 2>/dev/null || echo 0)
+    [[ "$line_count" == "1" ]] || return 1
+    IFS= read -r line < "$checksum_file" || [[ -n "$line" ]] || return 1
+    worms_has_control_chars "$line" && return 1
+
+    hash=${line%% *}
+    remainder=${line#"$hash"}
+    [[ "$hash" =~ ^[a-fA-F0-9]{64}$ ]] || return 1
+    if [[ "$remainder" != "  $expected_basename" ]] \
+        && [[ "$remainder" != " *$expected_basename" ]]; then
+        return 1
+    fi
+    printf '%s\n' "$hash" | tr 'A-F' 'a-f'
+}
+
+worms_verify_exact_sha256_file() {
+    local payload_file="$1"
+    local checksum_file="$2"
+    local expected_basename="$3"
+    local expected actual link_count
+
+    [[ -f "$payload_file" ]] && [[ ! -L "$payload_file" ]] || return 1
+    link_count=$(worms_file_link_count "$payload_file") || return 1
+    [[ "$link_count" == "1" ]] || return 1
+    expected=$(worms_read_exact_sha256_record \
+        "$checksum_file" "$expected_basename") || return 1
+    actual=$(worms_file_sha256 "$payload_file") || return 1
+    actual=$(printf '%s\n' "$actual" | tr 'A-F' 'a-f')
+    [[ "$actual" == "$expected" ]]
+}
+
 worms_select_python3() {
     local candidate
     local seen=""
@@ -484,7 +545,40 @@ worms_resolve_macho_rpath_dependency() {
 worms_file_link_count() {
     local path="$1"
 
-    stat -f "%l" "$path" 2>/dev/null || stat -c "%h" "$path" 2>/dev/null || echo 1
+    stat -f "%l" "$path" 2>/dev/null || stat -c "%h" "$path" 2>/dev/null
+}
+
+worms_file_owner_uid() {
+    local path="$1"
+
+    stat -f "%u" "$path" 2>/dev/null || stat -c "%u" "$path" 2>/dev/null
+}
+
+worms_validate_replaceable_regular_file() {
+    local path="$1"
+    local link_count
+
+    if [[ -e "$path" ]] || [[ -L "$path" ]]; then
+        [[ -f "$path" ]] && [[ ! -L "$path" ]] || return 1
+        link_count=$(worms_file_link_count "$path") || return 1
+        [[ "$link_count" == "1" ]] || return 1
+    fi
+}
+
+worms_same_directory_temp_file() {
+    local target="$1"
+    local parent
+    local old_umask
+    local status
+
+    parent=$(dirname "$target")
+    [[ -d "$parent" ]] && [[ ! -L "$parent" ]] || return 1
+    old_umask=$(umask)
+    umask 077
+    mktemp "$parent/.wormswmd-output.XXXXXX"
+    status=$?
+    umask "$old_umask"
+    return "$status"
 }
 
 worms_has_control_chars() {
@@ -546,6 +640,302 @@ worms_path_inside_root() {
     esac
 
     return 1
+}
+
+worms_macho_path_has_parent_component() {
+    local path="$1"
+
+    case "/$path/" in
+        *"/../"*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+worms_validate_dependency_source() {
+    local candidate="$1"
+    shift
+    local candidate_real root root_real archs allowed=false
+
+    if worms_has_control_chars "$candidate" || [[ -L "$candidate" ]] \
+        || [[ ! -f "$candidate" ]]; then
+        echo "Dependency source must be a regular non-symlink file: $candidate" >&2
+        return 1
+    fi
+    if [[ "$(worms_file_link_count "$candidate")" -ne 1 ]]; then
+        echo "Dependency source must not be hardlinked: $candidate" >&2
+        return 1
+    fi
+    candidate_real=$(realpath "$candidate" 2>/dev/null || true)
+    [[ -n "$candidate_real" ]] || return 1
+
+    for root in "$@"; do
+        [[ -n "$root" ]] || continue
+        root_real=$(worms_real_dir "$root" || true)
+        [[ -n "$root_real" ]] || continue
+        case "$candidate_real" in
+            "$root_real"/*)
+                allowed=true
+                break
+                ;;
+        esac
+    done
+    $allowed || {
+        echo "Dependency source resolves outside allowed roots: $candidate_real" >&2
+        return 1
+    }
+
+    archs=$(lipo -archs "$candidate_real" 2>/dev/null || true)
+    if ! printf '%s\n' "$archs" | tr ' ' '\n' | grep -qx x86_64; then
+        echo "Dependency source is missing x86_64: $candidate_real (${archs:-unreadable})" >&2
+        return 1
+    fi
+    printf '%s\n' "$candidate_real"
+}
+
+worms_resolve_macho_dependency_source() {
+    local binary="$1"
+    local dependency="$2"
+    local game_exec="$3"
+    shift 3
+    local dependency_suffix rpath expanded candidate resolved item rpath_bin
+    local existing=false
+    local resolved_sources=()
+
+    if worms_has_control_chars "$dependency" \
+        || worms_macho_path_has_parent_component "$dependency"; then
+        echo "Unsafe lexical dependency path: $dependency" >&2
+        return 1
+    fi
+
+    case "$dependency" in
+        @rpath/*)
+            dependency_suffix=${dependency#@rpath/}
+            for rpath_bin in "$binary" "$game_exec"; do
+                [[ -f "$rpath_bin" ]] || continue
+                while IFS= read -r rpath; do
+                    [[ -n "$rpath" ]] || continue
+                    worms_has_control_chars "$rpath" && continue
+                    expanded=$(worms_expand_macho_path \
+                        "$rpath" "$rpath_bin" "$game_exec" || true)
+                    [[ -n "$expanded" ]] || continue
+                    candidate="${expanded%/}/$dependency_suffix"
+                    [[ -e "$candidate" ]] || [[ -L "$candidate" ]] || continue
+                    resolved=$(worms_validate_dependency_source "$candidate" "$@" \
+                        2>/dev/null || true)
+                    [[ -n "$resolved" ]] || continue
+                    existing=false
+                    for item in "${resolved_sources[@]:-}"; do
+                        [[ "$item" == "$resolved" ]] && existing=true
+                    done
+                    $existing || resolved_sources+=("$resolved")
+                done < <(worms_macho_rpaths "$rpath_bin")
+                [[ "$rpath_bin" == "$game_exec" ]] && break
+            done
+            ;;
+        @executable_path|@executable_path/*|@loader_path|@loader_path/*)
+            candidate=$(worms_expand_macho_path \
+                "$dependency" "$binary" "$game_exec" || true)
+            [[ -n "$candidate" ]] || return 1
+            resolved=$(worms_validate_dependency_source "$candidate" "$@") \
+                || return 1
+            resolved_sources+=("$resolved")
+            ;;
+        /*)
+            resolved=$(worms_validate_dependency_source "$dependency" "$@") \
+                || return 1
+            resolved_sources+=("$resolved")
+            ;;
+        *)
+            echo "Unsupported relative dependency source: $dependency" >&2
+            return 1
+            ;;
+    esac
+
+    if (( ${#resolved_sources[@]} == 0 )); then
+        return 1
+    fi
+    if (( ${#resolved_sources[@]} > 1 )); then
+        echo "Multiple valid dependency sources for $dependency:" >&2
+        printf '  %s\n' "${resolved_sources[@]}" >&2
+        return 2
+    fi
+    printf '%s\n' "${resolved_sources[0]}"
+}
+
+worms_record_dependency_source() {
+    local records_file="$1"
+    local dependency_name="$2"
+    local source_path="$3"
+    local existing
+
+    if [[ "$dependency_name" == */* ]] \
+        || worms_has_control_chars "$dependency_name" \
+        || worms_has_control_chars "$source_path"; then
+        return 1
+    fi
+    existing=$(awk -F '\t' -v name="$dependency_name" \
+        '$1 == name {print $2; exit}' "$records_file" 2>/dev/null || true)
+    if [[ -n "$existing" ]]; then
+        if [[ "$existing" != "$source_path" ]]; then
+            echo "Dependency basename maps to multiple sources: $dependency_name" >&2
+            return 1
+        fi
+        return 0
+    fi
+    printf '%s\t%s\n' "$dependency_name" "$source_path" >> "$records_file"
+}
+
+worms_runtime_fix_complete_with() {
+    local game_app="$1"
+    local lipo_bin="$2"
+    local otool_bin="$3"
+    local path archs qt_details
+    local required_paths=(
+        "Contents/MacOS/Worms W.M.D"
+        "Contents/Frameworks/AGL.framework/Versions/A/AGL"
+        "Contents/Frameworks/QtCore.framework/Versions/5/QtCore"
+        "Contents/Frameworks/QtGui.framework/Versions/5/QtGui"
+        "Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets"
+        "Contents/Frameworks/QtOpenGL.framework/Versions/5/QtOpenGL"
+        "Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport"
+        "Contents/Frameworks/QtDBus.framework/Versions/5/QtDBus"
+        "Contents/Frameworks/QtSvg.framework/Versions/5/QtSvg"
+        "Contents/PlugIns/platforms/libqcocoa.dylib"
+        "Contents/PlugIns/imageformats/libqsvg.dylib"
+    )
+
+    [[ -x "$lipo_bin" ]] && [[ -x "$otool_bin" ]] || return 1
+    for path in "${required_paths[@]}"; do
+        path="$game_app/$path"
+        [[ -f "$path" ]] && [[ ! -L "$path" ]] || return 1
+        archs=$("$lipo_bin" -archs "$path" 2>/dev/null || true)
+        printf '%s\n' "$archs" | tr ' ' '\n' | grep -qx x86_64 || return 1
+    done
+    qt_details=$("$otool_bin" -L \
+        "$game_app/Contents/Frameworks/QtCore.framework/Versions/5/QtCore" \
+        2>/dev/null) || return 1
+    grep -Eq 'QtCore[.]framework/Versions/5/QtCore .*current version 5[.]15[.]' \
+        <<< "$qt_details" || return 1
+}
+
+worms_signature_state_with() {
+    local codesign_bin="$1"
+    local game_app="$2"
+    local verify_output details
+
+    if [[ -z "$codesign_bin" ]] || [[ ! -x "$codesign_bin" ]]; then
+        printf '%s\n' unavailable
+        return 0
+    fi
+    if verify_output=$("$codesign_bin" --verify --deep --strict \
+        "$game_app" 2>&1); then
+        details=$("$codesign_bin" -dv --verbose=4 "$game_app" 2>&1 || true)
+        if grep -Eqi 'Signature[[:space:]]*=[[:space:]]*adhoc|ad.?hoc' \
+            <<< "$details"; then
+            printf '%s\n' valid-adhoc
+        else
+            printf '%s\n' valid
+        fi
+        return 0
+    fi
+    if grep -Eqi 'invalid|modified|resource envelope|sealed resource' \
+        <<< "$verify_output"; then
+        printf '%s\n' invalid
+    elif grep -Eqi 'not signed|code object is not signed' <<< "$verify_output"; then
+        printf '%s\n' unsigned
+    else
+        printf '%s\n' invalid
+    fi
+}
+
+worms_classify_bundle_signature_with() {
+    local game_app="$1"
+    local lipo_bin="$2"
+    local codesign_bin="$3"
+    local otool_bin="$4"
+    local fix_state=original signature_state
+
+    if worms_runtime_fix_complete_with "$game_app" "$lipo_bin" "$otool_bin"; then
+        fix_state=fixed
+    fi
+    signature_state=$(worms_signature_state_with "$codesign_bin" "$game_app")
+    printf '%s-%s\n' "$fix_state" "$signature_state"
+}
+
+worms_classify_bundle_signature() {
+    local game_app="$1"
+    local lipo_bin codesign_bin otool_bin
+
+    lipo_bin=$(command -v lipo 2>/dev/null || true)
+    codesign_bin=$(command -v codesign 2>/dev/null || true)
+    otool_bin=$(command -v otool 2>/dev/null || true)
+    worms_classify_bundle_signature_with \
+        "$game_app" "$lipo_bin" "$codesign_bin" "$otool_bin"
+}
+
+worms_quarantine_state_with() {
+    local xattr_bin="$1"
+    local find_bin="$2"
+    local root_dir="$3"
+    local limit="${4:-20}"
+    local paths_file path status=0 count=0 excess=false scan_error=false
+
+    if [[ -z "$xattr_bin" ]] || [[ ! -x "$xattr_bin" ]] \
+        || [[ -z "$find_bin" ]] || [[ ! -x "$find_bin" ]]; then
+        printf '%s\n' unavailable
+        return 0
+    fi
+    [[ "$limit" =~ ^[1-9][0-9]*$ ]] && (( limit <= 100 )) || return 1
+    paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-quarantine-paths.XXXXXX")
+    if ! "$find_bin" "$root_dir" -print0 > "$paths_file" 2>/dev/null; then
+        rm -f "$paths_file"
+        printf '%s\n' scan-error
+        return 0
+    fi
+    while IFS= read -r -d '' path; do
+        status=0
+        "$xattr_bin" -p com.apple.quarantine "$path" >/dev/null 2>&1 \
+            || status=$?
+        case "$status" in
+            0)
+                if (( count < limit )); then
+                    count=$((count + 1))
+                else
+                    excess=true
+                    break
+                fi
+                ;;
+            1)
+                ;;
+            *)
+                scan_error=true
+                break
+                ;;
+        esac
+    done < "$paths_file"
+    rm -f "$paths_file"
+
+    if $scan_error; then
+        printf '%s\n' scan-error
+    elif $excess; then
+        printf 'present:%s+\n' "$limit"
+    elif (( count > 0 )); then
+        printf 'present:%s\n' "$count"
+    else
+        printf '%s\n' none
+    fi
+}
+
+worms_quarantine_state() {
+    local root_dir="$1"
+    local limit="${2:-20}"
+    local xattr_bin find_bin
+
+    xattr_bin=$(command -v xattr 2>/dev/null || true)
+    find_bin=$(command -v find 2>/dev/null || true)
+    worms_quarantine_state_with "$xattr_bin" "$find_bin" "$root_dir" "$limit"
 }
 
 worms_path_creatable_inside_root() {
@@ -1187,6 +1577,45 @@ worms_verify_manifest() {
 
     rm -f "$paths_file" "$expected_file" "$actual_file" "$tree_file" "$tree_expected_file"
 
+    return "$status"
+}
+
+worms_verify_manifest_with_extras() {
+    local root_dir="$1"
+    local manifest_file="$2"
+    shift 2
+    local extended_manifest manifest_real root_real rel hash size status=0
+
+    root_real=$(worms_real_dir "$root_dir") || return 1
+    manifest_real=$(realpath "$manifest_file" 2>/dev/null || true)
+    case "$manifest_real" in
+        "$root_real"/*)
+            ;;
+        *)
+            echo "Manifest with extras must be inside its root: $manifest_file" >&2
+            return 1
+            ;;
+    esac
+
+    extended_manifest=$(mktemp "${TMPDIR:-/tmp}/wormswmd-extended-manifest.XXXXXX")
+    cat "$manifest_file" > "$extended_manifest" || status=1
+    rel=${manifest_real#"$root_real"/}
+    set -- "$rel" "$@"
+    for rel in "$@"; do
+        if worms_has_control_chars "$rel" || worms_path_has_parent_escape "$rel" \
+            || [[ ! -f "$root_dir/$rel" ]] || [[ -L "$root_dir/$rel" ]] \
+            || [[ "$(worms_file_link_count "$root_dir/$rel")" -ne 1 ]]; then
+            status=1
+            break
+        fi
+        hash=$(worms_file_sha256 "$root_dir/$rel")
+        size=$(worms_file_size "$root_dir/$rel")
+        printf '%s\t%s\t%s\n' "$hash" "$size" "$rel" >> "$extended_manifest"
+    done
+    if [[ "$status" -eq 0 ]]; then
+        worms_verify_manifest "$root_dir" "$extended_manifest" || status=1
+    fi
+    rm -f "$extended_manifest"
     return "$status"
 }
 

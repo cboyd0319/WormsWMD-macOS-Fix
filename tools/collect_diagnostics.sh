@@ -45,6 +45,8 @@ COPY_TO_CLIPBOARD=false
 SUPPORT_BUNDLE=false
 BUNDLE_OUTPUT_DIR="${BUNDLE_OUTPUT_DIR:-$HOME/Desktop}"
 BUNDLE_TEMP_DIR=""
+BUNDLE_ARCHIVE_TEMP=""
+OUTPUT_TEMP_FILE=""
 REQUIRED_QT_FRAMEWORKS=(
     QtCore
     QtGui
@@ -74,6 +76,14 @@ REQUIRED_BUNDLED_DYLIBS=(
 )
 
 cleanup() {
+    if [[ -n "$BUNDLE_ARCHIVE_TEMP" ]] && [[ -f "$BUNDLE_ARCHIVE_TEMP" ]] \
+        && [[ ! -L "$BUNDLE_ARCHIVE_TEMP" ]]; then
+        rm -f "$BUNDLE_ARCHIVE_TEMP"
+    fi
+    if [[ -n "$OUTPUT_TEMP_FILE" ]] && [[ -f "$OUTPUT_TEMP_FILE" ]] \
+        && [[ ! -L "$OUTPUT_TEMP_FILE" ]]; then
+        rm -f "$OUTPUT_TEMP_FILE"
+    fi
     if [[ -n "$BUNDLE_TEMP_DIR" ]] && [[ -d "$BUNDLE_TEMP_DIR" ]]; then
         rm -rf "$BUNDLE_TEMP_DIR"
     fi
@@ -339,10 +349,31 @@ prepare_output_file() {
     esac
 
     mkdir -p "$(dirname "$output_file")"
-    if [[ -L "$output_file" ]] || [[ -d "$output_file" ]]; then
-        echo "ERROR: --output must be a regular file path"
+    if [[ -L "$(dirname "$output_file")" ]] \
+        || ! worms_validate_replaceable_regular_file "$output_file"; then
+        echo "ERROR: --output must be a regular non-linked file path"
         exit 1
     fi
+}
+
+write_diagnostics_file() {
+    local output_file="$1"
+
+    OUTPUT_TEMP_FILE=$(worms_same_directory_temp_file "$output_file") || {
+        echo "ERROR: could not create a secure diagnostics staging file" >&2
+        return 1
+    }
+    if ! emit_sanitized_diagnostics > "$OUTPUT_TEMP_FILE"; then
+        echo "ERROR: could not generate diagnostics" >&2
+        return 1
+    fi
+    chmod 600 "$OUTPUT_TEMP_FILE"
+    if ! worms_validate_replaceable_regular_file "$output_file"; then
+        echo "ERROR: --output became unsafe before publication" >&2
+        return 1
+    fi
+    mv -f -- "$OUTPUT_TEMP_FILE" "$output_file"
+    OUTPUT_TEMP_FILE=""
 }
 
 worms_reject_control_chars "$GAME_APP" "GAME_APP"
@@ -523,24 +554,28 @@ collect_diagnostics() {
     fi
 
     subsection "Code Signing"
-    local codesign_status
-    codesign_status=$(codesign -dv "$GAME_APP" 2>&1 || echo "unsigned")
-    if echo "$codesign_status" | grep -q "not signed"; then
-        warn "App is not signed"
-    elif echo "$codesign_status" | grep -q "adhoc"; then
-        ok "Ad-hoc signed"
-    elif echo "$codesign_status" | grep -q "Authority"; then
-        ok "Signed"
-    else
-        info "Signing status: $codesign_status"
-    fi
+    local signature_classification quarantine_state
+    signature_classification=$(worms_classify_bundle_signature "$GAME_APP")
+    case "$signature_classification" in
+        fixed-valid-adhoc) ok "Strict ad-hoc signature verified" ;;
+        fixed-valid) ok "Strict code signature verified" ;;
+        fixed-unsigned|fixed-invalid|fixed-unavailable)
+            fail "Complete fixed app strict signature: ${signature_classification#fixed-}"
+            ;;
+        original-unsigned|original-invalid|original-unavailable)
+            warn "Original/unfixed app signature: ${signature_classification#original-}"
+            ;;
+        *) info "Signature verifies; runtime fix is incomplete" ;;
+    esac
 
     subsection "Quarantine Status"
-    if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
-        warn "Quarantine flag present (may cause launch issues)"
-    else
-        ok "No quarantine flags"
-    fi
+    quarantine_state=$(worms_quarantine_state "$GAME_APP" 20)
+    case "$quarantine_state" in
+        none) ok "No recursive quarantine flags" ;;
+        present:*) warn "Recursive quarantine: ${quarantine_state#present:} entries (names omitted)" ;;
+        unavailable) warn "Quarantine inspection unavailable" ;;
+        *) warn "Recursive quarantine inspection failed" ;;
+    esac
 
     # ================================================================
     section "QT SOURCE STATUS"
@@ -1227,11 +1262,19 @@ copy_backup_manifests() {
 
 collect_support_bundle() {
     local output_dir="$BUNDLE_OUTPUT_DIR"
-    local timestamp bundle_path raw_report was_full
+    local timestamp bundle_path raw_report was_full publish_attempt
 
-    mkdir -p "$output_dir" 2>/dev/null || output_dir="$PWD"
+    if ! mkdir -p "$output_dir" 2>/dev/null \
+        || [[ ! -d "$output_dir" ]] || [[ -L "$output_dir" ]]; then
+        echo "ERROR: support bundle output must be a non-linked directory: $output_dir" >&2
+        return 1
+    fi
     timestamp=$(date '+%Y%m%d-%H%M%S')
     bundle_path=$(worms_unique_path "$output_dir/wormswmd-support-$timestamp" ".tar.gz")
+    BUNDLE_ARCHIVE_TEMP=$(worms_same_directory_temp_file "$bundle_path") || {
+        echo "ERROR: could not create a secure support-bundle staging file" >&2
+        return 1
+    }
     BUNDLE_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-support.XXXXXX")
 
     {
@@ -1257,14 +1300,32 @@ collect_support_bundle() {
     write_backup_summary "$BUNDLE_TEMP_DIR"
     copy_backup_manifests "$BUNDLE_TEMP_DIR"
 
-    COPYFILE_DISABLE=1 tar \
+    if ! COPYFILE_DISABLE=1 tar \
         --format ustar \
         --uid 0 \
         --gid 0 \
         --uname root \
         --gname wheel \
-        -czf "$bundle_path" \
-        -C "$BUNDLE_TEMP_DIR" .
+        -czf "$BUNDLE_ARCHIVE_TEMP" \
+        -C "$BUNDLE_TEMP_DIR" .; then
+        echo "ERROR: could not create support bundle" >&2
+        return 1
+    fi
+    chmod 600 "$BUNDLE_ARCHIVE_TEMP"
+    publish_attempt=0
+    while [[ "$publish_attempt" -lt 10 ]]; do
+        publish_attempt=$((publish_attempt + 1))
+        if mv -n -- "$BUNDLE_ARCHIVE_TEMP" "$bundle_path" \
+            && [[ ! -e "$BUNDLE_ARCHIVE_TEMP" ]]; then
+            BUNDLE_ARCHIVE_TEMP=""
+            break
+        fi
+        bundle_path=$(worms_unique_path "$output_dir/wormswmd-support-$timestamp" ".tar.gz")
+    done
+    if [[ -n "$BUNDLE_ARCHIVE_TEMP" ]]; then
+        echo "ERROR: could not publish a unique support bundle" >&2
+        return 1
+    fi
     echo "Support bundle created: $bundle_path"
 }
 
@@ -1272,7 +1333,7 @@ collect_support_bundle() {
 if $SUPPORT_BUNDLE; then
     collect_support_bundle
 elif [[ -n "$OUTPUT_FILE" ]]; then
-    emit_sanitized_diagnostics > "$OUTPUT_FILE"
+    write_diagnostics_file "$OUTPUT_FILE"
     echo "Diagnostics saved to: $OUTPUT_FILE"
 elif $COPY_TO_CLIPBOARD; then
     if command -v pbcopy >/dev/null 2>&1; then

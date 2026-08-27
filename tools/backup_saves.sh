@@ -31,7 +31,23 @@ worms_color_init
 # Cleanup temp files on exit
 TEMP_DIR=""
 RESTORE_WORK_DIR=""
+RESTORE_TRANSACTION_ACTIVE=false
+RESTORE_TRANSACTION_COUNT=0
+RESTORE_SOURCE_DIRS=()
+RESTORE_TARGET_DIRS=()
+RESTORE_ALLOWED_ROOTS=()
+RESTORE_STAGE_DIRS=()
+RESTORE_RETAINED_DIRS=()
+RESTORE_HAD_OLD=()
+RESTORE_APPLIED=()
 cleanup() {
+    if $RESTORE_TRANSACTION_ACTIVE \
+        && declare -F rollback_save_transactions >/dev/null; then
+        rollback_save_transactions "interrupted restore" || true
+    fi
+    if declare -F cleanup_save_transaction_stages >/dev/null; then
+        cleanup_save_transaction_stages
+    fi
     if [[ -n "$RESTORE_WORK_DIR" ]] && [[ -d "$RESTORE_WORK_DIR" ]]; then
         rm -rf "$RESTORE_WORK_DIR"
         return
@@ -50,9 +66,15 @@ SAVE_MANIFEST_NAME="MANIFEST.tsv"
 RESTORE_ASSUME_YES=false
 RESTORE_MAX_EXPANDED_SIZE=""
 RESTORE_MAX_EXPANDED_BYTES=""
+RESTORE_EXTERNAL_STEAM_ROOT=""
+RESTORE_EXTERNAL_STEAM_ROOT_REAL=""
+RESTORE_EXTERNAL_STEAM_ROOT_USED=false
+RESTORE_STEAM_USER_IDS=()
+RESTORE_STEAM_TARGETS=()
 RESTORE_RESERVE_BYTES=$((512 * 1024 * 1024))
 RESTORE_ABSOLUTE_MAX_BYTES=$((8 * 1024 * 1024 * 1024))
 worms_reject_control_chars "$BACKUP_DIR" "BACKUP_DIR"
+worms_reject_control_chars "$HOME" "HOME"
 
 macos_product_version() {
     sw_vers -productVersion 2>/dev/null || echo "unknown"
@@ -86,6 +108,8 @@ OPTIONS:
     --yes               Confirm a restore non-interactively
     --max-expanded-size SIZE
                         Bound restore expansion with a K, M, or G suffix
+    --allow-external-steam-root PATH
+                        Trust one exact canonical external 327030 destination
     --list, -l          List available backups
     --location          Show save game locations
     --help, -h          Show this help
@@ -105,6 +129,10 @@ EXAMPLES:
 
     # Explicitly allow up to 2 GiB after safety and free-space checks
     ./backup_saves.sh --restore --yes --max-expanded-size 2G
+
+    # Restore one deliberately relocated Steam save root
+    ./backup_saves.sh --restore --yes \
+        --allow-external-steam-root "$EXACT_EXTERNAL_327030_PATH"
 
 SAVE LOCATIONS:
     Steam Cloud saves: ~/Library/Application Support/Steam/userdata/*/327030/
@@ -147,6 +175,270 @@ filesystem_available_bytes() {
         return 1
     fi
     printf '%s\n' "$((available_kib * 1024))"
+}
+
+steam_process_state_with() {
+    local pgrep_bin="$1"
+    local status=0
+
+    [[ -x "$pgrep_bin" ]] || { printf '%s\n' unknown; return 0; }
+    "$pgrep_bin" -x steam_osx >/dev/null 2>&1 || status=$?
+    if [[ "$status" -eq 0 ]]; then
+        printf '%s\n' running
+        return 0
+    fi
+    [[ "$status" -eq 1 ]] || { printf '%s\n' unknown; return 0; }
+
+    status=0
+    "$pgrep_bin" -x Steam >/dev/null 2>&1 || status=$?
+    case "$status" in
+        0) printf '%s\n' running ;;
+        1) printf '%s\n' stopped ;;
+        *)
+        printf '%s\n' unknown
+            ;;
+    esac
+}
+
+steam_process_state() {
+    steam_process_state_with /usr/bin/pgrep
+}
+
+wait_for_steam_close() {
+    read -r -p "Press Return after Steam is closed, or Ctrl-C to cancel: " \
+        < /dev/tty
+}
+
+ensure_steam_stopped() {
+    local state
+
+    state=$(steam_process_state)
+    case "$state" in
+        stopped)
+            return 0
+            ;;
+        unknown)
+            echo -e "${YELLOW}WARNING:${NC} Unable to determine whether Steam is running."
+            return 0
+            ;;
+        running)
+            if restore_assume_yes; then
+                echo -e "${RED}ERROR:${NC} Steam is running; unattended restore is refused."
+                return 1
+            fi
+            echo -e "${YELLOW}Steam is running. Close Steam before restoring saves.${NC}"
+            wait_for_steam_close || return 1
+            state=$(steam_process_state)
+            case "$state" in
+                stopped)
+                    return 0
+                    ;;
+                unknown)
+                    echo -e "${YELLOW}WARNING:${NC} Unable to recheck Steam; continuing interactively."
+                    return 0
+                    ;;
+                *)
+                    echo -e "${RED}ERROR:${NC} Steam is still running; restore cancelled."
+                    return 1
+                    ;;
+            esac
+            ;;
+        *)
+            echo -e "${YELLOW}WARNING:${NC} Unexpected Steam process state; continuing cautiously."
+            return 0
+            ;;
+    esac
+}
+
+canonical_external_steam_root() {
+    local input="$RESTORE_EXTERNAL_STEAM_ROOT"
+    local input_trimmed real
+
+    [[ -n "$input" ]] || return 1
+    input_trimmed="${input%/}"
+    [[ -n "$input_trimmed" ]] || input_trimmed="/"
+    if [[ -L "$input_trimmed" ]] || [[ ! -d "$input_trimmed" ]]; then
+        echo -e "${RED}ERROR:${NC} External Steam root must be an existing non-symlink directory: $input" >&2
+        return 1
+    fi
+    real=$(worms_real_dir "$input_trimmed") || return 1
+    if [[ "$input_trimmed" != "$real" ]]; then
+        echo -e "${RED}ERROR:${NC} External Steam root must be its exact canonical path: $real" >&2
+        return 1
+    fi
+    printf '%s\n' "$real"
+}
+
+queue_save_transaction() {
+    local source_dir="$1"
+    local target_dir="$2"
+    local allowed_root="$3"
+    local index
+
+    worms_reject_control_chars "$source_dir" "save restore source" || return 1
+    worms_reject_control_chars "$target_dir" "save restore target" || return 1
+    worms_reject_control_chars "$allowed_root" "save restore allowed root" || return 1
+    for ((index = 0; index < RESTORE_TRANSACTION_COUNT; index++)); do
+        if [[ "${RESTORE_TARGET_DIRS[$index]}" == "$target_dir" ]]; then
+            echo -e "${RED}ERROR:${NC} Multiple save roots resolve to the same target: $target_dir"
+            return 1
+        fi
+    done
+
+    index=$RESTORE_TRANSACTION_COUNT
+    RESTORE_SOURCE_DIRS[index]="$source_dir"
+    RESTORE_TARGET_DIRS[index]="$target_dir"
+    RESTORE_ALLOWED_ROOTS[index]="$allowed_root"
+    RESTORE_STAGE_DIRS[index]=""
+    RESTORE_RETAINED_DIRS[index]=""
+    RESTORE_HAD_OLD[index]=0
+    RESTORE_APPLIED[index]=0
+    RESTORE_TRANSACTION_COUNT=$((RESTORE_TRANSACTION_COUNT + 1))
+}
+
+remember_steam_target() {
+    local user_id="$1"
+    local target_dir="$2"
+    local index=${#RESTORE_STEAM_USER_IDS[@]}
+
+    RESTORE_STEAM_USER_IDS[index]="$user_id"
+    RESTORE_STEAM_TARGETS[index]="$target_dir"
+}
+
+restore_steam_target_for_user() {
+    local user_id="$1"
+    local index
+
+    for ((index = 0; index < ${#RESTORE_STEAM_USER_IDS[@]}; index++)); do
+        if [[ "${RESTORE_STEAM_USER_IDS[$index]}" == "$user_id" ]]; then
+            printf '%s\n' "${RESTORE_STEAM_TARGETS[$index]}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+resolve_steam_restore_target() {
+    local user_id="$1"
+    local steam_root_real="$2"
+    local user_path="$STEAM_SAVES/$user_id"
+    local user_real target_path target_real allowed_root
+
+    if [[ ! "$user_id" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}ERROR:${NC} Steam save user ID must be numeric: $user_id"
+        return 1
+    fi
+    if [[ -L "$user_path" ]]; then
+        echo -e "${RED}ERROR:${NC} Refusing intermediate Steam-user symlink: $user_path"
+        return 1
+    fi
+    if [[ -e "$user_path" ]]; then
+        [[ -d "$user_path" ]] || {
+            echo -e "${RED}ERROR:${NC} Steam user path is not a directory: $user_path"
+            return 1
+        }
+        user_real=$(worms_real_dir "$user_path") || return 1
+        worms_path_inside_root "$steam_root_real" "$user_real" || {
+            echo -e "${RED}ERROR:${NC} Steam user path escapes userdata: $user_path"
+            return 1
+        }
+    else
+        user_real="$steam_root_real/$user_id"
+        worms_path_creatable_inside_root "$steam_root_real" "$user_real" || return 1
+    fi
+
+    target_path="$user_path/327030"
+    if [[ -L "$target_path" ]]; then
+        target_real=$(realpath "$target_path" 2>/dev/null || true)
+        if [[ -z "$target_real" ]] || [[ ! -d "$target_real" ]] || [[ -L "$target_real" ]]; then
+            echo -e "${RED}ERROR:${NC} Steam 327030 link target is unavailable: $target_path"
+            return 1
+        fi
+    elif [[ -e "$target_path" ]]; then
+        [[ -d "$target_path" ]] || {
+            echo -e "${RED}ERROR:${NC} Steam 327030 target is not a directory: $target_path"
+            return 1
+        }
+        target_real=$(worms_real_dir "$target_path") || return 1
+    else
+        target_real="$user_real/327030"
+    fi
+
+    if worms_path_inside_root "$steam_root_real" "$target_real" \
+        || worms_path_creatable_inside_root "$steam_root_real" "$target_real"; then
+        allowed_root="$steam_root_real"
+    else
+        [[ -n "$RESTORE_EXTERNAL_STEAM_ROOT_REAL" ]] || {
+            echo -e "${RED}ERROR:${NC} Steam 327030 target escapes userdata: $target_real"
+            return 1
+        }
+        if [[ "$target_real" != "$RESTORE_EXTERNAL_STEAM_ROOT_REAL" ]]; then
+            echo -e "${RED}ERROR:${NC} External Steam root does not match this exact 327030 destination: $target_real"
+            return 1
+        fi
+        allowed_root=$(dirname "$target_real")
+        RESTORE_EXTERNAL_STEAM_ROOT_USED=true
+        echo "External Steam restore target: $target_real"
+    fi
+
+    remember_steam_target "$user_id" "$target_real"
+    queue_save_transaction "$TEMP_DIR/Steam/$user_id" "$target_real" "$allowed_root"
+}
+
+prepare_restore_targets() {
+    local home_real steam_root_real entry user_id team17_real
+
+    home_real=$(worms_real_dir "$HOME") || return 1
+    if [[ -n "$RESTORE_EXTERNAL_STEAM_ROOT" ]]; then
+        RESTORE_EXTERNAL_STEAM_ROOT_REAL=$(canonical_external_steam_root) || return 1
+    fi
+
+    if [[ -e "$TEMP_DIR/Team17" ]]; then
+        [[ -d "$TEMP_DIR/Team17" ]] && [[ ! -L "$TEMP_DIR/Team17" ]] || return 1
+        if [[ -L "$TEAM17_SAVES" ]]; then
+            echo -e "${RED}ERROR:${NC} Refusing linked Team17 save destination: $TEAM17_SAVES"
+            return 1
+        elif [[ -e "$TEAM17_SAVES" ]]; then
+            [[ -d "$TEAM17_SAVES" ]] || return 1
+            team17_real=$(worms_real_dir "$TEAM17_SAVES") || return 1
+            worms_path_inside_root "$home_real" "$team17_real" || return 1
+        else
+            team17_real="$TEAM17_SAVES"
+            worms_path_creatable_inside_root "$home_real" "$team17_real" || return 1
+        fi
+        queue_save_transaction "$TEMP_DIR/Team17" "$team17_real" "$home_real"
+    fi
+
+    if [[ -e "$TEMP_DIR/Steam" ]]; then
+        [[ -d "$TEMP_DIR/Steam" ]] && [[ ! -L "$TEMP_DIR/Steam" ]] || return 1
+        if [[ -L "$STEAM_SAVES" ]]; then
+            steam_root_real=$(worms_real_dir "$STEAM_SAVES") || return 1
+        elif [[ -e "$STEAM_SAVES" ]]; then
+            [[ -d "$STEAM_SAVES" ]] || return 1
+            steam_root_real=$(worms_real_dir "$STEAM_SAVES") || return 1
+        else
+            echo -e "${RED}ERROR:${NC} Steam userdata is missing; launch Steam once before restoring Steam saves."
+            return 1
+        fi
+
+        while IFS= read -r -d '' entry; do
+            [[ -d "$entry" ]] && [[ ! -L "$entry" ]] || {
+                echo -e "${RED}ERROR:${NC} Invalid Steam user entry in backup: $(basename "$entry")"
+                return 1
+            }
+            user_id=$(basename "$entry")
+            resolve_steam_restore_target "$user_id" "$steam_root_real" || return 1
+        done < <(find "$TEMP_DIR/Steam" -mindepth 1 -maxdepth 1 -print0)
+    fi
+
+    if [[ -n "$RESTORE_EXTERNAL_STEAM_ROOT" ]] && ! $RESTORE_EXTERNAL_STEAM_ROOT_USED; then
+        echo -e "${RED}ERROR:${NC} External Steam root was not required by this backup."
+        return 1
+    fi
+    (( RESTORE_TRANSACTION_COUNT > 0 )) || {
+        echo -e "${RED}ERROR:${NC} Backup contains no restorable save roots."
+        return 1
+    }
 }
 
 # Find Worms W.M.D Steam user data directories
@@ -197,7 +489,7 @@ validate_backup_archive_layout() {
 
 restore_target_for_manifest_path() {
     local rel_path="$1"
-    local steam_rel user_id save_rel
+    local steam_rel user_id save_rel steam_target
 
     case "$rel_path" in
         Team17/*)
@@ -208,7 +500,8 @@ restore_target_for_manifest_path() {
             user_id="${steam_rel%%/*}"
             save_rel="${steam_rel#*/}"
             [[ -n "$user_id" ]] && [[ -n "$save_rel" ]] || return 1
-            echo "$STEAM_SAVES/$user_id/327030/$save_rel"
+            steam_target=$(restore_steam_target_for_user "$user_id") || return 1
+            echo "$steam_target/$save_rel"
             ;;
         BACKUP_INFO.txt|"$SAVE_MANIFEST_NAME")
             return 1
@@ -263,7 +556,8 @@ verify_restored_saves() {
         for user_dir in "$TEMP_DIR/Steam"/*; do
             [[ -d "$user_dir" ]] || continue
             user_id=$(basename "$user_dir")
-            target_dir="$STEAM_SAVES/$user_id/327030"
+            target_dir=$(restore_steam_target_for_user "$user_id" || true)
+            [[ -n "$target_dir" ]] || { status=1; continue; }
             [[ -d "$target_dir" ]] || continue
             (
                 cd "$target_dir" || exit 1
@@ -285,22 +579,227 @@ verify_restored_saves() {
     return "$status"
 }
 
-replace_save_tree() {
+verify_save_tree_copy() {
     local source_dir="$1"
     local target_dir="$2"
-    local target_parent target_base temp_target
+    local manifest child status=0
+    local inputs=()
+
+    manifest=$(mktemp "${TMPDIR:-/tmp}/wormswmd-save-tree-manifest.XXXXXX")
+    while IFS= read -r -d '' child; do
+        inputs+=("$(basename "$child")")
+    done < <(find "$source_dir" -mindepth 1 -maxdepth 1 -print0)
+
+    worms_write_manifest "$source_dir" "$manifest" "${inputs[@]}" \
+        && worms_verify_manifest "$target_dir" "$manifest" \
+        || status=1
+    rm -f "$manifest"
+    return "$status"
+}
+
+cleanup_save_transaction_stages() {
+    local index stage
+
+    for ((index = 0; index < RESTORE_TRANSACTION_COUNT; index++)); do
+        stage="${RESTORE_STAGE_DIRS[$index]:-}"
+        if [[ -n "$stage" ]] && [[ -d "$stage" ]] && [[ ! -L "$stage" ]]; then
+            rm -rf "$stage"
+            RESTORE_STAGE_DIRS[index]=""
+        fi
+    done
+}
+
+ensure_save_target_parent() {
+    local target_dir="$1"
+    local allowed_root="$2"
+    local target_parent
+
+    target_parent=$(dirname "$target_dir")
+    if [[ -L "$target_parent" ]]; then
+        echo -e "${RED}ERROR:${NC} Save target parent may not be a symlink: $target_parent"
+        return 1
+    fi
+    if [[ ! -e "$target_parent" ]]; then
+        worms_path_creatable_inside_root "$allowed_root" "$target_parent" || {
+            echo -e "${RED}ERROR:${NC} Save target parent escapes its allowed root: $target_parent"
+            return 1
+        }
+        mkdir -p "$target_parent"
+        chmod 0700 "$target_parent"
+    fi
+    [[ -d "$target_parent" ]] && [[ ! -L "$target_parent" ]] || return 1
+    worms_path_inside_root "$allowed_root" "$target_parent" || {
+        echo -e "${RED}ERROR:${NC} Save target parent resolves outside its allowed root: $target_parent"
+        return 1
+    }
+}
+
+prepare_save_tree_stage() {
+    local index="$1"
+    local source_dir="${RESTORE_SOURCE_DIRS[$index]}"
+    local target_dir="${RESTORE_TARGET_DIRS[$index]}"
+    local allowed_root="${RESTORE_ALLOWED_ROOTS[$index]}"
+    local target_parent target_base stage
+
+    ensure_save_target_parent "$target_dir" "$allowed_root" || return 1
+    if [[ -L "$target_dir" ]] || { [[ -e "$target_dir" ]] && [[ ! -d "$target_dir" ]]; }; then
+        echo -e "${RED}ERROR:${NC} Save restore target is not a real directory: $target_dir"
+        return 1
+    fi
 
     target_parent=$(dirname "$target_dir")
     target_base=$(basename "$target_dir")
-
-    mkdir -p "$target_parent"
-    temp_target=$(mktemp -d "$target_parent/.${target_base}.restore.XXXXXX")
-    if ! cp -R "$source_dir/." "$temp_target/"; then
-        rm -rf "$temp_target"
+    stage=$(mktemp -d "$target_parent/.${target_base}.restore-stage.XXXXXX")
+    chmod 0700 "$stage"
+    RESTORE_STAGE_DIRS[index]="$stage"
+    if ! cp -R "$source_dir/." "$stage/"; then
+        echo -e "${RED}ERROR:${NC} Unable to stage save restore for: $target_dir"
         return 1
     fi
-    rm -rf "$target_dir"
-    mv "$temp_target" "$target_dir"
+    worms_validate_no_special_entries "$stage" || return 1
+    if ! verify_save_tree_copy "$source_dir" "$stage"; then
+        echo -e "${RED}ERROR:${NC} Staged save tree verification failed: $target_dir"
+        return 1
+    fi
+}
+
+rollback_save_transactions() {
+    local reason="${1:-restore failure}"
+    local index target retained failed stage status=0
+
+    echo -e "${YELLOW}Rolling back save restore after ${reason}...${NC}" >&2
+    for ((index = RESTORE_TRANSACTION_COUNT - 1; index >= 0; index--)); do
+        [[ "${RESTORE_APPLIED[$index]:-0}" == "1" ]] || continue
+        target="${RESTORE_TARGET_DIRS[$index]}"
+        retained="${RESTORE_RETAINED_DIRS[$index]}"
+        stage="${RESTORE_STAGE_DIRS[$index]:-}"
+        failed="$retained/failed-replacement"
+
+        if [[ "${RESTORE_HAD_OLD[$index]:-0}" == "1" ]] \
+            && [[ ! -d "$retained/original" ]]; then
+            RESTORE_APPLIED[index]=0
+            if rmdir "$retained" 2>/dev/null; then
+                RESTORE_RETAINED_DIRS[index]=""
+            else
+                echo -e "${YELLOW}WARNING:${NC} Unused retention directory remains at: $retained" >&2
+            fi
+            continue
+        fi
+        if [[ "${RESTORE_HAD_OLD[$index]:-0}" == "0" ]] \
+            && [[ -n "$stage" ]] && [[ -d "$stage" ]]; then
+            RESTORE_APPLIED[index]=0
+            if rmdir "$retained" 2>/dev/null; then
+                RESTORE_RETAINED_DIRS[index]=""
+            else
+                echo -e "${YELLOW}WARNING:${NC} Unused retention directory remains at: $retained" >&2
+            fi
+            continue
+        fi
+
+        if [[ -e "$target" ]] || [[ -L "$target" ]]; then
+            if ! mv "$target" "$failed"; then
+                echo -e "${RED}ERROR:${NC} Could not retain failed replacement: $target" >&2
+                status=1
+                continue
+            fi
+        fi
+        if [[ "${RESTORE_HAD_OLD[$index]:-0}" == "1" ]]; then
+            if ! mv "$retained/original" "$target"; then
+                echo -e "${RED}ERROR:${NC} Could not restore original save tree; retained at: $retained/original" >&2
+                status=1
+                continue
+            fi
+        fi
+        RESTORE_APPLIED[index]=0
+        rm -rf "$retained"
+        RESTORE_RETAINED_DIRS[index]=""
+    done
+    RESTORE_TRANSACTION_ACTIVE=false
+
+    if [[ "$status" -eq 0 ]]; then
+        echo -e "${YELLOW}Save restore rollback completed.${NC}" >&2
+    else
+        echo -e "${RED}ERROR:${NC} Save restore rollback failed; retained originals require manual recovery." >&2
+    fi
+    return "$status"
+}
+
+finalize_save_transactions() {
+    local index retained
+
+    for ((index = 0; index < RESTORE_TRANSACTION_COUNT; index++)); do
+        retained="${RESTORE_RETAINED_DIRS[$index]:-}"
+        if [[ -n "$retained" ]] && [[ -d "$retained" ]] && [[ ! -L "$retained" ]]; then
+            rm -rf "$retained"
+            RESTORE_RETAINED_DIRS[index]=""
+        fi
+        RESTORE_APPLIED[index]=0
+    done
+    RESTORE_TRANSACTION_ACTIVE=false
+}
+
+prepare_save_transactions() {
+    local index
+
+    for ((index = 0; index < RESTORE_TRANSACTION_COUNT; index++)); do
+        prepare_save_tree_stage "$index" || {
+            cleanup_save_transaction_stages
+            return 1
+        }
+    done
+}
+
+apply_save_transactions() {
+    local index source target target_parent target_base stage retained
+
+    RESTORE_TRANSACTION_ACTIVE=true
+    for ((index = 0; index < RESTORE_TRANSACTION_COUNT; index++)); do
+        source="${RESTORE_SOURCE_DIRS[$index]}"
+        target="${RESTORE_TARGET_DIRS[$index]}"
+        stage="${RESTORE_STAGE_DIRS[$index]}"
+        if [[ -z "$stage" ]] || [[ ! -d "$stage" ]] || [[ -L "$stage" ]]; then
+            rollback_save_transactions "missing staged replacement" || true
+            return 1
+        fi
+        target_parent=$(dirname "$target")
+        target_base=$(basename "$target")
+        if [[ -L "$target" ]] \
+            || { [[ -e "$target" ]] && [[ ! -d "$target" ]]; } \
+            || ! worms_path_inside_root "${RESTORE_ALLOWED_ROOTS[$index]}" "$target"; then
+            rollback_save_transactions "target changed during staging" || true
+            return 1
+        fi
+        retained=$(mktemp -d "$target_parent/.${target_base}.restore-retained.XXXXXX") || {
+            rollback_save_transactions "retained-tree reservation failure" || true
+            return 1
+        }
+        chmod 0700 "$retained"
+        RESTORE_RETAINED_DIRS[index]="$retained"
+        RESTORE_APPLIED[index]=1
+
+        if [[ -d "$target" ]]; then
+            RESTORE_HAD_OLD[index]=1
+            if ! mv "$target" "$retained/original"; then
+                rollback_save_transactions "old-tree retention failure" || true
+                return 1
+            fi
+        fi
+        if ! mv "$stage" "$target"; then
+            rollback_save_transactions "replacement publish failure" || true
+            return 1
+        fi
+        RESTORE_STAGE_DIRS[index]=""
+        if ! verify_save_tree_copy "$source" "$target"; then
+            rollback_save_transactions "post-publish verification failure" || true
+            return 1
+        fi
+    done
+
+    if ! verify_restored_saves; then
+        rollback_save_transactions "manifest verification failure" || true
+        return 1
+    fi
+    finalize_save_transactions
 }
 
 # Create backup
@@ -381,7 +880,7 @@ EOF
 do_restore() {
     local backup_file="$1"
     local archive_copy compressed_bytes free_bytes usable_bytes default_expanded_bytes
-    local max_expanded_bytes required_bytes
+    local max_expanded_bytes required_bytes target_index
 
     # If no file specified, use latest
     if [[ -z "$backup_file" ]]; then
@@ -459,23 +958,6 @@ do_restore() {
         "$compressed_bytes" "$max_expanded_bytes" "$free_bytes" "$RESTORE_RESERVE_BYTES"
     validate_backup_archive_layout "$archive_copy"
 
-    echo -e "${YELLOW}WARNING: This will overwrite your current save games!${NC}"
-    echo ""
-    if restore_assume_yes; then
-        echo "Continuing because WORMSWMD_RESTORE_ASSUME_YES is set."
-    else
-        read -p "Continue? [y/N] " -n 1 -r < /dev/tty
-        echo ""
-
-        if [[ ! "${REPLY:-}" =~ ^[Yy]$ ]]; then
-            echo "Restore cancelled."
-            exit 0
-        fi
-    fi
-
-    echo ""
-    echo -e "${BLUE}Restoring from: $(basename "$backup_file")${NC}"
-
     # Extract backup
     tar -xzf "$archive_copy" -C "$TEMP_DIR"
     worms_validate_tree_paths "$TEMP_DIR"
@@ -492,29 +974,39 @@ do_restore() {
         echo -e "${YELLOW}WARNING:${NC} Backup has no manifest; restoring as a legacy archive."
     fi
 
-    # Restore Team17 saves
-    if [[ -d "$TEMP_DIR/Team17" ]]; then
-        echo "Restoring Team17 saves..."
-        replace_save_tree "$TEMP_DIR/Team17" "$TEAM17_SAVES"
+    prepare_restore_targets || {
+        echo -e "${RED}ERROR:${NC} Save restore target validation failed."
+        exit 1
+    }
+
+    echo -e "${YELLOW}WARNING: This will replace the following save roots:${NC}"
+    for ((target_index = 0; target_index < RESTORE_TRANSACTION_COUNT; target_index++)); do
+        printf '  %s\n' "${RESTORE_TARGET_DIRS[$target_index]}"
+    done
+    echo ""
+    if restore_assume_yes; then
+        echo "Continuing with non-interactive confirmation."
+    else
+        read -p "Continue? [y/N] " -n 1 -r < /dev/tty
+        echo ""
+        if [[ ! "${REPLY:-}" =~ ^[Yy]$ ]]; then
+            echo "Restore cancelled."
+            exit 0
+        fi
     fi
 
-    # Restore Steam saves
+    if ! prepare_save_transactions; then
+        echo -e "${RED}ERROR:${NC} Save restore staging failed; existing saves were not changed."
+        exit 1
+    fi
     if [[ -d "$TEMP_DIR/Steam" ]]; then
-        for user_dir in "$TEMP_DIR/Steam"/*; do
-            if [[ -d "$user_dir" ]]; then
-                local user_id
-                user_id=$(basename "$user_dir")
-                local target_dir="$STEAM_SAVES/$user_id/327030"
-
-                echo "Restoring Steam saves for user $user_id..."
-                replace_save_tree "$user_dir" "$target_dir"
-            fi
-        done
+        ensure_steam_stopped || exit 1
     fi
 
-    if ! verify_restored_saves; then
-        echo -e "${RED}ERROR:${NC} Restore verification failed after copying saves."
-        echo "At least one restored file did not match the backup manifest."
+    echo ""
+    echo -e "${BLUE}Restoring from: $(basename "$backup_file")${NC}"
+    if ! apply_save_transactions; then
+        echo -e "${RED}ERROR:${NC} Save restore failed. Review rollback messages above."
         exit 1
     fi
 
@@ -602,6 +1094,11 @@ while [[ $# -gt 0 ]]; do
             RESTORE_MAX_EXPANDED_SIZE="$2"
             shift 2
             ;;
+        --allow-external-steam-root)
+            [[ $# -ge 2 ]] || { echo -e "${RED}--allow-external-steam-root requires a path.${NC}"; exit 1; }
+            RESTORE_EXTERNAL_STEAM_ROOT="$2"
+            shift 2
+            ;;
         --list|-l)
             [[ -z "$action" ]] || { echo -e "${RED}Choose only one action.${NC}"; exit 1; }
             action="list"
@@ -635,6 +1132,22 @@ if [[ -n "$RESTORE_MAX_EXPANDED_SIZE" ]]; then
         exit 1
     }
     RESTORE_MAX_EXPANDED_BYTES=$(parse_bounded_restore_size "$RESTORE_MAX_EXPANDED_SIZE") || exit 1
+fi
+if [[ -n "$RESTORE_EXTERNAL_STEAM_ROOT" ]]; then
+    [[ "$action" == "restore" ]] || {
+        echo -e "${RED}--allow-external-steam-root is valid only with --restore.${NC}"
+        exit 1
+    }
+    $RESTORE_ASSUME_YES || {
+        echo -e "${RED}--allow-external-steam-root requires explicit --yes.${NC}"
+        exit 1
+    }
+    worms_reject_control_chars "$RESTORE_EXTERNAL_STEAM_ROOT" \
+        "--allow-external-steam-root"
+    [[ "$RESTORE_EXTERNAL_STEAM_ROOT" == /* ]] || {
+        echo -e "${RED}--allow-external-steam-root requires an absolute path.${NC}"
+        exit 1
+    }
 fi
 if $RESTORE_ASSUME_YES && [[ "$action" != "restore" ]]; then
     echo -e "${RED}--yes is valid only with --restore.${NC}"

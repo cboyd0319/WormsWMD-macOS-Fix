@@ -330,15 +330,26 @@ else
     check_fail "Qt SVG image plugin not found"
 fi
 
-# Check code signing
-sign_status=$(codesign -dv "$GAME_APP" 2>&1 || true)
-if echo "$sign_status" | grep -q "not signed"; then
-    check_warn "App is not signed (may trigger Gatekeeper warnings)"
-elif echo "$sign_status" | grep -q "adhoc"; then
-    check_pass "App has ad-hoc signature"
-else
-    check_pass "App is signed"
-fi
+signature_classification=$(worms_classify_bundle_signature "$GAME_APP")
+case "$signature_classification" in
+    fixed-valid-adhoc) check_pass "Strict ad-hoc signature verified" ;;
+    fixed-valid) check_pass "Strict code signature verified" ;;
+    fixed-unsigned|fixed-invalid|fixed-unavailable)
+        check_fail "Complete fixed app failed strict signature verification (${signature_classification#fixed-})"
+        ;;
+    original-unsigned|original-invalid|original-unavailable)
+        check_warn "Original/unfixed app signature is ${signature_classification#original-}; apply the fix to repair it"
+        ;;
+    *) check_pass "Existing signature verifies; runtime fix is incomplete" ;;
+esac
+
+quarantine_state=$(worms_quarantine_state "$GAME_APP" 20)
+case "$quarantine_state" in
+    none) check_pass "No recursive quarantine flags" ;;
+    present:*) check_warn "Recursive quarantine flags present (${quarantine_state#present:} entries, names omitted)" ;;
+    unavailable) check_warn "Quarantine inspection unavailable" ;;
+    *) check_warn "Recursive quarantine inspection failed" ;;
+esac
 
 # ============================================================================
 # Runtime Dependencies

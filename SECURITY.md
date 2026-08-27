@@ -35,6 +35,7 @@ Last reviewed: 2026-08-27.
 | CI workflow compromise | Full-SHA Action policy, selected-action allowlist, job-scoped tokens, CODEOWNERS |
 | New committed secrets | Local staged scan, required current-tree scan, secret scanning, push protection |
 | Diagnostic data exposure | Support bundles sanitize text and omit raw/private/game/save content |
+| Local output redirection | New traces, diagnostics, crashes, and watcher plists use validated paths, private modes, atomic publish, and rollback |
 
 ### Assumptions and exclusions
 
@@ -58,13 +59,21 @@ files. It may create these user-owned paths outside the bundle:
 | `~/Documents/WormsWMD-SaveBackups/` | Optional save backups | Manual |
 | `~/Library/Logs/WormsWMD-Fix/` | Installer logs | Manual |
 | `~/Library/Logs/WormsWMD/` | Launcher/crash logs | Manual |
-| `~/.cache/wormswmd-fix/` | Verified Qt cache | Manual or `--force` |
+| `~/.cache/wormswmd-fix/` | Archive-digest-bound Qt cache | `--prune-cache` for marked legacy caches |
 | `~/Library/LaunchAgents/com.wormswmd.fix.watcher.plist` | Optional watcher | `--uninstall` |
 | `${TMPDIR:-/tmp}/agl_stub_build.*/` | AGL build workspace | Automatic |
 | Same-parent `.stage-*` bottle prefix | Maintainer-only Qt rebuild staging | Automatic |
 
 The fix does not modify system directories, collect telemetry, alter `PATH` or
 `DYLD_LIBRARY_PATH`, or install privileged persistence.
+
+Debug traces are new-file-only. Environment-selected traces stay under
+`~/Library/Logs`; an explicit `--trace-file` may select another existing safe
+directory. Diagnostics and crash reports stage mode-`0600` output beside the
+destination before rename. The optional watcher replaces or removes only its
+exact regular, singly linked, user-owned plist with the expected label and
+program, validates it with `plutil`, and restores/reactivates the prior agent if
+bootstrap fails.
 
 ### Untrusted inputs
 
@@ -74,8 +83,9 @@ The fix does not modify system directories, collect telemetry, alter `PATH` or
 | `INSTALL_DIR` | User project path; not home/system/non-empty foreign repository |
 | `INSTALL_REF` | Defaults to v1.7.6; other refs require explicit developer opt-in |
 | `LOG_FILE` | Regular `.log` beneath `~/Library/Logs` |
-| `QT_PREFIX` | Required Qt 5.15.x layout and explicit custom-prefix opt-in |
+| `QT_PREFIX`/`QT_DEP_PREFIX` | Explicit roots; canonical regular x86_64 dependencies only |
 | Archive files | Bounded owner-only copy, external digest where available, shared profile, same-copy extraction |
+| External Steam save root | Exact canonical `327030` destination, explicit `--yes`, per invocation only |
 
 The complete backup, restore, archive, Mach-O, signing, and diagnostics
 contracts are maintained in
@@ -96,6 +106,12 @@ contracts are maintained in
 Project-owned `curl` downloads enforce HTTPS, TLS 1.2+, certificate checks,
 timeouts, and bounded retries. Git, `gh`, and Apple system services own their
 TLS settings; project scripts do not weaken them.
+
+Update downloads are staged with owner-only permissions. Verification accepts
+one bounded SHA-256 record only when it names the exact release zip, hashes the
+regular nonlinked payload directly, and publishes only after success. Existing
+links, hardlinks, and special-file destinations are rejected; safe prior files
+survive download or verification failure.
 
 ### Qt package verification
 
@@ -247,8 +263,8 @@ Runtime verification remains:
 | --- | --- |
 | Qt package is not independently signed | Locked inputs, checksums, manifests, Mach-O closure, release attestation |
 | Archive inspection needs Python 3.9+ | macOS 26 Apple Command Line Tools provide it; mutating archive operations fail with install/update guidance |
-| Update downloader verifies checksum but not attestation | Users can run `gh attestation verify` on the downloaded zip |
-| Modified game uses ad-hoc signing | Strict signature verification occurs inside rollback boundary |
+| Update downloader verifies an exact checksum but not attestation | Users can run `gh attestation verify` on the downloaded zip |
+| Modified game uses ad-hoc signing | Strict deep verification in rollback and classified standalone checks |
 | Legacy backups lack complete identity/integrity | Explicit warning; ambiguous multi-install restore refused |
 | Team17-controlled credentials exist in the game/old report history | Current repo is redacted; project does not validate, rotate, or gate on vendor values |
 | Local hooks can be absent or bypassed | Required current-tree Kingfisher plus GitHub push protection |

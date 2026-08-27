@@ -26,6 +26,8 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 LOGGING_PRESET="${WORMSWMD_LOGGING_INITIALIZED:-}"
 QT_SOURCE="${QT_SOURCE:-homebrew}"
+QT_PREFIX="${QT_PREFIX:-/usr/local/opt/qt@5}"
+QT_DEP_PREFIX="${QT_DEP_PREFIX:-}"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
@@ -147,8 +149,20 @@ fi
 copied=0
 missing=0
 
+declare -a dependency_roots=()
 declare -a scanned_bins=()
+declare -a installed_dependency_names=()
 declare -a queue=("${scan_bins[@]}")
+DEPENDENCY_SOURCE_RECORDS=$(mktemp "${TMPDIR:-/tmp}/wormswmd-dependency-sources.XXXXXX")
+DEPENDENCY_TEMP=""
+cleanup_dependency_copy() {
+    rm -f "$DEPENDENCY_SOURCE_RECORDS"
+    if [[ -n "$DEPENDENCY_TEMP" ]] && [[ -f "$DEPENDENCY_TEMP" ]] \
+        && [[ ! -L "$DEPENDENCY_TEMP" ]]; then
+        rm -f "$DEPENDENCY_TEMP"
+    fi
+}
+trap cleanup_dependency_copy EXIT
 
 bin_scanned() {
     local search="$1"
@@ -163,19 +177,97 @@ bin_scanned() {
     return 1
 }
 
-resolve_rpath_dep() {
-    local name="$1"
-    local candidate
+dependency_name_installed() {
+    local search="$1"
+    local item
 
-    for candidate in /usr/local/opt/*/lib/"$name" /usr/local/Cellar/*/*/lib/"$name" /usr/local/lib/"$name"; do
-        if [ -f "$candidate" ]; then
-            echo "$candidate"
-            return 0
-        fi
+    for item in "${installed_dependency_names[@]:-}"; do
+        [[ "$item" == "$search" ]] && return 0
     done
-
     return 1
 }
+
+install_dependency_source() {
+    local source="$1"
+    local target="$2"
+    local name="$3"
+
+    DEPENDENCY_TEMP=$(worms_same_directory_temp_file "$target") || return 1
+    if ! cp "$source" "$DEPENDENCY_TEMP" \
+        || ! chmod 755 "$DEPENDENCY_TEMP" \
+        || ! install_name_tool -id \
+            "@executable_path/../Frameworks/$name" "$DEPENDENCY_TEMP" \
+        || ! validate_bundled_dependency_target "$DEPENDENCY_TEMP"; then
+        rm -f "$DEPENDENCY_TEMP"
+        DEPENDENCY_TEMP=""
+        return 1
+    fi
+    if ! worms_validate_replaceable_regular_file "$target"; then
+        rm -f "$DEPENDENCY_TEMP"
+        DEPENDENCY_TEMP=""
+        return 1
+    fi
+    if ! mv -f -- "$DEPENDENCY_TEMP" "$target"; then
+        rm -f "$DEPENDENCY_TEMP"
+        DEPENDENCY_TEMP=""
+        return 1
+    fi
+    DEPENDENCY_TEMP=""
+}
+
+initialize_dependency_roots() {
+    local qt_prefix_real dependency_prefix_real cellar_real
+
+    worms_reject_control_chars "$QT_PREFIX" "QT_PREFIX"
+    worms_reject_control_chars "$QT_DEP_PREFIX" "QT_DEP_PREFIX"
+    [[ -d "$QT_PREFIX" ]] || {
+        echo "ERROR: Qt dependency source prefix not found: $QT_PREFIX"
+        return 1
+    }
+    qt_prefix_real=$(worms_real_dir "$QT_PREFIX") || return 1
+
+    if [[ "$QT_PREFIX" == "/usr/local/opt/qt@5" ]]; then
+        cellar_real=$(worms_real_dir /usr/local/Cellar) || {
+            echo "ERROR: Standard Intel Homebrew Cellar is unavailable."
+            return 1
+        }
+        worms_path_inside_root "$cellar_real" "$qt_prefix_real" || {
+            echo "ERROR: /usr/local/opt/qt@5 resolves outside /usr/local/Cellar."
+            return 1
+        }
+        dependency_roots+=("$cellar_real")
+    else
+        worms_bool_true "${WORMSWMD_ALLOW_CUSTOM_QT_PREFIX:-}" || {
+            echo "ERROR: Custom QT_PREFIX requires WORMSWMD_ALLOW_CUSTOM_QT_PREFIX=1"
+            return 1
+        }
+        dependency_roots+=("$qt_prefix_real")
+    fi
+
+    if [[ -n "$QT_DEP_PREFIX" ]]; then
+        [[ -d "$QT_DEP_PREFIX" ]] && [[ ! -L "$QT_DEP_PREFIX" ]] || {
+            echo "ERROR: QT_DEP_PREFIX must be a real directory: $QT_DEP_PREFIX"
+            return 1
+        }
+        dependency_prefix_real=$(worms_real_dir "$QT_DEP_PREFIX") || return 1
+        dependency_roots+=("$dependency_prefix_real")
+    fi
+}
+
+validate_bundled_dependency_target() {
+    local target="$1"
+    local target_real archs
+
+    [[ -f "$target" ]] && [[ ! -L "$target" ]] \
+        && [[ "$(worms_file_link_count "$target")" -eq 1 ]] || return 1
+    target_real=$(realpath "$target" 2>/dev/null || true)
+    [[ -n "$target_real" ]] \
+        && worms_path_inside_root "$GAME_FRAMEWORKS" "$target_real" || return 1
+    archs=$(lipo -archs "$target_real" 2>/dev/null || true)
+    printf '%s\n' "$archs" | tr ' ' '\n' | grep -qx x86_64
+}
+
+initialize_dependency_roots || exit 1
 
 while [ ${#queue[@]} -gt 0 ]; do
     bin="${queue[0]}"
@@ -190,56 +282,98 @@ while [ ${#queue[@]} -gt 0 ]; do
         continue
     fi
 
+    binary_id=$(worms_macho_install_id "$bin" || true)
     while IFS= read -r dep; do
-        local_path=""
-
-        if [[ "$dep" == /usr/local/* ]]; then
-            local_path="$dep"
-        elif [[ "$dep" == @rpath/* ]]; then
-            name="${dep#@rpath/}"
-            if [[ "$name" == *.dylib ]]; then
-                local_path=$(resolve_rpath_dep "$name" || true)
-            fi
-        fi
-
-        if [ -z "$local_path" ]; then
+        [[ -n "$dep" ]] || continue
+        [[ "$dep" == "$binary_id" ]] && continue
+        case "$dep" in
+            /usr/lib/*|/System/Library/*|*".framework/"*)
+                continue
+                ;;
+        esac
+        [[ "$dep" == *.dylib ]] || continue
+        if worms_has_control_chars "$dep" \
+            || worms_macho_path_has_parent_component "$dep"; then
+            echo "ERROR: Unsafe dependency path: $dep ($bin)"
+            ((++missing))
             continue
         fi
+        case "$dep" in
+            @rpath/*|@executable_path/*|@loader_path/*|/*)
+                ;;
+            *)
+                echo "ERROR: Unsupported relative dependency: $dep ($bin)"
+                ((++missing))
+                continue
+                ;;
+        esac
 
-        if [[ "$local_path" != *.dylib ]]; then
-            continue
-        fi
-
-        if [[ "$local_path" == *".framework/"* ]]; then
-            continue
-        fi
-
-        name=$(basename "$local_path")
+        name=$(basename "$dep")
         target="$GAME_FRAMEWORKS/$name"
+        local_path=""
+        resolve_status=0
+        if local_path=$(worms_resolve_macho_dependency_source \
+            "$bin" "$dep" "$GAME_EXEC" "${dependency_roots[@]}" 2>&1); then
+            resolve_status=0
+        else
+            resolve_status=$?
+            local_path=""
+        fi
 
-        if [ ! -f "$target" ]; then
-            if [ -f "$local_path" ]; then
-                echo "Copying $name..."
-                cp -L "$local_path" "$target"
-                chmod 755 "$target"
-                install_name_tool -id "@executable_path/../Frameworks/$name" "$target" 2>/dev/null || true
-                ((++copied))
-            else
-                echo "WARNING: $name not found at $local_path"
+        if [[ -n "$local_path" ]]; then
+            if ! worms_record_dependency_source \
+                "$DEPENDENCY_SOURCE_RECORDS" "$name" "$local_path"; then
                 ((++missing))
                 continue
             fi
         fi
 
-        queue+=("$target")
+        if [[ -e "$target" ]] || [[ -L "$target" ]]; then
+            if ! validate_bundled_dependency_target "$target"; then
+                echo "ERROR: Existing bundled dependency is unsafe: $target"
+                ((++missing))
+                continue
+            fi
+        fi
+
+        if [[ -n "$local_path" ]]; then
+            if ! dependency_name_installed "$name"; then
+                echo "Copying $name..."
+                if ! install_dependency_source "$local_path" "$target" "$name"; then
+                    echo "ERROR: Failed to publish copied dependency: $target"
+                    ((++missing))
+                    continue
+                fi
+                installed_dependency_names+=("$name")
+                ((++copied))
+            fi
+            queue+=("$target")
+            continue
+        fi
+
+        if [[ -f "$target" ]]; then
+            queue+=("$target")
+            continue
+        fi
+
+        if worms_macho_dependency_is_weak "$bin" "$dep"; then
+            echo "WARNING: Optional dependency unavailable: $dep"
+            continue
+        fi
+        if [[ "$resolve_status" -eq 2 ]]; then
+            echo "ERROR: Ambiguous dependency source: $dep ($bin)"
+        else
+            echo "ERROR: Could not resolve dependency source: $dep ($bin)"
+        fi
+        ((++missing))
     done < <(worms_otool_dependencies "$bin")
 done
 
 echo ""
 echo "Copied $copied libraries"
 if [ $missing -gt 0 ]; then
-    echo "WARNING: $missing libraries were not found"
-    echo "You may need to install additional Homebrew packages"
+    echo "ERROR: $missing required dependency source(s) failed validation"
 fi
 echo "COPIED_LIBS=$copied"
 echo "MISSING_LIBS=$missing"
+[[ "$missing" -eq 0 ]]
