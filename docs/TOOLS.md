@@ -159,7 +159,25 @@ or docs-topology changes:
 ./tools/test_preflight_regression.sh
 ./tools/test_manifest_regression.sh
 ./tools/test_qt_version_pinning.sh
+./tools/test_github_security.sh
+./tools/test_ci_changed_paths.sh
+./tools/test_ci_change_classification.sh
+python3 tools/test_generate_sbom.py
+./tools/test_git_hooks.sh
 ```
+
+Install the repository-local Kingfisher pre-commit hook once per clone:
+
+```bash
+./tools/install_git_hooks.sh
+./tools/install_git_hooks.sh --check
+```
+
+The hook uses a checksum-pinned Kingfisher 2.0.0 binary stored under the local
+Git directory and scans staged changes with redaction, no live provider
+validation, and no Git-history traversal. CI scans the current checkout with
+the same privacy boundaries. GitHub push protection and required CI remain the
+backstop for clones whose hooks were not installed or were bypassed.
 
 Check or refresh the pre-built Qt package used by the installer:
 
@@ -228,3 +246,10 @@ The release builder copies the friendly launcher, bootstrap installers, docs,
 assets, source, tools, scripts, and `dist/` package into
 `build/release/WormsWMD-macOS-Fix-VERSION/`. It writes `RELEASE_INFO.txt`,
 `RELEASE_MANIFEST.tsv`, an optional zip, and a `.sha256` file for the zip.
+
+For tagged releases, `tools/generate_sbom.py` verifies that the standalone Qt
+bottle provenance is byte-identical to `SOURCE_PROVENANCE.tsv` inside the
+checksummed Qt archive, then converts it into a deterministic CycloneDX 1.6
+JSON SBOM. The release workflow publishes that `.cdx.json` file and creates an
+SBOM attestation that binds it to the release zip. Generation also hashes the
+built zip and rejects a checksum mismatch before writing the SBOM.

@@ -53,8 +53,11 @@ it.
 - GitHub workflows use job-scoped permissions, bounded execution, disabled
   checkout credential persistence, immutable Action SHAs, and a seven-day
   update cooldown.
-- A path-scoped Zizmor job and the local GitHub policy regression validate
+- A required Zizmor job and the local GitHub policy regression validate
   workflow changes before they reach release automation.
+- A repository-local pre-commit hook runs checksum-pinned Kingfisher 2.0.0 on
+  staged changes. Required CI scans the current tree as a backstop; neither mode
+  traverses Git history or sends candidates to providers for live validation.
 - GitHub also enforces full-SHA Actions, an allowlist limited to GitHub-owned
   actions plus ShellCheck and Zizmor, approval for every external contributor,
   and CodeQL scanning for Actions, C/C++, and Ruby.
@@ -62,6 +65,9 @@ it.
   replace a published release, and publishes only after checksum assets and
   attestations exist. Repository-level immutability protects future published
   releases; v1.7.6 predates that GitHub setting.
+- Starting with the next tagged release after v1.7.6, releases publish a
+  deterministic CycloneDX SBOM for the complete checksum-locked Qt bottle
+  inventory. GitHub's SBOM attestation binds that inventory to the release zip.
 
 ## What it can still do
 

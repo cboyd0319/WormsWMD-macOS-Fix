@@ -4,6 +4,14 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
+### Changed
+
+- Reduced CI runner use by canceling stale runs, chaining cheap checks before
+  macOS, merging C compilation into the regression job, and skipping macOS for
+  allowlisted documentation/community-only changes.
+- Tagged releases now publish a deterministic CycloneDX SBOM for the locked Qt
+  bottle closure and bind it to the release zip with an SBOM attestation.
+
 ### Security
 
 - Updated the immutable `actions/checkout` pin to the verified v7.0.1 tag.
@@ -21,6 +29,9 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   Zizmor actions; required Zizmor alongside the existing `main` checks.
 - Required approval for all external contributors, enabled CodeQL default setup
   for Actions/C++/Ruby, and enabled immutable future GitHub releases.
+- Added checksum-pinned Kingfisher 2.0.0 scans for staged changes and the
+  current CI checkout, with redaction, no history traversal, and no live secret
+  validation.
 
 ## Mainline maintenance after 1.7.6 (2026-08-26)
 

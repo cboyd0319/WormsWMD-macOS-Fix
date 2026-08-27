@@ -16,6 +16,12 @@ Then check `docs/exec-plans/` for active work. If the change is multi-step,
 risky, or likely to outlive the current session, create or update a plan from
 `docs/exec-plans/TEMPLATE.md` before editing.
 
+Enable the enforced staged-secret check once per clone:
+
+```bash
+./tools/install_git_hooks.sh
+```
+
 ## Choose Validation
 
 Use the smallest command set that covers the change.
@@ -30,6 +36,10 @@ GitHub workflow or release automation:
 
 ```bash
 ./tools/test_github_security.sh
+./tools/test_ci_changed_paths.sh
+./tools/test_ci_change_classification.sh
+python3 tools/test_generate_sbom.py
+./tools/test_git_hooks.sh
 actionlint .github/workflows/*.yml
 zizmor --persona=pedantic --no-ignores --no-progress .github
 ```
@@ -60,6 +70,10 @@ Release publication:
 ```bash
 ./tools/validate_harness.sh
 ./tools/test_github_security.sh
+./tools/test_ci_changed_paths.sh
+./tools/test_ci_change_classification.sh
+python3 tools/test_generate_sbom.py
+./tools/test_git_hooks.sh
 ./tools/test_bootstrap_installer_safety.sh
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
@@ -94,7 +108,7 @@ After the tag workflow publishes assets, verify:
 ```bash
 gh run watch RUN_ID --exit-status
 gh release view vX.Y.Z --json tagName,isDraft,isPrerelease,publishedAt,url,assets
-gh release download vX.Y.Z -p "WormsWMD-macOS-Fix-vX.Y.Z.zip" -p "WormsWMD-macOS-Fix-vX.Y.Z.zip.sha256" -D /tmp/wormswmd-release-check
+gh release download vX.Y.Z -p "WormsWMD-macOS-Fix-vX.Y.Z.zip" -p "WormsWMD-macOS-Fix-vX.Y.Z.zip.sha256" -p "WormsWMD-macOS-Fix-vX.Y.Z.cdx.json" -D /tmp/wormswmd-release-check
 (cd /tmp/wormswmd-release-check && shasum -a 256 -c "WormsWMD-macOS-Fix-vX.Y.Z.zip.sha256")
 gh attestation verify /tmp/wormswmd-release-check/WormsWMD-macOS-Fix-vX.Y.Z.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```

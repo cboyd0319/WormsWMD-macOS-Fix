@@ -24,5 +24,7 @@ that could not be run and why.
       where affected.
 - [ ] Tests/checks and user-facing documentation match the changed behavior.
 - [ ] I ran `./tools/validate_harness.sh`.
+- [ ] The repository pre-commit hook completed, or I ran
+      `./tools/install_git_hooks.sh` before committing.
 - [ ] I ran `./tools/test_github_security.sh` when `.github/`, release, or
       dependency automation changed.
