@@ -12,12 +12,29 @@ if [[ "$GIT_COMMON_DIR" != /* ]]; then
     GIT_COMMON_DIR="$ROOT_DIR/$GIT_COMMON_DIR"
 fi
 
-if [[ -n "${WORMSWMD_KINGFISHER_BIN:-}" ]]; then
+case "${WORMSWMD_HOOK_TEST_MODE:-}" in
+    1|true|TRUE|yes|YES)
+        HOOK_TEST_MODE=true
+        ;;
+    *)
+        HOOK_TEST_MODE=false
+        ;;
+esac
+
+if $HOOK_TEST_MODE && [[ -n "${WORMSWMD_KINGFISHER_BIN:-}" ]]; then
     KINGFISHER_BIN="$WORMSWMD_KINGFISHER_BIN"
+elif [[ -n "${WORMSWMD_KINGFISHER_BIN:-}" ]]; then
+    printf '%s\n' \
+        "ERROR: WORMSWMD_KINGFISHER_BIN is available only in explicit hook test mode." >&2
+    exit 1
 elif [[ -x "$GIT_COMMON_DIR/tools/kingfisher" ]]; then
     KINGFISHER_BIN="$GIT_COMMON_DIR/tools/kingfisher"
 else
     KINGFISHER_BIN=""
+fi
+
+if ! $HOOK_TEST_MODE; then
+    "$ROOT_DIR/tools/install_git_hooks.sh" --check >/dev/null
 fi
 
 if [[ -z "$KINGFISHER_BIN" || ! -x "$KINGFISHER_BIN" ]]; then

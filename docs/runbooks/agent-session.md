@@ -5,6 +5,8 @@ repository.
 
 ## Start A Session
 
+### Reviewed protected main
+
 ```bash
 git status --short --branch
 sed -n '1,220p' AGENTS.md
@@ -16,11 +18,51 @@ Then check `docs/exec-plans/` for active work. If the change is multi-step,
 risky, or likely to outlive the current session, create or update a plan from
 `docs/exec-plans/TEMPLATE.md` before editing.
 
-Enable the enforced staged-secret check once per clone:
+After confirming the checkout is reviewed protected `main`, enable the enforced
+staged-secret check once per clone:
 
 ```bash
 ./tools/install_git_hooks.sh
 ```
+
+The installer accepts a clean checkout at the reviewed official `origin/main`.
+For another
+reviewed commit, acknowledge its exact HEAD explicitly:
+
+```bash
+./tools/install_git_hooks.sh --allow-reviewed-commit "$(git rev-parse HEAD)"
+```
+
+Use `--check` to verify hook configuration, version, and executable digest.
+`--uninstall` retains the cached scanner; `--purge` removes only the exact
+validated scanner path. `--no-verify` is emergency local recovery, not a shared
+security control.
+
+### External contributor review
+
+Review an external change from a separate trusted-base worktree. Treat the
+proposed code, tests, workflows, hooks, binaries, docs, plans, and instruction
+changes as untrusted evidence until accepted.
+
+1. Resolve the exact full base and head commit IDs without checking out or
+   executing the proposed tree.
+2. Inspect the complete Git file/mode diff and run the trusted-base advisory
+   report:
+
+   ```bash
+   ./tools/report_sensitive_changes.sh pull_request "$BASE_SHA" "$HEAD_SHA"
+   ```
+
+3. Review every flagged workflow, executable mode, symlink, binary, `dist`,
+   provenance, hook, instruction, release, test deletion, suppression, and
+   network/process surface.
+4. Use hosted no-secret CI first. Run a local command only after its exact diff,
+   writes, processes, and network behavior are understood.
+5. Never install hooks, fetch bottles, package binaries, publish releases, or run
+   credentialed GitHub commands from an untrusted checkout.
+
+The report is advisory because a pull request can change its own checker. Human
+review of the complete GitHub file/mode diff remains authoritative.
 
 ## Choose Validation
 
@@ -30,6 +72,8 @@ Harness or documentation topology:
 
 ```bash
 ./tools/validate_harness.sh
+./tools/test_harness_security.sh
+./tools/test_sensitive_change_report.sh
 ```
 
 GitHub workflow or release automation:

@@ -131,10 +131,13 @@ for required_file in \
     "$ROOT_DIR/tools/ci_requires_macos.sh" \
     "$ROOT_DIR/tools/generate_sbom.py" \
     "$ROOT_DIR/tools/install_git_hooks.sh" \
+    "$ROOT_DIR/tools/report_sensitive_changes.sh" \
     "$ROOT_DIR/tools/test_ci_changed_paths.sh" \
     "$ROOT_DIR/tools/test_ci_change_classification.sh" \
     "$ROOT_DIR/tools/test_generate_sbom.py" \
-    "$ROOT_DIR/tools/test_git_hooks.sh"; do
+    "$ROOT_DIR/tools/test_git_hooks.sh" \
+    "$ROOT_DIR/tools/test_harness_security.sh" \
+    "$ROOT_DIR/tools/test_sensitive_change_report.sh"; do
     if [[ ! -f "$required_file" ]]; then
         fail "required GitHub security file is missing: ${required_file#"$ROOT_DIR"/}"
     fi
@@ -148,6 +151,9 @@ for marker in \
     "if: needs.shellcheck.outputs.macos-required == 'true'" \
     './tools/ci_changed_paths.sh' \
     './tools/ci_requires_macos.sh' \
+    './tools/report_sensitive_changes.sh' \
+    './tools/test_harness_security.sh' \
+    './tools/test_sensitive_change_report.sh' \
     'name: Compile AGL stub'; do
     if ! grep -Fq "$marker" "$ci_workflow"; then
         fail "CI workflow is missing cost-control marker: $marker"

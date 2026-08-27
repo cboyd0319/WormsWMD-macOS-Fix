@@ -149,8 +149,13 @@ Run once per clone:
 
 This installs checksum-pinned Kingfisher 2.0.0 beneath the local Git directory
 and sets `core.hooksPath=.githooks`. The hook scans staged content and fails
-closed when the scanner is missing or has another version. CI scans the current
-checkout in the existing Zizmor job, sharing its Ubuntu runner.
+closed when the scanner is missing, has another version, or differs from the
+pinned per-platform executable digest. Installation defaults to a clean checkout
+at the reviewed official `origin/main`; another reviewed commit requires its
+exact HEAD.
+`--uninstall` retains the scanner and explicit `--purge` removes only the exact
+validated cache path. CI scans the current checkout in the existing Zizmor job,
+sharing its Ubuntu runner.
 
 Both modes redact findings, disable live provider validation and update checks,
 exclude Git history/internals, and avoid extracting or scanning the vendored Qt

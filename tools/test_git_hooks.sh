@@ -32,6 +32,14 @@ pwd > "$WORMSWMD_HOOK_CWD_LOG"
 EOF
 chmod +x "$fake_kingfisher"
 
+if WORMSWMD_KINGFISHER_BIN="$fake_kingfisher" \
+    WORMSWMD_HOOK_ARGUMENT_LOG="$argument_log" \
+    WORMSWMD_HOOK_CWD_LOG="$test_dir/cwd" \
+    "$HOOK" >/dev/null 2>&1; then
+    fail "pre-commit hook accepted the scanner override outside explicit test mode"
+fi
+
+WORMSWMD_HOOK_TEST_MODE=1 \
 WORMSWMD_KINGFISHER_BIN="$fake_kingfisher" \
 WORMSWMD_HOOK_ARGUMENT_LOG="$argument_log" \
 WORMSWMD_HOOK_CWD_LOG="$test_dir/cwd" \
@@ -46,7 +54,7 @@ if grep -Fq 'command -v kingfisher' "$HOOK"; then
     fail "pre-commit hook accepts an arbitrary Kingfisher from PATH"
 fi
 
-if WORMSWMD_KINGFISHER_BIN="$test_dir/missing" "$HOOK" >/dev/null 2>&1; then
+if WORMSWMD_HOOK_TEST_MODE=1 WORMSWMD_KINGFISHER_BIN="$test_dir/missing" "$HOOK" >/dev/null 2>&1; then
     fail "pre-commit hook succeeded without its pinned scanner"
 fi
 
@@ -59,7 +67,7 @@ fi
 exit 0
 EOF
 chmod +x "$fake_kingfisher"
-if WORMSWMD_KINGFISHER_BIN="$fake_kingfisher" "$HOOK" >/dev/null 2>&1; then
+if WORMSWMD_HOOK_TEST_MODE=1 WORMSWMD_KINGFISHER_BIN="$fake_kingfisher" "$HOOK" >/dev/null 2>&1; then
     fail "pre-commit hook accepted an unpinned Kingfisher version"
 fi
 
@@ -71,6 +79,12 @@ cp "$INSTALLER" "$fixture/tools/install_git_hooks.sh"
 cp "$HOOK" "$fixture/.githooks/pre-commit"
 chmod +x "$fixture/tools/install_git_hooks.sh" "$fixture/.githooks/pre-commit"
 git -C "$fixture" init -q
+git -C "$fixture" config user.name "Git hook test"
+git -C "$fixture" config user.email "git-hook-test@example.invalid"
+git -C "$fixture" add .
+git -C "$fixture" commit -qm "fixture"
+git -C "$fixture" update-ref refs/remotes/origin/main HEAD
+git -C "$fixture" remote add origin https://example.invalid/untrusted-fork.git
 
 cat > "$mock_bin/uname" <<'EOF'
 #!/bin/bash
@@ -107,8 +121,29 @@ printf '%s\n' "mock archive" > "$output"
 EOF
 cat > "$mock_bin/shasum" <<'EOF'
 #!/bin/bash
-cat >/dev/null
-[[ "${FAKE_SHASUM_FAIL:-0}" != "1" ]]
+for argument in "$@"; do
+    if [[ "$argument" == "-c" ]]; then
+        cat >/dev/null
+        [[ "${FAKE_SHASUM_FAIL:-0}" != "1" ]]
+        exit
+    fi
+done
+
+if [[ "${FAKE_BINARY_HASH_MISMATCH:-0}" == "1" ]]; then
+    digest="$(printf '0%.0s' {1..64})"
+else
+    case "${FAKE_UNAME_S}:${FAKE_UNAME_M}" in
+        Darwin:arm64) digest="bcda56855b5aee9e868d8f6d45c89c84a77ed1d15180cbd28ebc6b17c1d55ffb" ;;
+        Darwin:x86_64) digest="0013b6f7709fbd65408c8b0debd5211365bb0ce123912aaec23065a0627325fe" ;;
+        Linux:x86_64) digest="e5aa138eb67931b5520cedcde0ed605516ad4f3251c56f6cf0d93bb885782f1c" ;;
+        Linux:arm64|Linux:aarch64) digest="a3ffa17d13feb7236fc2a268ad1fb4b9e17059033c9a0aeb358c79676dd6e66b" ;;
+        *) exit 2 ;;
+    esac
+fi
+for argument in "$@"; do
+    path="$argument"
+done
+printf '%s  %s\n' "$digest" "$path"
 EOF
 cat > "$mock_bin/tar" <<'EOF'
 #!/bin/bash
@@ -153,7 +188,14 @@ installer_env=(
     "FAKE_CURL_LOG=$mock_log"
     "FAKE_UNAME_S=Darwin"
     "FAKE_UNAME_M=arm64"
+    "WORMSWMD_HOOK_TEST_MODE=1"
+    "WORMSWMD_TEST_SHASUM_BIN=$mock_bin/shasum"
+    "WORMSWMD_TEST_UNAME_BIN=$mock_bin/uname"
 )
+if env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" >/dev/null 2>&1; then
+    fail "hook installer trusted origin/main from an unrelated repository"
+fi
+git -C "$fixture" remote set-url origin https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" >/dev/null
 [[ "$(git -C "$fixture" config --local --get core.hooksPath)" == ".githooks" ]] \
     || fail "hook installer did not configure core.hooksPath"
@@ -163,6 +205,10 @@ grep -Fq '/v2.0.0/kingfisher-darwin-arm64.tgz' "$mock_log" \
     || fail "hook installer selected the wrong Darwin arm64 asset"
 env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" --check >/dev/null \
     || fail "hook installer --check rejected a valid installation"
+if env "${installer_env[@]}" FAKE_BINARY_HASH_MISMATCH=1 \
+    "$fixture/tools/install_git_hooks.sh" --check >/dev/null 2>&1; then
+    fail "hook installer --check accepted a changed installed scanner digest"
+fi
 
 env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" --uninstall >/dev/null
 if git -C "$fixture" config --local --get core.hooksPath >/dev/null 2>&1; then
@@ -207,9 +253,53 @@ installer_env=(
     "FAKE_CURL_LOG=$mock_log"
     "FAKE_UNAME_S=Linux"
     "FAKE_UNAME_M=x86_64"
+    "WORMSWMD_HOOK_TEST_MODE=1"
+    "WORMSWMD_TEST_SHASUM_BIN=$mock_bin/shasum"
+    "WORMSWMD_TEST_UNAME_BIN=$mock_bin/uname"
 )
 env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" >/dev/null
 grep -Fq '/v2.0.0/kingfisher-linux-x64.tgz' "$mock_log" \
     || fail "hook installer selected the wrong Linux x64 asset"
+
+env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" --uninstall >/dev/null
+git -C "$fixture" switch -qc reviewed-change
+printf '%s\n' "reviewed branch" > "$fixture/REVIEWED.txt"
+git -C "$fixture" add REVIEWED.txt
+git -C "$fixture" commit -qm "reviewed branch"
+reviewed_head=$(git -C "$fixture" rev-parse HEAD)
+
+if env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" >/dev/null 2>&1; then
+    fail "hook installer accepted an unreviewed branch without an exact commit acknowledgement"
+fi
+if env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" \
+    --allow-reviewed-commit "0000000000000000000000000000000000000000" >/dev/null 2>&1; then
+    fail "hook installer accepted an acknowledgement that did not match HEAD"
+fi
+if env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" \
+    --allow-reviewed-commit "${reviewed_head:0:12}" >/dev/null 2>&1; then
+    fail "hook installer accepted a non-full reviewed commit acknowledgement"
+fi
+env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" \
+    --allow-reviewed-commit "$reviewed_head" >/dev/null \
+    || fail "hook installer rejected an exact reviewed commit acknowledgement"
+
+printf '%s\n' "# dirty" >> "$fixture/.githooks/pre-commit"
+if env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" \
+    --allow-reviewed-commit "$reviewed_head" >/dev/null 2>&1; then
+    fail "hook installer accepted a checkout with tracked changes"
+fi
+git -C "$fixture" restore -- .githooks/pre-commit
+
+env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" --uninstall >/dev/null
+[[ -x "$fixture/.git/tools/kingfisher" ]] \
+    || fail "hook uninstall removed the cached scanner before explicit purge"
+env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" \
+    --allow-reviewed-commit "$reviewed_head" >/dev/null
+env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" --purge >/dev/null
+if git -C "$fixture" config --local --get core.hooksPath >/dev/null 2>&1; then
+    fail "hook purge retained core.hooksPath"
+fi
+[[ ! -e "$fixture/.git/tools/kingfisher" ]] \
+    || fail "hook purge retained the cached scanner"
 
 printf '%s\n' "Git hook regression check passed."
