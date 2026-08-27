@@ -30,7 +30,12 @@ worms_color_init
 
 # Cleanup temp files on exit
 TEMP_DIR=""
+RESTORE_WORK_DIR=""
 cleanup() {
+    if [[ -n "$RESTORE_WORK_DIR" ]] && [[ -d "$RESTORE_WORK_DIR" ]]; then
+        rm -rf "$RESTORE_WORK_DIR"
+        return
+    fi
     if [[ -n "$TEMP_DIR" ]] && [[ -d "$TEMP_DIR" ]]; then
         rm -rf "$TEMP_DIR"
     fi
@@ -42,6 +47,11 @@ STEAM_SAVES="$HOME/Library/Application Support/Steam/userdata"
 TEAM17_SAVES="$HOME/Library/Application Support/Team17"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/WormsWMD-SaveBackups}"
 SAVE_MANIFEST_NAME="MANIFEST.tsv"
+RESTORE_ASSUME_YES=false
+RESTORE_MAX_EXPANDED_SIZE=""
+RESTORE_MAX_EXPANDED_BYTES=""
+RESTORE_RESERVE_BYTES=$((512 * 1024 * 1024))
+RESTORE_ABSOLUTE_MAX_BYTES=$((8 * 1024 * 1024 * 1024))
 worms_reject_control_chars "$BACKUP_DIR" "BACKUP_DIR"
 
 macos_product_version() {
@@ -49,6 +59,10 @@ macos_product_version() {
 }
 
 restore_assume_yes() {
+    if $RESTORE_ASSUME_YES; then
+        return 0
+    fi
+
     case "${WORMSWMD_RESTORE_ASSUME_YES:-}" in
         1|true|TRUE|yes|YES|y|Y)
             return 0
@@ -69,6 +83,9 @@ OPTIONS:
     --backup, -b        Create a new backup (default)
     --restore, -r       Restore from latest backup
     --restore FILE      Restore from specific backup file
+    --yes               Confirm a restore non-interactively
+    --max-expanded-size SIZE
+                        Bound restore expansion with a K, M, or G suffix
     --list, -l          List available backups
     --location          Show save game locations
     --help, -h          Show this help
@@ -86,11 +103,50 @@ EXAMPLES:
     # Restore specific backup
     ./backup_saves.sh --restore ~/Documents/WormsWMD-SaveBackups/saves-20251225-120000.tar.gz
 
+    # Explicitly allow up to 2 GiB after safety and free-space checks
+    ./backup_saves.sh --restore --yes --max-expanded-size 2G
+
 SAVE LOCATIONS:
     Steam Cloud saves: ~/Library/Application Support/Steam/userdata/*/327030/
     Local saves:       ~/Library/Application Support/Team17/
 
 EOF
+}
+
+parse_bounded_restore_size() {
+    local value="$1"
+    local number suffix multiplier bytes
+
+    if [[ ! "$value" =~ ^([1-9][0-9]*)([KkMmGg])$ ]]; then
+        printf 'ERROR: --max-expanded-size requires a positive K, M, or G value.\n' >&2
+        return 1
+    fi
+    number="${BASH_REMATCH[1]}"
+    suffix="${BASH_REMATCH[2]}"
+    case "$suffix" in
+        K|k) multiplier=1024 ;;
+        M|m) multiplier=$((1024 * 1024)) ;;
+        G|g) multiplier=$((1024 * 1024 * 1024)) ;;
+    esac
+
+    if (( number > RESTORE_ABSOLUTE_MAX_BYTES / multiplier )); then
+        printf 'ERROR: --max-expanded-size exceeds the 8 GiB safety limit.\n' >&2
+        return 1
+    fi
+    bytes=$((number * multiplier))
+    printf '%s\n' "$bytes"
+}
+
+filesystem_available_bytes() {
+    local path="$1"
+    local available_kib
+
+    available_kib=$(df -Pk "$path" 2>/dev/null | awk 'NR == 2 {print $4; exit}')
+    if [[ ! "$available_kib" =~ ^[0-9]+$ ]]; then
+        printf 'ERROR: Unable to determine free space for %s.\n' "$path" >&2
+        return 1
+    fi
+    printf '%s\n' "$((available_kib * 1024))"
 }
 
 # Find Worms W.M.D Steam user data directories
@@ -110,19 +166,9 @@ find_steam_saves() {
 
 validate_backup_archive_layout() {
     local archive="$1"
-    local listing raw_entry entry
+    local raw_entry entry
 
-    if ! listing=$(tar -tzf "$archive" 2>/dev/null); then
-        echo -e "${RED}ERROR:${NC} Unable to read backup archive."
-        return 1
-    fi
-
-    if ! worms_validate_tar_no_duplicate_entries "$archive"; then
-        echo -e "${RED}ERROR:${NC} Backup archive contains duplicate members."
-        return 1
-    fi
-
-    while IFS= read -r raw_entry; do
+    if ! tar -tzf "$archive" 2>/dev/null | while IFS= read -r raw_entry; do
         [[ -n "$raw_entry" ]] || continue
         entry="${raw_entry#./}"
         while [[ "$entry" == */ ]]; do
@@ -132,7 +178,7 @@ validate_backup_archive_layout() {
 
         if worms_path_has_parent_escape "$entry"; then
             echo -e "${RED}ERROR:${NC} Unsafe path in backup archive: $entry"
-            return 1
+            exit 1
         fi
 
         case "$entry" in
@@ -140,13 +186,11 @@ validate_backup_archive_layout() {
                 ;;
             *)
                 echo -e "${RED}ERROR:${NC} Unexpected entry in backup archive: $entry"
-                return 1
+                exit 1
                 ;;
         esac
-    done <<< "$listing"
-
-    if ! worms_validate_tar_entry_metadata "$archive" reject-symlinks; then
-        echo -e "${RED}ERROR:${NC} Unsafe backup archive entry metadata."
+    done; then
+        echo -e "${RED}ERROR:${NC} Backup archive layout validation failed."
         return 1
     fi
 }
@@ -336,6 +380,8 @@ EOF
 # Restore backup
 do_restore() {
     local backup_file="$1"
+    local archive_copy compressed_bytes free_bytes usable_bytes default_expanded_bytes
+    local max_expanded_bytes required_bytes
 
     # If no file specified, use latest
     if [[ -z "$backup_file" ]]; then
@@ -349,13 +395,69 @@ do_restore() {
         echo "Using latest backup: $(basename "$backup_file")"
     fi
 
-    if [[ ! -f "$backup_file" ]]; then
+    if [[ ! -f "$backup_file" ]] || [[ -L "$backup_file" ]]; then
         echo -e "${RED}Backup file not found: $backup_file${NC}"
         exit 1
     fi
     worms_reject_control_chars "$backup_file" "backup file"
 
-    validate_backup_archive_layout "$backup_file"
+    if ! worms_python3 >/dev/null; then
+        printf '%s\n' \
+            "ERROR: Python 3.9 or newer is required for safe save restoration." \
+            "Install or update Apple Command Line Tools, then run this command again." >&2
+        exit 1
+    fi
+
+    compressed_bytes=$(worms_file_size "$backup_file")
+    free_bytes=$(filesystem_available_bytes "$HOME") || exit 1
+    if (( free_bytes <= compressed_bytes + RESTORE_RESERVE_BYTES )); then
+        printf 'ERROR: Restore needs %s archive bytes plus a %s-byte free-space reserve; only %s bytes are free.\n' \
+            "$compressed_bytes" "$RESTORE_RESERVE_BYTES" "$free_bytes" >&2
+        exit 1
+    fi
+    usable_bytes=$((free_bytes - compressed_bytes - RESTORE_RESERVE_BYTES))
+    default_expanded_bytes=$((usable_bytes / 2))
+    if (( default_expanded_bytes > RESTORE_ABSOLUTE_MAX_BYTES )); then
+        default_expanded_bytes=$RESTORE_ABSOLUTE_MAX_BYTES
+    fi
+
+    if [[ -n "$RESTORE_MAX_EXPANDED_BYTES" ]]; then
+        max_expanded_bytes=$RESTORE_MAX_EXPANDED_BYTES
+    else
+        max_expanded_bytes=$default_expanded_bytes
+    fi
+    if (( max_expanded_bytes <= 0 )); then
+        printf '%s\n' "ERROR: Insufficient free space for a bounded restore." >&2
+        exit 1
+    fi
+    required_bytes=$((compressed_bytes + (2 * max_expanded_bytes) + RESTORE_RESERVE_BYTES))
+    if (( required_bytes > free_bytes )); then
+        printf 'ERROR: Restore limit requires %s free bytes including staging and reserve; only %s bytes are free.\n' \
+            "$required_bytes" "$free_bytes" >&2
+        exit 1
+    fi
+
+    RESTORE_WORK_DIR=$(mktemp -d "$HOME/.wormswmd-restore.XXXXXX")
+    TEMP_DIR="$RESTORE_WORK_DIR/extracted"
+    archive_copy="$RESTORE_WORK_DIR/backup.tar.gz"
+    mkdir -m 0700 "$TEMP_DIR"
+    if ! worms_copy_and_inspect_archive \
+        "$backup_file" "$archive_copy" save "" \
+        --max-expanded-bytes "$max_expanded_bytes" --quiet; then
+        printf '%s\n' "ERROR: Backup archive safety inspection failed." >&2
+        exit 1
+    fi
+    compressed_bytes=$(worms_file_size "$archive_copy")
+    free_bytes=$(filesystem_available_bytes "$HOME") || exit 1
+    required_bytes=$(((2 * max_expanded_bytes) + RESTORE_RESERVE_BYTES))
+    if (( required_bytes > free_bytes )); then
+        printf 'ERROR: Restore staging requires %s remaining free bytes; only %s bytes remain after the archive copy.\n' \
+            "$required_bytes" "$free_bytes" >&2
+        exit 1
+    fi
+    printf 'Restore safety limits: archive=%s bytes, expanded=%s bytes, remaining-free=%s bytes, reserve=%s bytes.\n' \
+        "$compressed_bytes" "$max_expanded_bytes" "$free_bytes" "$RESTORE_RESERVE_BYTES"
+    validate_backup_archive_layout "$archive_copy"
 
     echo -e "${YELLOW}WARNING: This will overwrite your current save games!${NC}"
     echo ""
@@ -374,10 +476,8 @@ do_restore() {
     echo ""
     echo -e "${BLUE}Restoring from: $(basename "$backup_file")${NC}"
 
-    TEMP_DIR=$(mktemp -d)
-
     # Extract backup
-    tar -xzf "$backup_file" -C "$TEMP_DIR"
+    tar -xzf "$archive_copy" -C "$TEMP_DIR"
     worms_validate_tree_paths "$TEMP_DIR"
     worms_validate_no_special_entries "$TEMP_DIR"
 
@@ -475,25 +575,75 @@ do_location() {
 }
 
 # Parse arguments
-case "${1:-}" in
-    --backup|-b|"")
-        do_backup
-        ;;
-    --restore|-r)
-        do_restore "${2:-}"
-        ;;
-    --list|-l)
-        do_list
-        ;;
-    --location)
-        do_location
-        ;;
-    --help|-h)
-        print_help
-        ;;
-    *)
-        echo -e "${RED}Unknown option: $1${NC}"
-        echo "Use --help for usage"
+action=""
+restore_file=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --backup|-b)
+            [[ -z "$action" ]] || { echo -e "${RED}Choose only one action.${NC}"; exit 1; }
+            action="backup"
+            shift
+            ;;
+        --restore|-r)
+            [[ -z "$action" ]] || { echo -e "${RED}Choose only one action.${NC}"; exit 1; }
+            action="restore"
+            shift
+            if [[ $# -gt 0 ]] && [[ "$1" != -* ]]; then
+                restore_file="$1"
+                shift
+            fi
+            ;;
+        --yes)
+            RESTORE_ASSUME_YES=true
+            shift
+            ;;
+        --max-expanded-size)
+            [[ $# -ge 2 ]] || { echo -e "${RED}--max-expanded-size requires a value.${NC}"; exit 1; }
+            RESTORE_MAX_EXPANDED_SIZE="$2"
+            shift 2
+            ;;
+        --list|-l)
+            [[ -z "$action" ]] || { echo -e "${RED}Choose only one action.${NC}"; exit 1; }
+            action="list"
+            shift
+            ;;
+        --location)
+            [[ -z "$action" ]] || { echo -e "${RED}Choose only one action.${NC}"; exit 1; }
+            action="location"
+            shift
+            ;;
+        --help|-h)
+            print_help
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            echo "Use --help for usage"
+            exit 1
+            ;;
+    esac
+done
+
+action="${action:-backup}"
+if [[ -n "$RESTORE_MAX_EXPANDED_SIZE" ]]; then
+    [[ "$action" == "restore" ]] || {
+        echo -e "${RED}--max-expanded-size is valid only with --restore.${NC}"
         exit 1
-        ;;
+    }
+    $RESTORE_ASSUME_YES || {
+        echo -e "${RED}--max-expanded-size requires explicit --yes.${NC}"
+        exit 1
+    }
+    RESTORE_MAX_EXPANDED_BYTES=$(parse_bounded_restore_size "$RESTORE_MAX_EXPANDED_SIZE") || exit 1
+fi
+if $RESTORE_ASSUME_YES && [[ "$action" != "restore" ]]; then
+    echo -e "${RED}--yes is valid only with --restore.${NC}"
+    exit 1
+fi
+
+case "$action" in
+    backup) do_backup ;;
+    restore) do_restore "$restore_file" ;;
+    list) do_list ;;
+    location) do_location ;;
 esac

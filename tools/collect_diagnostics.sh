@@ -86,6 +86,11 @@ verify_qt_package_checksum() {
     local checksum_name
 
     [[ -f "${package}.sha256" ]] || return 1
+    local package_size
+    package_size=$(worms_file_size "$package" 2>/dev/null || echo 0)
+    [[ "$package_size" =~ ^[0-9]+$ ]] \
+        && (( package_size > 0 && package_size <= 64 * 1024 * 1024 )) \
+        || return 1
 
     package_dir="$(dirname "$package")"
     checksum_name="$(basename "${package}.sha256")"
@@ -819,13 +824,20 @@ write_qt_package_bundle_info() {
     local info_file="$bundle_dir/qt-package.txt"
     local local_qt_package=""
     local listing_file required_fw required_plugin required_dylib entry
+    local archive_temp_dir="" inspected_archive="" expected_sha256=""
+    local checksum_verified=false inspection_ready=false
+    local python_available=false
+
+    worms_python3 >/dev/null && python_available=true
 
     {
         echo "Qt package status"
         echo "================="
         echo ""
 
-        if [[ -f "$REPO_DIR/scripts/download_qt_frameworks.sh" ]]; then
+        if ! $python_available; then
+            echo "Availability: unavailable (compatible Python/CLT missing)"
+        elif [[ -f "$REPO_DIR/scripts/download_qt_frameworks.sh" ]]; then
             echo "Availability: $("$REPO_DIR/scripts/download_qt_frameworks.sh" --check 2>/dev/null || echo unavailable)"
         else
             echo "Availability: unavailable (download script missing)"
@@ -837,21 +849,41 @@ write_qt_package_bundle_info() {
             if [[ -f "${local_qt_package}.sha256" ]]; then
                 if verify_qt_package_checksum "$local_qt_package"; then
                     echo "Checksum: verified"
+                    checksum_verified=true
                 else
                     echo "Checksum: mismatch"
                 fi
             else
                 echo "Checksum: missing"
             fi
-            echo ""
-            echo "Metadata:"
-            tar -xOf "$local_qt_package" METADATA.txt 2>/dev/null || echo "(metadata unavailable)"
-            echo ""
-            echo "Required archive contents"
-            echo "========================="
+            if ! $python_available; then
+                echo "Archive inspection: unavailable (compatible Python/CLT missing)"
+            elif ! $checksum_verified; then
+                echo "Archive inspection: skipped (verified checksum unavailable)"
+            else
+                expected_sha256=$(awk 'NR == 1 {print $1; exit}' "${local_qt_package}.sha256")
+                archive_temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-diagnostic-qt.XXXXXX")
+                inspected_archive="$archive_temp_dir/package.tar.gz"
+                if worms_copy_and_inspect_archive \
+                    "$local_qt_package" "$inspected_archive" qt "$expected_sha256" --quiet \
+                    >/dev/null 2>&1; then
+                    echo "Archive inspection: passed"
+                    inspection_ready=true
+                else
+                    echo "Archive inspection: failed"
+                fi
+            fi
 
-            listing_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-qt-listing.XXXXXX")
-            if tar -tzf "$local_qt_package" > "$listing_file" 2>/dev/null; then
+            if $inspection_ready; then
+                echo ""
+                echo "Metadata:"
+                tar -xOf "$inspected_archive" METADATA.txt 2>/dev/null || echo "(metadata unavailable)"
+                echo ""
+                echo "Required archive contents"
+                echo "========================="
+
+                listing_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-qt-listing.XXXXXX")
+                if tar -tzf "$inspected_archive" > "$listing_file" 2>/dev/null; then
                 for required_fw in "${REQUIRED_QT_FRAMEWORKS[@]}"; do
                     entry="Frameworks/${required_fw}.framework/Versions/5/${required_fw}"
                     if grep -Fxq "$entry" "$listing_file"; then
@@ -889,14 +921,19 @@ write_qt_package_bundle_info() {
                 else
                     echo "WARN source provenance missing: SOURCE_PROVENANCE.tsv"
                 fi
-            else
-                echo "FAIL unable to list archive contents"
+                else
+                    echo "FAIL unable to list inspected archive contents"
+                fi
             fi
             rm -f "${listing_file:-}"
         else
             echo "Local package: none"
         fi
     } > "$raw_file"
+
+    if [[ -n "$archive_temp_dir" ]] && [[ -d "$archive_temp_dir" ]]; then
+        rm -rf "$archive_temp_dir"
+    fi
 
     sanitize_report "$raw_file" "$info_file"
     rm -f "$raw_file"

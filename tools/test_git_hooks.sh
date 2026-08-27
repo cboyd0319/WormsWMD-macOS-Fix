@@ -74,10 +74,29 @@ fi
 fixture="$test_dir/repo"
 mock_bin="$test_dir/mock-bin"
 mock_log="$test_dir/mock-curl.log"
-mkdir -p "$fixture/tools" "$fixture/.githooks" "$mock_bin"
+mkdir -p "$fixture/tools" "$fixture/scripts" "$fixture/.githooks" "$mock_bin"
 cp "$INSTALLER" "$fixture/tools/install_git_hooks.sh"
+cp "$ROOT_DIR/tools/inspect_archive.py" "$fixture/tools/inspect_archive.py"
+cp "$ROOT_DIR/scripts/common.sh" "$fixture/scripts/common.sh"
 cp "$HOOK" "$fixture/.githooks/pre-commit"
-chmod +x "$fixture/tools/install_git_hooks.sh" "$fixture/.githooks/pre-commit"
+chmod +x "$fixture/tools/install_git_hooks.sh" "$fixture/tools/inspect_archive.py" \
+    "$fixture/.githooks/pre-commit"
+cat > "$fixture/tools/inspect_archive.py" <<'PY'
+#!/usr/bin/env python3
+import os
+import shutil
+import sys
+
+with open(os.environ["FAKE_ARCHIVE_FLOW_LOG"], "a", encoding="utf-8") as log:
+    log.write("inspect\n")
+with open(os.environ["FAKE_INSPECT_LOG"], "a", encoding="utf-8") as log:
+    log.write(" ".join(sys.argv[1:]) + "\n")
+if os.environ.get("FAKE_INSPECT_FAIL") == "1":
+    raise SystemExit(1)
+destination = sys.argv[sys.argv.index("--copy-to") + 1]
+shutil.copyfile(sys.argv[-1], destination)
+os.chmod(destination, 0o600)
+PY
 git -C "$fixture" init -q
 git -C "$fixture" config user.name "Git hook test"
 git -C "$fixture" config user.email "git-hook-test@example.invalid"
@@ -147,6 +166,7 @@ printf '%s  %s\n' "$digest" "$path"
 EOF
 cat > "$mock_bin/tar" <<'EOF'
 #!/bin/bash
+printf '%s\n' "tar" >> "$FAKE_ARCHIVE_FLOW_LOG"
 destination=""
 while [[ "$#" -gt 0 ]]; do
     if [[ "$1" == "-C" ]]; then
@@ -182,6 +202,8 @@ fi
 
 fixture_tmp="$test_dir/installer-tmp"
 mkdir -p "$fixture_tmp"
+inspect_log="$test_dir/inspect.log"
+archive_flow_log="$test_dir/archive-flow.log"
 installer_env=(
     "PATH=$mock_bin:$PATH"
     "TMPDIR=$fixture_tmp"
@@ -191,12 +213,18 @@ installer_env=(
     "WORMSWMD_HOOK_TEST_MODE=1"
     "WORMSWMD_TEST_SHASUM_BIN=$mock_bin/shasum"
     "WORMSWMD_TEST_UNAME_BIN=$mock_bin/uname"
+    "FAKE_INSPECT_LOG=$inspect_log"
+    "FAKE_ARCHIVE_FLOW_LOG=$archive_flow_log"
 )
 if env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" >/dev/null 2>&1; then
     fail "hook installer trusted origin/main from an unrelated repository"
 fi
 git -C "$fixture" remote set-url origin https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" >/dev/null
+grep -Fq -- '--profile kingfisher --copy-to' "$inspect_log" \
+    || fail "hook installer did not invoke the shared Kingfisher archive profile"
+[[ "$(sed -n '1p' "$archive_flow_log")" == "inspect" ]] \
+    || fail "hook installer extracted the archive before safety inspection"
 [[ "$(git -C "$fixture" config --local --get core.hooksPath)" == ".githooks" ]] \
     || fail "hook installer did not configure core.hooksPath"
 [[ -x "$fixture/.git/tools/kingfisher" ]] \
@@ -247,6 +275,16 @@ fi
 if find "$fixture_tmp" -mindepth 1 -print -quit | grep -q .; then
     fail "hook installer leaked temporary files after a checksum failure"
 fi
+if env "${installer_env[@]}" FAKE_INSPECT_FAIL=1 \
+    "$fixture/tools/install_git_hooks.sh" >/dev/null 2>&1; then
+    fail "hook installer ignored an archive inspection failure"
+fi
+if [[ -e "$fixture/.git/tools/kingfisher" ]]; then
+    fail "hook installer installed a scanner after archive inspection failed"
+fi
+if find "$fixture_tmp" -mindepth 1 -print -quit | grep -q .; then
+    fail "hook installer leaked temporary files after an inspection failure"
+fi
 if env "${installer_env[@]}" FAKE_SCANNER_VERSION=1.113.0 \
     "$fixture/tools/install_git_hooks.sh" >/dev/null 2>&1; then
     fail "hook installer accepted an extracted scanner with the wrong version"
@@ -268,6 +306,8 @@ installer_env=(
     "WORMSWMD_HOOK_TEST_MODE=1"
     "WORMSWMD_TEST_SHASUM_BIN=$mock_bin/shasum"
     "WORMSWMD_TEST_UNAME_BIN=$mock_bin/uname"
+    "FAKE_INSPECT_LOG=$inspect_log"
+    "FAKE_ARCHIVE_FLOW_LOG=$archive_flow_log"
 )
 env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" >/dev/null
 grep -Fq '/v2.0.0/kingfisher-linux-x64.tgz' "$mock_log" \
