@@ -275,9 +275,9 @@ queue_save_transaction() {
     local allowed_root="$3"
     local index
 
-    worms_reject_control_chars "$source_dir" "save restore source"
-    worms_reject_control_chars "$target_dir" "save restore target"
-    worms_reject_control_chars "$allowed_root" "save restore allowed root"
+    worms_reject_control_chars "$source_dir" "save restore source" || return 1
+    worms_reject_control_chars "$target_dir" "save restore target" || return 1
+    worms_reject_control_chars "$allowed_root" "save restore allowed root" || return 1
     for ((index = 0; index < RESTORE_TRANSACTION_COUNT; index++)); do
         if [[ "${RESTORE_TARGET_DIRS[$index]}" == "$target_dir" ]]; then
             echo -e "${RED}ERROR:${NC} Multiple save roots resolve to the same target: $target_dir"
@@ -665,14 +665,36 @@ prepare_save_tree_stage() {
 
 rollback_save_transactions() {
     local reason="${1:-restore failure}"
-    local index target retained failed status=0
+    local index target retained failed stage status=0
 
     echo -e "${YELLOW}Rolling back save restore after ${reason}...${NC}" >&2
     for ((index = RESTORE_TRANSACTION_COUNT - 1; index >= 0; index--)); do
         [[ "${RESTORE_APPLIED[$index]:-0}" == "1" ]] || continue
         target="${RESTORE_TARGET_DIRS[$index]}"
         retained="${RESTORE_RETAINED_DIRS[$index]}"
+        stage="${RESTORE_STAGE_DIRS[$index]:-}"
         failed="$retained/failed-replacement"
+
+        if [[ "${RESTORE_HAD_OLD[$index]:-0}" == "1" ]] \
+            && [[ ! -d "$retained/original" ]]; then
+            RESTORE_APPLIED[index]=0
+            if rmdir "$retained" 2>/dev/null; then
+                RESTORE_RETAINED_DIRS[index]=""
+            else
+                echo -e "${YELLOW}WARNING:${NC} Unused retention directory remains at: $retained" >&2
+            fi
+            continue
+        fi
+        if [[ "${RESTORE_HAD_OLD[$index]:-0}" == "0" ]] \
+            && [[ -n "$stage" ]] && [[ -d "$stage" ]]; then
+            RESTORE_APPLIED[index]=0
+            if rmdir "$retained" 2>/dev/null; then
+                RESTORE_RETAINED_DIRS[index]=""
+            else
+                echo -e "${YELLOW}WARNING:${NC} Unused retention directory remains at: $retained" >&2
+            fi
+            continue
+        fi
 
         if [[ -e "$target" ]] || [[ -L "$target" ]]; then
             if ! mv "$target" "$failed"; then
@@ -756,11 +778,11 @@ apply_save_transactions() {
         RESTORE_APPLIED[index]=1
 
         if [[ -d "$target" ]]; then
+            RESTORE_HAD_OLD[index]=1
             if ! mv "$target" "$retained/original"; then
                 rollback_save_transactions "old-tree retention failure" || true
                 return 1
             fi
-            RESTORE_HAD_OLD[index]=1
         fi
         if ! mv "$stage" "$target"; then
             rollback_save_transactions "replacement publish failure" || true

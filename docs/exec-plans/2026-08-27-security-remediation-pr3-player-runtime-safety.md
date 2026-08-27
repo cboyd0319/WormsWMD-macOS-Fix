@@ -33,7 +33,7 @@ settings, tags, release publication, and PR 4 delivery/provenance work.
 - [x] Contain Homebrew dependency sources canonically.
 - [x] Classify strict signatures and recursive quarantine.
 - [x] Bind update downloads to exact checksums and atomic publish.
-- [ ] Harden traces, diagnostics, crashes, and LaunchAgent updates.
+- [x] Harden traces, diagnostics, crashes, and LaunchAgent updates.
 - [ ] Run local and adversarial gates, merge one reviewed PR, and record PR 4 base.
 
 ## Verification
@@ -92,6 +92,20 @@ git status --short
   stage both artifacts owner-only before rollback-aware publication. Text and
   binary records, decoys, extra records, NUL/CR controls, mismatches,
   interruption, replacement, links, hardlinks, FIFOs, and temp cleanup pass.
+- 2026-08-27: Debug traces are new, private, path-classified files; diagnostics
+  and uniquely named crashes publish private same-directory staging files.
+  Watcher plist install/uninstall now validates exact ownership, type, label,
+  program, and syntax, and a forced bootstrap failure restores and reactivates
+  the prior agent. Linked, foreign, collision, and rollback regressions pass.
+- 2026-08-27: Adversarial review found and corrected premature save-transaction
+  state, omitted executable-owned fallback rpaths, stale bundled dependency
+  reuse, a Qt-version-blind fixed-state predicate, and a conditional-call
+  control-path check. Each correction has a fail-first regression; fresh full
+  local verification passed across all PR3, harness/security, CI-classifier,
+  SBOM/archive/bottle, hook/bootstrap/issue, ShellCheck, and syntax gates.
+- 2026-08-27: The one requested Copilot review identified duplicated update
+  target validation. The checker now calls the shared exact-string validator;
+  its focused test and the affected local gates pass before the corrective push.
 
 ## Surprises & Discoveries
 
@@ -116,6 +130,10 @@ git status --short
   stays unchanged.
 - Release checksum records are parsed as data and bound to the expected basename;
   remote checksum text is never executed through checksum-tool path semantics.
+- Local output uses destination-side staging and private modes; the watcher
+  retains its verified prior plist until replacement bootstrap succeeds.
+- Restore rollback state is set before each rename but interpreted with
+  filesystem evidence, so failure before retention cannot delete the original.
 
 ## Outcomes & Retrospective
 

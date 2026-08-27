@@ -62,7 +62,9 @@ Steam's **Verify integrity of game files** overwrites the fix. Use the watcher t
 The watcher uses the same common game discovery as the installer when
 `GAME_APP` is not set, so it can check common Steam, GOG, Applications, and
 Games-folder installs. When installed as a LaunchAgent, it persists the selected
-`GAME_APP` so automatic reapply targets the same bundle.
+`GAME_APP` so automatic reapply targets the same bundle. Installation replaces
+only a valid project-owned plist and restores the prior loaded agent if the new
+agent cannot bootstrap. Uninstall targets only the exact project label and path.
 
 ## Steam launch options integration
 
@@ -125,6 +127,9 @@ binaries, or private config file contents. The support-bundle
 archive also normalizes tar owner and group metadata so it does not expose the
 local macOS account name. Terminal escape sequences and other C0/DEL controls
 are removed from support text while TSV tabs remain intact.
+Explicit `--output` files are staged beside their destination with mode `0600`
+and atomically published. Existing links, hardlinks, and special files are
+rejected; a safe regular output may be deliberately replaced.
 
 If more than one installation is detected, direct diagnostics require
 `GAME_APP`. The friendly launcher prompts once and preserves that selection for
@@ -144,7 +149,8 @@ Launch the game with extra logging and debug options:
 ```
 
 Log files must be regular `.log` files under `~/Library/Logs/`. Crash reports
-are saved to `~/Library/Logs/WormsWMD/crashes/`. When `GAME_APP` is not set,
+are uniquely staged and atomically saved with mode `0600` under
+`~/Library/Logs/WormsWMD/crashes/`. When `GAME_APP` is not set,
 the launcher auto-detects common Steam, GOG, Applications, and Games-folder
 installs before launching.
 
@@ -167,6 +173,7 @@ or docs-topology changes:
 ./tools/test_launcher_friction.sh
 ./tools/test_preflight_regression.sh
 ./tools/test_signature_verification.sh
+./tools/test_logging_safety.sh
 ./tools/test_manifest_regression.sh
 ./tools/test_qt_cache_integrity.sh
 ./tools/test_qt_version_pinning.sh

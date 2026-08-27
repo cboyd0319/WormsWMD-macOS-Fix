@@ -302,8 +302,11 @@ for function_name in \
 done
 # shellcheck disable=SC1090
 source "$save_functions"
+# shellcheck disable=SC2034
 RED=""
+# shellcheck disable=SC2034
 YELLOW=""
+# shellcheck disable=SC2034
 NC=""
 
 fake_pgrep="$tmp_dir/fake-pgrep"
@@ -356,6 +359,7 @@ steam_process_state() { printf '%s\n' unknown; }
 ensure_steam_stopped >/dev/null \
     || fail "Steam detection failure was treated as proof of a running process"
 
+# shellcheck disable=SC2034
 reset_save_transaction_state() {
     RESTORE_TRANSACTION_ACTIVE=false
     RESTORE_TRANSACTION_COUNT=0
@@ -387,6 +391,32 @@ grep -Fxq original "$copy_failure_root/target/save.dat" \
     || fail "staging copy failure modified the original save tree"
 
 # Restore production transaction functions after the copy-failure override.
+# shellcheck disable=SC1090
+source "$save_functions"
+retention_failure_root="$tmp_dir/retention-failure"
+mkdir -p "$retention_failure_root/source" "$retention_failure_root/target"
+printf 'replacement\n' > "$retention_failure_root/source/save.dat"
+printf 'original\n' > "$retention_failure_root/target/save.dat"
+reset_save_transaction_state
+queue_save_transaction \
+    "$retention_failure_root/source" "$retention_failure_root/target" "$retention_failure_root"
+prepare_save_transactions
+# shellcheck disable=SC2329
+mv() {
+    if [[ "${2:-}" == */original ]]; then
+        return 1
+    fi
+    command mv "$@"
+}
+if apply_save_transactions >/dev/null 2>&1; then
+    unset -f mv
+    fail "save transaction ignored an old-tree retention failure"
+fi
+unset -f mv
+grep -Fxq original "$retention_failure_root/target/save.dat" \
+    || fail "old-tree retention failure removed the original save tree"
+
+# Restore production transaction functions after the retention-failure override.
 # shellcheck disable=SC1090
 source "$save_functions"
 post_verify_root="$tmp_dir/post-verify-failure"

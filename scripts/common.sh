@@ -548,6 +548,39 @@ worms_file_link_count() {
     stat -f "%l" "$path" 2>/dev/null || stat -c "%h" "$path" 2>/dev/null
 }
 
+worms_file_owner_uid() {
+    local path="$1"
+
+    stat -f "%u" "$path" 2>/dev/null || stat -c "%u" "$path" 2>/dev/null
+}
+
+worms_validate_replaceable_regular_file() {
+    local path="$1"
+    local link_count
+
+    if [[ -e "$path" ]] || [[ -L "$path" ]]; then
+        [[ -f "$path" ]] && [[ ! -L "$path" ]] || return 1
+        link_count=$(worms_file_link_count "$path") || return 1
+        [[ "$link_count" == "1" ]] || return 1
+    fi
+}
+
+worms_same_directory_temp_file() {
+    local target="$1"
+    local parent
+    local old_umask
+    local status
+
+    parent=$(dirname "$target")
+    [[ -d "$parent" ]] && [[ ! -L "$parent" ]] || return 1
+    old_umask=$(umask)
+    umask 077
+    mktemp "$parent/.wormswmd-output.XXXXXX"
+    status=$?
+    umask "$old_umask"
+    return "$status"
+}
+
 worms_has_control_chars() {
     local value="$1"
     local LC_ALL=C
@@ -666,7 +699,7 @@ worms_resolve_macho_dependency_source() {
     local dependency="$2"
     local game_exec="$3"
     shift 3
-    local dependency_suffix rpath expanded candidate resolved item
+    local dependency_suffix rpath expanded candidate resolved item rpath_bin
     local existing=false
     local resolved_sources=()
 
@@ -679,23 +712,27 @@ worms_resolve_macho_dependency_source() {
     case "$dependency" in
         @rpath/*)
             dependency_suffix=${dependency#@rpath/}
-            while IFS= read -r rpath; do
-                [[ -n "$rpath" ]] || continue
-                worms_has_control_chars "$rpath" && continue
-                expanded=$(worms_expand_macho_path \
-                    "$rpath" "$binary" "$game_exec" || true)
-                [[ -n "$expanded" ]] || continue
-                candidate="${expanded%/}/$dependency_suffix"
-                [[ -e "$candidate" ]] || [[ -L "$candidate" ]] || continue
-                resolved=$(worms_validate_dependency_source "$candidate" "$@" \
-                    2>/dev/null || true)
-                [[ -n "$resolved" ]] || continue
-                existing=false
-                for item in "${resolved_sources[@]:-}"; do
-                    [[ "$item" == "$resolved" ]] && existing=true
-                done
-                $existing || resolved_sources+=("$resolved")
-            done < <(worms_macho_rpaths "$binary")
+            for rpath_bin in "$binary" "$game_exec"; do
+                [[ -f "$rpath_bin" ]] || continue
+                while IFS= read -r rpath; do
+                    [[ -n "$rpath" ]] || continue
+                    worms_has_control_chars "$rpath" && continue
+                    expanded=$(worms_expand_macho_path \
+                        "$rpath" "$rpath_bin" "$game_exec" || true)
+                    [[ -n "$expanded" ]] || continue
+                    candidate="${expanded%/}/$dependency_suffix"
+                    [[ -e "$candidate" ]] || [[ -L "$candidate" ]] || continue
+                    resolved=$(worms_validate_dependency_source "$candidate" "$@" \
+                        2>/dev/null || true)
+                    [[ -n "$resolved" ]] || continue
+                    existing=false
+                    for item in "${resolved_sources[@]:-}"; do
+                        [[ "$item" == "$resolved" ]] && existing=true
+                    done
+                    $existing || resolved_sources+=("$resolved")
+                done < <(worms_macho_rpaths "$rpath_bin")
+                [[ "$rpath_bin" == "$game_exec" ]] && break
+            done
             ;;
         @executable_path|@executable_path/*|@loader_path|@loader_path/*)
             candidate=$(worms_expand_macho_path \
@@ -753,7 +790,8 @@ worms_record_dependency_source() {
 worms_runtime_fix_complete_with() {
     local game_app="$1"
     local lipo_bin="$2"
-    local path archs
+    local otool_bin="$3"
+    local path archs qt_details
     local required_paths=(
         "Contents/MacOS/Worms W.M.D"
         "Contents/Frameworks/AGL.framework/Versions/A/AGL"
@@ -768,13 +806,18 @@ worms_runtime_fix_complete_with() {
         "Contents/PlugIns/imageformats/libqsvg.dylib"
     )
 
-    [[ -x "$lipo_bin" ]] || return 1
+    [[ -x "$lipo_bin" ]] && [[ -x "$otool_bin" ]] || return 1
     for path in "${required_paths[@]}"; do
         path="$game_app/$path"
         [[ -f "$path" ]] && [[ ! -L "$path" ]] || return 1
         archs=$("$lipo_bin" -archs "$path" 2>/dev/null || true)
         printf '%s\n' "$archs" | tr ' ' '\n' | grep -qx x86_64 || return 1
     done
+    qt_details=$("$otool_bin" -L \
+        "$game_app/Contents/Frameworks/QtCore.framework/Versions/5/QtCore" \
+        2>/dev/null) || return 1
+    grep -Eq 'QtCore[.]framework/Versions/5/QtCore .*current version 5[.]15[.]' \
+        <<< "$qt_details" || return 1
 }
 
 worms_signature_state_with() {
@@ -811,9 +854,10 @@ worms_classify_bundle_signature_with() {
     local game_app="$1"
     local lipo_bin="$2"
     local codesign_bin="$3"
+    local otool_bin="$4"
     local fix_state=original signature_state
 
-    if worms_runtime_fix_complete_with "$game_app" "$lipo_bin"; then
+    if worms_runtime_fix_complete_with "$game_app" "$lipo_bin" "$otool_bin"; then
         fix_state=fixed
     fi
     signature_state=$(worms_signature_state_with "$codesign_bin" "$game_app")
@@ -822,12 +866,13 @@ worms_classify_bundle_signature_with() {
 
 worms_classify_bundle_signature() {
     local game_app="$1"
-    local lipo_bin codesign_bin
+    local lipo_bin codesign_bin otool_bin
 
     lipo_bin=$(command -v lipo 2>/dev/null || true)
     codesign_bin=$(command -v codesign 2>/dev/null || true)
+    otool_bin=$(command -v otool 2>/dev/null || true)
     worms_classify_bundle_signature_with \
-        "$game_app" "$lipo_bin" "$codesign_bin"
+        "$game_app" "$lipo_bin" "$codesign_bin" "$otool_bin"
 }
 
 worms_quarantine_state_with() {

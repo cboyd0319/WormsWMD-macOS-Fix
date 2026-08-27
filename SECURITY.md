@@ -35,6 +35,7 @@ Last reviewed: 2026-08-27.
 | CI workflow compromise | Full-SHA Action policy, selected-action allowlist, job-scoped tokens, CODEOWNERS |
 | New committed secrets | Local staged scan, required current-tree scan, secret scanning, push protection |
 | Diagnostic data exposure | Support bundles sanitize text and omit raw/private/game/save content |
+| Local output redirection | New traces, diagnostics, crashes, and watcher plists use validated paths, private modes, atomic publish, and rollback |
 
 ### Assumptions and exclusions
 
@@ -65,6 +66,14 @@ files. It may create these user-owned paths outside the bundle:
 
 The fix does not modify system directories, collect telemetry, alter `PATH` or
 `DYLD_LIBRARY_PATH`, or install privileged persistence.
+
+Debug traces are new-file-only. Environment-selected traces stay under
+`~/Library/Logs`; an explicit `--trace-file` may select another existing safe
+directory. Diagnostics and crash reports stage mode-`0600` output beside the
+destination before rename. The optional watcher replaces or removes only its
+exact regular, singly linked, user-owned plist with the expected label and
+program, validates it with `plutil`, and restores/reactivates the prior agent if
+bootstrap fails.
 
 ### Untrusted inputs
 

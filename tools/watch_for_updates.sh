@@ -27,12 +27,23 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 LAUNCH_AGENT_ID="com.wormswmd.fix.watcher"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_ID}.plist"
 CHECK_INTERVAL=300  # 5 minutes
+LAUNCH_AGENT_TEMP_FILE=""
 
 # shellcheck disable=SC1091
 source "$REPO_DIR/scripts/common.sh"
 # shellcheck disable=SC1091
 source "$REPO_DIR/scripts/ui.sh"
 worms_color_init
+
+cleanup_watcher_temp() {
+    if [[ -n "$LAUNCH_AGENT_TEMP_FILE" ]] \
+        && [[ -f "$LAUNCH_AGENT_TEMP_FILE" ]] \
+        && [[ ! -L "$LAUNCH_AGENT_TEMP_FILE" ]]; then
+        rm -f -- "$LAUNCH_AGENT_TEMP_FILE"
+    fi
+}
+
+trap cleanup_watcher_temp EXIT
 
 DEFAULT_GAME_PATH="$(worms_default_game_app)"
 GAME_APP="${GAME_APP:-$DEFAULT_GAME_PATH}"
@@ -138,6 +149,40 @@ xml_escape() {
         -e "s/'/\&apos;/g"
 }
 
+prepare_launch_agent_directory() {
+    local library_dir="$HOME/Library"
+    local launch_agents_dir="$library_dir/LaunchAgents"
+
+    worms_reject_control_chars "$HOME" "HOME" || return 1
+    [[ -d "$HOME" ]] && [[ ! -L "$HOME" ]] || return 1
+    if [[ -e "$library_dir" ]] || [[ -L "$library_dir" ]]; then
+        [[ -d "$library_dir" ]] && [[ ! -L "$library_dir" ]] || return 1
+    else
+        mkdir "$library_dir" || return 1
+    fi
+    if [[ -e "$launch_agents_dir" ]] || [[ -L "$launch_agents_dir" ]]; then
+        [[ -d "$launch_agents_dir" ]] && [[ ! -L "$launch_agents_dir" ]] || return 1
+    else
+        mkdir "$launch_agents_dir" || return 1
+    fi
+}
+
+launch_agent_is_project_owned() {
+    local path="$1"
+    local link_count owner_uid label program
+
+    [[ -f "$path" ]] && [[ ! -L "$path" ]] || return 1
+    link_count=$(worms_file_link_count "$path") || return 1
+    [[ "$link_count" == "1" ]] || return 1
+    owner_uid=$(worms_file_owner_uid "$path") || return 1
+    [[ "$owner_uid" == "$UID" ]] || return 1
+    plutil -lint "$path" >/dev/null 2>&1 || return 1
+    label=$(plutil -extract Label raw -o - "$path" 2>/dev/null) || return 1
+    program=$(plutil -extract ProgramArguments.0 raw -o - "$path" 2>/dev/null) || return 1
+    [[ "$label" == "$LAUNCH_AGENT_ID" ]] \
+        && [[ "$program" == "$SCRIPT_DIR/watch_for_updates.sh" ]]
+}
+
 # Prompt user to reapply
 prompt_reapply() {
     local response
@@ -218,15 +263,66 @@ do_daemon() {
 do_install() {
     echo "Installing update watcher as LaunchAgent..."
     local launch_domain="gui/${UID}"
-    local watcher_path log_path game_app_path
+    local watcher_path log_path game_app_path retained_plist="" watcher_log_temp=""
+    local logs_root="$HOME/Library/Logs"
+    local project_log_dir="$logs_root/WormsWMD-Fix"
+    local watcher_log_path="$project_log_dir/watcher.log"
+    local prior_active=false old_umask
 
-    mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/WormsWMD-Fix"
+    if ! prepare_launch_agent_directory; then
+        echo -e "${RED}Refusing an unsafe LaunchAgents directory${NC}" >&2
+        return 1
+    fi
+    if [[ -e "$logs_root" ]] || [[ -L "$logs_root" ]]; then
+        [[ -d "$logs_root" ]] && [[ ! -L "$logs_root" ]] || {
+            echo -e "${RED}Refusing an unsafe Logs directory${NC}" >&2
+            return 1
+        }
+    else
+        mkdir "$logs_root"
+    fi
+    if [[ -e "$project_log_dir" ]] || [[ -L "$project_log_dir" ]]; then
+        [[ -d "$project_log_dir" ]] && [[ ! -L "$project_log_dir" ]] || {
+            echo -e "${RED}Refusing an unsafe watcher log directory${NC}" >&2
+            return 1
+        }
+    else
+        mkdir "$project_log_dir"
+    fi
+    if ! worms_validate_replaceable_regular_file "$watcher_log_path"; then
+        echo -e "${RED}Refusing an unsafe watcher log target${NC}" >&2
+        return 1
+    fi
+    if [[ ! -e "$watcher_log_path" ]]; then
+        watcher_log_temp=$(worms_same_directory_temp_file "$watcher_log_path") || return 1
+        chmod 600 "$watcher_log_temp"
+        if ! mv -n -- "$watcher_log_temp" "$watcher_log_path" \
+            || [[ -e "$watcher_log_temp" ]]; then
+            rm -f -- "$watcher_log_temp"
+            echo -e "${RED}Could not create a safe watcher log${NC}" >&2
+            return 1
+        fi
+    else
+        chmod 600 "$watcher_log_path"
+    fi
+    if [[ -e "$LAUNCH_AGENT_PATH" ]] || [[ -L "$LAUNCH_AGENT_PATH" ]]; then
+        if ! launch_agent_is_project_owned "$LAUNCH_AGENT_PATH"; then
+            echo -e "${RED}Refusing to replace a foreign or linked LaunchAgent${NC}" >&2
+            return 1
+        fi
+        if launchctl print "$launch_domain/$LAUNCH_AGENT_ID" >/dev/null 2>&1; then
+            prior_active=true
+        fi
+    fi
     watcher_path=$(printf '%s' "${SCRIPT_DIR}/watch_for_updates.sh" | xml_escape)
-    log_path=$(printf '%s' "${HOME}/Library/Logs/WormsWMD-Fix/watcher.log" | xml_escape)
+    log_path=$(printf '%s' "$watcher_log_path" | xml_escape)
     game_app_path=$(printf '%s' "$GAME_APP" | xml_escape)
 
-    # Create LaunchAgent plist
-    cat > "$LAUNCH_AGENT_PATH" << EOF
+    old_umask=$(umask)
+    umask 077
+    LAUNCH_AGENT_TEMP_FILE=$(mktemp "$(dirname "$LAUNCH_AGENT_PATH")/.${LAUNCH_AGENT_ID}.plist.XXXXXX")
+    umask "$old_umask"
+    cat > "$LAUNCH_AGENT_TEMP_FILE" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -254,10 +350,62 @@ do_install() {
 </dict>
 </plist>
 EOF
+    chmod 600 "$LAUNCH_AGENT_TEMP_FILE"
+    if ! plutil -lint "$LAUNCH_AGENT_TEMP_FILE" >/dev/null 2>&1; then
+        rm -f -- "$LAUNCH_AGENT_TEMP_FILE"
+        LAUNCH_AGENT_TEMP_FILE=""
+        echo -e "${RED}Generated LaunchAgent failed plist validation${NC}" >&2
+        return 1
+    fi
 
-    # Load the agent
-    launchctl bootout "$launch_domain" "$LAUNCH_AGENT_PATH" 2>/dev/null || true
-    launchctl bootstrap "$launch_domain" "$LAUNCH_AGENT_PATH"
+    if [[ -e "$LAUNCH_AGENT_PATH" ]] || [[ -L "$LAUNCH_AGENT_PATH" ]]; then
+        if ! launch_agent_is_project_owned "$LAUNCH_AGENT_PATH"; then
+            echo -e "${RED}LaunchAgent became unsafe before replacement${NC}" >&2
+            return 1
+        fi
+        retained_plist=$(mktemp "$(dirname "$LAUNCH_AGENT_PATH")/.${LAUNCH_AGENT_ID}.retained.XXXXXX")
+        rm -f -- "$retained_plist"
+        if ! mv -- "$LAUNCH_AGENT_PATH" "$retained_plist"; then
+            echo -e "${RED}Could not retain the prior LaunchAgent${NC}" >&2
+            return 1
+        fi
+        launchctl bootout "$launch_domain/$LAUNCH_AGENT_ID" 2>/dev/null || true
+    fi
+    if ! mv -n -- "$LAUNCH_AGENT_TEMP_FILE" "$LAUNCH_AGENT_PATH" \
+        || [[ -e "$LAUNCH_AGENT_TEMP_FILE" ]]; then
+        if [[ -n "$retained_plist" ]] \
+            && [[ ! -e "$LAUNCH_AGENT_PATH" ]] && [[ ! -L "$LAUNCH_AGENT_PATH" ]]; then
+            if mv -n -- "$retained_plist" "$LAUNCH_AGENT_PATH" \
+                && [[ ! -e "$retained_plist" ]]; then
+                $prior_active \
+                    && launchctl bootstrap "$launch_domain" "$LAUNCH_AGENT_PATH" >/dev/null 2>&1 \
+                    || true
+            fi
+        fi
+        if [[ -n "$retained_plist" ]] && [[ -e "$retained_plist" ]]; then
+            echo -e "${RED}Prior LaunchAgent retained at: $retained_plist${NC}" >&2
+        fi
+        echo -e "${RED}Could not publish the LaunchAgent${NC}" >&2
+        return 1
+    fi
+    LAUNCH_AGENT_TEMP_FILE=""
+    if ! launchctl bootstrap "$launch_domain" "$LAUNCH_AGENT_PATH"; then
+        rm -f -- "$LAUNCH_AGENT_PATH"
+        if [[ -n "$retained_plist" ]] && [[ -f "$retained_plist" ]]; then
+            if mv -n -- "$retained_plist" "$LAUNCH_AGENT_PATH" \
+                && [[ ! -e "$retained_plist" ]]; then
+                if $prior_active \
+                    && ! launchctl bootstrap "$launch_domain" "$LAUNCH_AGENT_PATH"; then
+                    echo -e "${RED}Prior LaunchAgent was restored but could not be reactivated${NC}" >&2
+                fi
+            else
+                echo -e "${RED}Prior LaunchAgent retained at: $retained_plist${NC}" >&2
+            fi
+        fi
+        echo -e "${RED}LaunchAgent bootstrap failed; prior configuration restored${NC}" >&2
+        return 1
+    fi
+    [[ -n "$retained_plist" ]] && rm -f -- "$retained_plist"
 
     echo -e "${GREEN}Update watcher installed!${NC}"
     echo ""
@@ -272,9 +420,13 @@ do_uninstall() {
     echo "Uninstalling update watcher..."
     local launch_domain="gui/${UID}"
 
-    if [[ -f "$LAUNCH_AGENT_PATH" ]]; then
-        launchctl bootout "$launch_domain" "$LAUNCH_AGENT_PATH" 2>/dev/null || true
-        rm -f "$LAUNCH_AGENT_PATH"
+    if [[ -e "$LAUNCH_AGENT_PATH" ]] || [[ -L "$LAUNCH_AGENT_PATH" ]]; then
+        if ! launch_agent_is_project_owned "$LAUNCH_AGENT_PATH"; then
+            echo -e "${RED}Refusing to remove a foreign or linked LaunchAgent${NC}" >&2
+            return 1
+        fi
+        launchctl bootout "$launch_domain/$LAUNCH_AGENT_ID" 2>/dev/null || true
+        rm -f -- "$LAUNCH_AGENT_PATH"
         echo -e "${GREEN}Update watcher uninstalled${NC}"
     else
         echo "LaunchAgent not installed"

@@ -134,6 +134,7 @@ ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/test_launcher_friction.sh
 ./tools/test_preflight_regression.sh
 ./tools/test_signature_verification.sh
+./tools/test_logging_safety.sh
 ./tools/test_update_download_safety.sh
 ./tools/test_manifest_regression.sh
 ./tools/test_qt_cache_integrity.sh
@@ -216,5 +217,4 @@ Confirm:
 - Relevant docs and execution plans match the implementation.
 - Required validation commands ran, or the reason they could not run is clear.
 - New local artifacts such as `/tmp/AGL_test` were removed.
-- No logs, diagnostics, secrets, or generated support bundles were accidentally
-  added to the repo.
+- No logs, diagnostics, secrets, or generated support bundles were added.

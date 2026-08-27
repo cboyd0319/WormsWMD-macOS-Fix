@@ -21,6 +21,10 @@ cp "$ROOT_DIR/tools/check_updates.sh" "$fixture/tools/check_updates.sh"
 cp "$ROOT_DIR/scripts/common.sh" "$fixture/scripts/common.sh"
 cp "$ROOT_DIR/scripts/ui.sh" "$fixture/scripts/ui.sh"
 chmod +x "$fixture/tools/check_updates.sh"
+# shellcheck disable=SC2016
+grep -Fq 'worms_validate_replaceable_regular_file "$DOWNLOAD_FILE"' \
+    "$fixture/tools/check_updates.sh" \
+    || fail "update checker does not reuse the shared safe-target validator"
 cat > "$fixture/fix_worms_wmd.sh" <<'SH'
 VERSION="1.0.0"
 SH

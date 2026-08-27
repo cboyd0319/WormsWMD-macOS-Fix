@@ -151,9 +151,18 @@ missing=0
 
 declare -a dependency_roots=()
 declare -a scanned_bins=()
+declare -a installed_dependency_names=()
 declare -a queue=("${scan_bins[@]}")
 DEPENDENCY_SOURCE_RECORDS=$(mktemp "${TMPDIR:-/tmp}/wormswmd-dependency-sources.XXXXXX")
-trap 'rm -f "$DEPENDENCY_SOURCE_RECORDS"' EXIT
+DEPENDENCY_TEMP=""
+cleanup_dependency_copy() {
+    rm -f "$DEPENDENCY_SOURCE_RECORDS"
+    if [[ -n "$DEPENDENCY_TEMP" ]] && [[ -f "$DEPENDENCY_TEMP" ]] \
+        && [[ ! -L "$DEPENDENCY_TEMP" ]]; then
+        rm -f "$DEPENDENCY_TEMP"
+    fi
+}
+trap cleanup_dependency_copy EXIT
 
 bin_scanned() {
     local search="$1"
@@ -166,6 +175,44 @@ bin_scanned() {
     done
 
     return 1
+}
+
+dependency_name_installed() {
+    local search="$1"
+    local item
+
+    for item in "${installed_dependency_names[@]:-}"; do
+        [[ "$item" == "$search" ]] && return 0
+    done
+    return 1
+}
+
+install_dependency_source() {
+    local source="$1"
+    local target="$2"
+    local name="$3"
+
+    DEPENDENCY_TEMP=$(worms_same_directory_temp_file "$target") || return 1
+    if ! cp "$source" "$DEPENDENCY_TEMP" \
+        || ! chmod 755 "$DEPENDENCY_TEMP" \
+        || ! install_name_tool -id \
+            "@executable_path/../Frameworks/$name" "$DEPENDENCY_TEMP" \
+        || ! validate_bundled_dependency_target "$DEPENDENCY_TEMP"; then
+        rm -f "$DEPENDENCY_TEMP"
+        DEPENDENCY_TEMP=""
+        return 1
+    fi
+    if ! worms_validate_replaceable_regular_file "$target"; then
+        rm -f "$DEPENDENCY_TEMP"
+        DEPENDENCY_TEMP=""
+        return 1
+    fi
+    if ! mv -f -- "$DEPENDENCY_TEMP" "$target"; then
+        rm -f "$DEPENDENCY_TEMP"
+        DEPENDENCY_TEMP=""
+        return 1
+    fi
+    DEPENDENCY_TEMP=""
 }
 
 initialize_dependency_roots() {
@@ -281,42 +328,44 @@ while [ ${#queue[@]} -gt 0 ]; do
             fi
         fi
 
-        if [[ -f "$target" ]]; then
+        if [[ -e "$target" ]] || [[ -L "$target" ]]; then
             if ! validate_bundled_dependency_target "$target"; then
                 echo "ERROR: Existing bundled dependency is unsafe: $target"
                 ((++missing))
                 continue
             fi
+        fi
+
+        if [[ -n "$local_path" ]]; then
+            if ! dependency_name_installed "$name"; then
+                echo "Copying $name..."
+                if ! install_dependency_source "$local_path" "$target" "$name"; then
+                    echo "ERROR: Failed to publish copied dependency: $target"
+                    ((++missing))
+                    continue
+                fi
+                installed_dependency_names+=("$name")
+                ((++copied))
+            fi
             queue+=("$target")
             continue
         fi
 
-        if [[ -z "$local_path" ]]; then
-            if worms_macho_dependency_is_weak "$bin" "$dep"; then
-                echo "WARNING: Optional dependency unavailable: $dep"
-                continue
-            fi
-            if [[ "$resolve_status" -eq 2 ]]; then
-                echo "ERROR: Ambiguous dependency source: $dep ($bin)"
-            else
-                echo "ERROR: Could not resolve dependency source: $dep ($bin)"
-            fi
-            ((++missing))
+        if [[ -f "$target" ]]; then
+            queue+=("$target")
             continue
         fi
 
-        echo "Copying $name..."
-        cp "$local_path" "$target"
-        chmod 755 "$target"
-        if ! install_name_tool -id \
-            "@executable_path/../Frameworks/$name" "$target"; then
-            echo "ERROR: Failed to update copied dependency ID: $target"
-            ((++missing))
+        if worms_macho_dependency_is_weak "$bin" "$dep"; then
+            echo "WARNING: Optional dependency unavailable: $dep"
             continue
         fi
-        ((++copied))
-
-        queue+=("$target")
+        if [[ "$resolve_status" -eq 2 ]]; then
+            echo "ERROR: Ambiguous dependency source: $dep ($bin)"
+        else
+            echo "ERROR: Could not resolve dependency source: $dep ($bin)"
+        fi
+        ((++missing))
     done < <(worms_otool_dependencies "$bin")
 done
 

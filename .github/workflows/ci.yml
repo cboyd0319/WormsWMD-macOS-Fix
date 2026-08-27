@@ -124,10 +124,8 @@ jobs:
             src/agl_stub.c
           file /tmp/AGL_test
           rm /tmp/AGL_test
-
       - name: Test bootstrap installer safety
         run: ./tools/test_bootstrap_installer_safety.sh
-
       - name: Test dependency parsing
         run: ./tools/test_dependency_parsing.sh
 
@@ -159,6 +157,8 @@ jobs:
         run: ./tools/test_preflight_regression.sh
       - name: Test signature verification
         run: ./tools/test_signature_verification.sh
+      - name: Test logging safety
+        run: ./tools/test_logging_safety.sh
       - name: Test update download safety
         run: ./tools/test_update_download_safety.sh
       - name: Test manifest regression

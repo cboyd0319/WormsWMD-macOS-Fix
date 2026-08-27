@@ -161,15 +161,6 @@ get_checksum_url() {
     fi
 }
 
-validate_download_target() {
-    local path="$1"
-
-    if [[ -e "$path" ]] || [[ -L "$path" ]]; then
-        [[ -f "$path" ]] && [[ ! -L "$path" ]] \
-            && [[ "$(worms_file_link_count "$path")" -eq 1 ]]
-    fi
-}
-
 prepare_download_directory() {
     local downloads_dir="$1"
     local home_dir="${HOME:-}"
@@ -313,8 +304,8 @@ else
             echo -e "${RED}Unsafe Downloads directory${NC}"
             exit 2
         fi
-        if ! validate_download_target "$DOWNLOAD_FILE" \
-            || ! validate_download_target "$CHECKSUM_FILE"; then
+        if ! worms_validate_replaceable_regular_file "$DOWNLOAD_FILE" \
+            || ! worms_validate_replaceable_regular_file "$CHECKSUM_FILE"; then
             echo -e "${RED}Refusing an unsafe existing download target${NC}"
             exit 2
         fi

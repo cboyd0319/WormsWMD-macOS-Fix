@@ -252,6 +252,18 @@ cat > "$fake_bin/install_name_tool" <<'STUB'
 exit 0
 STUB
 chmod +x "$fake_bin/install_name_tool"
+cat > "$fake_bin/mv" <<'STUB'
+#!/bin/bash
+source_path="${@: -2:1}"
+target_path="${@: -1}"
+if [[ "${WORMS_TEST_DEPENDENCY_PUBLISH_FAIL:-0}" == "1" ]] \
+    && [[ "$(basename "$source_path")" == .wormswmd-output.* ]] \
+    && [[ "$target_path" == */Contents/Frameworks/libRuntime\ With\ Spaces.dylib ]]; then
+    exit 1
+fi
+exec /bin/mv "$@"
+STUB
+chmod +x "$fake_bin/mv"
 
 cat > "$fake_bin/find" <<'STUB'
 #!/bin/bash
@@ -381,6 +393,47 @@ resolved_source=$(PATH="$resolver_tools:$PATH" worms_resolve_macho_dependency_so
 [[ "$resolved_source" == "$resolver_root_real/deps/libValid.dylib" ]] \
     || fail "loader-owned rpath with spaces resolved incorrectly: $resolved_source"
 
+exec_rpath_root="$tmp_dir/Executable Rpath Root"
+exec_rpath_tools="$tmp_dir/executable-rpath-tools"
+exec_rpath_owner="$exec_rpath_root/plugins/imageformats/libowner.dylib"
+exec_rpath_game="$exec_rpath_root/bin/game"
+exec_rpath_source="$exec_rpath_root/deps/libFromExecutable.dylib"
+mkdir -p "$exec_rpath_tools" "$(dirname "$exec_rpath_owner")" \
+    "$(dirname "$exec_rpath_game")" "$(dirname "$exec_rpath_source")"
+: > "$exec_rpath_owner"
+: > "$exec_rpath_game"
+printf 'executable rpath source\n' > "$exec_rpath_source"
+cat > "$exec_rpath_tools/otool" <<'STUB'
+#!/bin/bash
+has_loads=false
+for argument in "$@"; do
+    [[ "$argument" == "-l" ]] && has_loads=true
+done
+$has_loads || exit 1
+binary="${@: -1}"
+if [[ "$binary" == */bin/game ]]; then
+    cat <<'LOADS'
+Load command 1
+          cmd LC_RPATH
+      cmdsize 48
+         path @loader_path/../deps (offset 12)
+LOADS
+fi
+STUB
+cat > "$exec_rpath_tools/lipo" <<'STUB'
+#!/bin/bash
+[[ "${1:-}" == "-archs" ]] || exit 1
+printf '%s\n' x86_64
+STUB
+chmod +x "$exec_rpath_tools"/*
+exec_rpath_source_real=$(cd "$(dirname "$exec_rpath_source")" && pwd -P)/$(basename "$exec_rpath_source")
+resolved_from_exec=$(PATH="$exec_rpath_tools:$PATH" \
+    worms_resolve_macho_dependency_source \
+    "$exec_rpath_owner" '@rpath/libFromExecutable.dylib' "$exec_rpath_game" \
+    "$(dirname "$exec_rpath_source_real")" || true)
+[[ "$resolved_from_exec" == "$exec_rpath_source_real" ]] \
+    || fail "executable-owned fallback rpath did not resolve from its owning image: $resolved_from_exec"
+
 for unsafe_dependency in \
     '@loader_path/../deps/libValid.dylib' \
     "$tmp_dir/libOutside.dylib" \
@@ -435,6 +488,35 @@ homebrew_copy_output=$(PATH="$fake_bin:$PATH" \
     || fail "runtime dependency copy rejected a valid explicit root: $homebrew_copy_output"
 grep -Fxq 'runtime source' "$game_app/Contents/Frameworks/$(basename "$runtime_source")" \
     || fail "runtime dependency copy did not use the canonical explicit source"
+runtime_target="$game_app/Contents/Frameworks/$(basename "$runtime_source")"
+printf 'stale bundled dependency\n' > "$runtime_target"
+homebrew_copy_output=$(PATH="$fake_bin:$PATH" \
+    GAME_APP="$game_app" HOME="$dependency_home" QT_SOURCE=homebrew \
+    QT_PREFIX="$homebrew_root" QT_DEP_PREFIX="$homebrew_dep_root" \
+    WORMSWMD_ALLOW_CUSTOM_QT_PREFIX=1 WORMSWMD_LOGGING_INITIALIZED=1 \
+    LOG_FILE="$homebrew_log" WORMS_TEST_COPY_SOURCE="$runtime_source" \
+    "$ROOT_DIR/scripts/03_copy_dependencies.sh" 2>&1) \
+    || fail "runtime dependency refresh failed: $homebrew_copy_output"
+grep -Fxq 'runtime source' "$runtime_target" \
+    || fail "runtime dependency copy trusted a stale same-named bundled target"
+printf 'preserved bundled dependency\n' > "$runtime_target"
+set +e
+PATH="$fake_bin:$PATH" GAME_APP="$game_app" HOME="$dependency_home" \
+    QT_SOURCE=homebrew QT_PREFIX="$homebrew_root" QT_DEP_PREFIX="$homebrew_dep_root" \
+    WORMSWMD_ALLOW_CUSTOM_QT_PREFIX=1 WORMSWMD_LOGGING_INITIALIZED=1 \
+    LOG_FILE="$homebrew_log" WORMS_TEST_COPY_SOURCE="$runtime_source" \
+    WORMS_TEST_DEPENDENCY_PUBLISH_FAIL=1 \
+    "$ROOT_DIR/scripts/03_copy_dependencies.sh" >/dev/null 2>&1
+publish_failure_status=$?
+set -e
+[[ "$publish_failure_status" -ne 0 ]] \
+    || fail "runtime dependency copy ignored a publication failure"
+grep -Fxq 'preserved bundled dependency' "$runtime_target" \
+    || fail "runtime dependency publication failure modified the prior target"
+if find "$game_app/Contents/Frameworks" -mindepth 1 -maxdepth 1 \
+    -name '.wormswmd-output.*' -print -quit | grep -q .; then
+    fail "runtime dependency publication failure leaked a staging file"
+fi
 
 first_duplicate="$homebrew_dep_root/lib-one/libDuplicate.dylib"
 second_duplicate="$homebrew_dep_root/lib-two/libDuplicate.dylib"
@@ -461,12 +543,12 @@ for unsafe_source in \
     "$tmp_dir/libOutside.dylib" \
     "$resolver_root/deps/libNoX86.dylib"; do
     set +e
-    unsafe_copy_output=$(PATH="$fake_bin:$PATH" \
+    PATH="$fake_bin:$PATH" \
         GAME_APP="$game_app" HOME="$dependency_home" QT_SOURCE=homebrew QT_PREFIX="$homebrew_root" \
         QT_DEP_PREFIX="$homebrew_dep_root" WORMSWMD_ALLOW_CUSTOM_QT_PREFIX=1 \
         WORMSWMD_LOGGING_INITIALIZED=1 LOG_FILE="$homebrew_log" \
         WORMS_TEST_COPY_SOURCE="$unsafe_source" \
-        "$ROOT_DIR/scripts/03_copy_dependencies.sh" 2>&1)
+        "$ROOT_DIR/scripts/03_copy_dependencies.sh" >/dev/null 2>&1
     unsafe_copy_status=$?
     set -e
     [[ "$unsafe_copy_status" -ne 0 ]] \

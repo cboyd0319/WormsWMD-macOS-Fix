@@ -17,7 +17,9 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 complete_app="$tmp_dir/complete/Worms W.M.D.app"
 original_app="$tmp_dir/original/Worms W.M.D.app"
+stale_qt_app="$tmp_dir/stale-qt/Worms W.M.D.app"
 fake_lipo="$tmp_dir/lipo"
+fake_otool="$tmp_dir/otool"
 fake_codesign="$tmp_dir/codesign"
 fake_xattr="$tmp_dir/xattr"
 
@@ -35,6 +37,8 @@ for framework in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
 done
 : > "$complete_app/Contents/PlugIns/platforms/libqcocoa.dylib"
 : > "$complete_app/Contents/PlugIns/imageformats/libqsvg.dylib"
+mkdir -p "$(dirname "$stale_qt_app")"
+cp -R "$complete_app" "$stale_qt_app"
 
 cat > "$fake_lipo" <<'STUB'
 #!/bin/bash
@@ -61,6 +65,16 @@ case "${SIGNATURE_MODE:-unsigned}" in
     unsigned) printf '%s\n' 'code object is not signed at all' >&2; exit 1 ;;
 esac
 STUB
+cat > "$fake_otool" <<'STUB'
+#!/bin/bash
+binary="${@: -1}"
+printf '%s:\n' "$binary"
+if [[ "$binary" == *stale-qt* ]]; then
+    printf '\t@rpath/QtCore.framework/Versions/5/QtCore (compatibility version 5.3.0, current version 5.3.2)\n'
+else
+    printf '\t@rpath/QtCore.framework/Versions/5/QtCore (compatibility version 5.15.0, current version 5.15.19)\n'
+fi
+STUB
 cat > "$fake_xattr" <<'STUB'
 #!/bin/bash
 [[ "${1:-}" == "-p" && "${2:-}" == "com.apple.quarantine" ]] || exit 2
@@ -70,7 +84,7 @@ case ",${QUARANTINE_NAMES:-}," in
 esac
 exit 1
 STUB
-chmod +x "$fake_lipo" "$fake_codesign" "$fake_xattr"
+chmod +x "$fake_lipo" "$fake_otool" "$fake_codesign" "$fake_xattr"
 
 assert_signature_state() {
     local expected="$1"
@@ -79,20 +93,21 @@ assert_signature_state() {
     local actual
 
     actual=$(SIGNATURE_MODE="$mode" worms_classify_bundle_signature_with \
-        "$app" "$fake_lipo" "$fake_codesign")
+        "$app" "$fake_lipo" "$fake_codesign" "$fake_otool")
     [[ "$actual" == "$expected" ]] \
         || fail "expected $expected for $mode, got $actual"
 }
 
 assert_signature_state original-unsigned "$original_app" unsigned
 assert_signature_state original-invalid "$original_app" invalid
+assert_signature_state original-unsigned "$stale_qt_app" unsigned
 assert_signature_state fixed-valid-adhoc "$complete_app" valid-adhoc
 assert_signature_state fixed-valid "$complete_app" valid-authority
 assert_signature_state fixed-invalid "$complete_app" invalid
 assert_signature_state fixed-invalid "$complete_app" metadata-only
 
 unavailable_state=$(worms_classify_bundle_signature_with \
-    "$complete_app" "$fake_lipo" "")
+    "$complete_app" "$fake_lipo" "" "$fake_otool")
 [[ "$unavailable_state" == "fixed-unavailable" ]] \
     || fail "unavailable codesign was misclassified: $unavailable_state"
 
@@ -127,6 +142,7 @@ signature_home="$tmp_dir/signature-home"
 diagnostic_report="$tmp_dir/signature-diagnostics.txt"
 mkdir -p "$signature_bin" "$signature_home"
 ln -s "$fake_lipo" "$signature_bin/lipo"
+ln -s "$fake_otool" "$signature_bin/otool"
 ln -s "$fake_codesign" "$signature_bin/codesign"
 ln -s "$fake_xattr" "$signature_bin/xattr"
 : > "$complete_app/Contents/Resources/private-quarantine-name"
