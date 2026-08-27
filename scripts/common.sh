@@ -689,6 +689,149 @@ worms_record_dependency_source() {
     printf '%s\t%s\n' "$dependency_name" "$source_path" >> "$records_file"
 }
 
+worms_runtime_fix_complete_with() {
+    local game_app="$1"
+    local lipo_bin="$2"
+    local path archs
+    local required_paths=(
+        "Contents/MacOS/Worms W.M.D"
+        "Contents/Frameworks/AGL.framework/Versions/A/AGL"
+        "Contents/Frameworks/QtCore.framework/Versions/5/QtCore"
+        "Contents/Frameworks/QtGui.framework/Versions/5/QtGui"
+        "Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets"
+        "Contents/Frameworks/QtOpenGL.framework/Versions/5/QtOpenGL"
+        "Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport"
+        "Contents/Frameworks/QtDBus.framework/Versions/5/QtDBus"
+        "Contents/Frameworks/QtSvg.framework/Versions/5/QtSvg"
+        "Contents/PlugIns/platforms/libqcocoa.dylib"
+        "Contents/PlugIns/imageformats/libqsvg.dylib"
+    )
+
+    [[ -x "$lipo_bin" ]] || return 1
+    for path in "${required_paths[@]}"; do
+        path="$game_app/$path"
+        [[ -f "$path" ]] && [[ ! -L "$path" ]] || return 1
+        archs=$("$lipo_bin" -archs "$path" 2>/dev/null || true)
+        printf '%s\n' "$archs" | tr ' ' '\n' | grep -qx x86_64 || return 1
+    done
+}
+
+worms_signature_state_with() {
+    local codesign_bin="$1"
+    local game_app="$2"
+    local verify_output details
+
+    if [[ -z "$codesign_bin" ]] || [[ ! -x "$codesign_bin" ]]; then
+        printf '%s\n' unavailable
+        return 0
+    fi
+    if verify_output=$("$codesign_bin" --verify --deep --strict \
+        "$game_app" 2>&1); then
+        details=$("$codesign_bin" -dv --verbose=4 "$game_app" 2>&1 || true)
+        if grep -Eqi 'Signature[[:space:]]*=[[:space:]]*adhoc|ad.?hoc' \
+            <<< "$details"; then
+            printf '%s\n' valid-adhoc
+        else
+            printf '%s\n' valid
+        fi
+        return 0
+    fi
+    if grep -Eqi 'invalid|modified|resource envelope|sealed resource' \
+        <<< "$verify_output"; then
+        printf '%s\n' invalid
+    elif grep -Eqi 'not signed|code object is not signed' <<< "$verify_output"; then
+        printf '%s\n' unsigned
+    else
+        printf '%s\n' invalid
+    fi
+}
+
+worms_classify_bundle_signature_with() {
+    local game_app="$1"
+    local lipo_bin="$2"
+    local codesign_bin="$3"
+    local fix_state=original signature_state
+
+    if worms_runtime_fix_complete_with "$game_app" "$lipo_bin"; then
+        fix_state=fixed
+    fi
+    signature_state=$(worms_signature_state_with "$codesign_bin" "$game_app")
+    printf '%s-%s\n' "$fix_state" "$signature_state"
+}
+
+worms_classify_bundle_signature() {
+    local game_app="$1"
+    local lipo_bin codesign_bin
+
+    lipo_bin=$(command -v lipo 2>/dev/null || true)
+    codesign_bin=$(command -v codesign 2>/dev/null || true)
+    worms_classify_bundle_signature_with \
+        "$game_app" "$lipo_bin" "$codesign_bin"
+}
+
+worms_quarantine_state_with() {
+    local xattr_bin="$1"
+    local find_bin="$2"
+    local root_dir="$3"
+    local limit="${4:-20}"
+    local paths_file path status=0 count=0 excess=false scan_error=false
+
+    if [[ -z "$xattr_bin" ]] || [[ ! -x "$xattr_bin" ]] \
+        || [[ -z "$find_bin" ]] || [[ ! -x "$find_bin" ]]; then
+        printf '%s\n' unavailable
+        return 0
+    fi
+    [[ "$limit" =~ ^[1-9][0-9]*$ ]] && (( limit <= 100 )) || return 1
+    paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-quarantine-paths.XXXXXX")
+    if ! "$find_bin" "$root_dir" -print0 > "$paths_file" 2>/dev/null; then
+        rm -f "$paths_file"
+        printf '%s\n' scan-error
+        return 0
+    fi
+    while IFS= read -r -d '' path; do
+        status=0
+        "$xattr_bin" -p com.apple.quarantine "$path" >/dev/null 2>&1 \
+            || status=$?
+        case "$status" in
+            0)
+                if (( count < limit )); then
+                    count=$((count + 1))
+                else
+                    excess=true
+                    break
+                fi
+                ;;
+            1)
+                ;;
+            *)
+                scan_error=true
+                break
+                ;;
+        esac
+    done < "$paths_file"
+    rm -f "$paths_file"
+
+    if $scan_error; then
+        printf '%s\n' scan-error
+    elif $excess; then
+        printf 'present:%s+\n' "$limit"
+    elif (( count > 0 )); then
+        printf 'present:%s\n' "$count"
+    else
+        printf '%s\n' none
+    fi
+}
+
+worms_quarantine_state() {
+    local root_dir="$1"
+    local limit="${2:-20}"
+    local xattr_bin find_bin
+
+    xattr_bin=$(command -v xattr 2>/dev/null || true)
+    find_bin=$(command -v find 2>/dev/null || true)
+    worms_quarantine_state_with "$xattr_bin" "$find_bin" "$root_dir" "$limit"
+}
+
 worms_path_creatable_inside_root() {
     local root="$1"
     local path="$2"
@@ -1328,6 +1471,45 @@ worms_verify_manifest() {
 
     rm -f "$paths_file" "$expected_file" "$actual_file" "$tree_file" "$tree_expected_file"
 
+    return "$status"
+}
+
+worms_verify_manifest_with_extras() {
+    local root_dir="$1"
+    local manifest_file="$2"
+    shift 2
+    local extended_manifest manifest_real root_real rel hash size status=0
+
+    root_real=$(worms_real_dir "$root_dir") || return 1
+    manifest_real=$(realpath "$manifest_file" 2>/dev/null || true)
+    case "$manifest_real" in
+        "$root_real"/*)
+            ;;
+        *)
+            echo "Manifest with extras must be inside its root: $manifest_file" >&2
+            return 1
+            ;;
+    esac
+
+    extended_manifest=$(mktemp "${TMPDIR:-/tmp}/wormswmd-extended-manifest.XXXXXX")
+    cat "$manifest_file" > "$extended_manifest" || status=1
+    rel=${manifest_real#"$root_real"/}
+    set -- "$rel" "$@"
+    for rel in "$@"; do
+        if worms_has_control_chars "$rel" || worms_path_has_parent_escape "$rel" \
+            || [[ ! -f "$root_dir/$rel" ]] || [[ -L "$root_dir/$rel" ]] \
+            || [[ "$(worms_file_link_count "$root_dir/$rel")" -ne 1 ]]; then
+            status=1
+            break
+        fi
+        hash=$(worms_file_sha256 "$root_dir/$rel")
+        size=$(worms_file_size "$root_dir/$rel")
+        printf '%s\t%s\t%s\n' "$hash" "$size" "$rel" >> "$extended_manifest"
+    done
+    if [[ "$status" -eq 0 ]]; then
+        worms_verify_manifest "$root_dir" "$extended_manifest" || status=1
+    fi
+    rm -f "$extended_manifest"
     return "$status"
 }
 

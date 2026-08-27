@@ -31,7 +31,7 @@ settings, tags, release publication, and PR 4 delivery/provenance work.
 - [x] Contain save restore destinations and prove rollback.
 - [x] Authenticate Qt cache reuse against archive authority.
 - [x] Contain Homebrew dependency sources canonically.
-- [ ] Classify strict signatures and recursive quarantine.
+- [x] Classify strict signatures and recursive quarantine.
 - [ ] Bind update downloads to exact checksums and atomic publish.
 - [ ] Harden traces, diagnostics, crashes, and LaunchAgent updates.
 - [ ] Run local and adversarial gates, merge one reviewed PR, and record PR 4 base.
@@ -82,6 +82,11 @@ git status --short
   canonical Intel Cellar. Runtime copying and packaging share the policy. The
   installed Steam app completed read-only verification with zero findings after
   excluding each Mach-O image's own install ID.
+- 2026-08-27: Shared strict classification now derives complete-fixed state
+  from the AGL/Qt/plugin surface, uses deep/strict codesign verification, and
+  recursively counts quarantine without filenames. Unit and consumer tests pass.
+  Read-only live state is `fixed-valid-adhoc`/`none` for Steam and
+  `original-unsigned`/`none` for the unfixed `/Applications` copy.
 
 ## Surprises & Discoveries
 
@@ -101,6 +106,9 @@ git status --short
   manifest authority.
 - Dependency source policy is canonical and shared; copied bundle targets have
   a separate in-bundle regular-file/x86_64 check before reuse.
+- Original/unfixed signature failures remain repairable warnings; complete fixed
+  failures or unavailable verification are errors. Installer rollback signing
+  stays unchanged.
 
 ## Outcomes & Retrospective
 

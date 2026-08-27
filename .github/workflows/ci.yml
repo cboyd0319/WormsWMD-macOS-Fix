@@ -158,7 +158,8 @@ jobs:
 
       - name: Test preflight regression
         run: ./tools/test_preflight_regression.sh
-
+      - name: Test signature verification
+        run: ./tools/test_signature_verification.sh
       - name: Test manifest regression
         run: ./tools/test_manifest_regression.sh
       - name: Test Qt cache integrity

@@ -348,30 +348,12 @@ qt_cache_marker_valid() {
     [[ "$actual" == "$expected" ]]
 }
 
-write_extended_cache_manifest() {
-    local cache_dir="$1"
-    local source_manifest="$2"
-    local output_manifest="$3"
-    local rel hash size
-
-    cat "$source_manifest" > "$output_manifest" || return 1
-    for rel in MANIFEST.txt "$QT_CACHE_MARKER_NAME"; do
-        [[ -f "$cache_dir/$rel" ]] && [[ ! -L "$cache_dir/$rel" ]] \
-            && [[ "$(worms_file_link_count "$cache_dir/$rel")" -eq 1 ]] \
-            || return 1
-        hash=$(worms_file_sha256 "$cache_dir/$rel")
-        size=$(worms_file_size "$cache_dir/$rel")
-        printf '%s\t%s\t%s\n' "$hash" "$size" "$rel" >> "$output_manifest"
-    done
-}
-
 verify_marked_qt_cache() {
     local cache_dir="$1"
     local published_path="$2"
     local archive_sha256="$3"
     local cache_kind="$4"
     local authority_manifest="${5:-}"
-    local extended_manifest status=0
 
     [[ -d "$cache_dir" ]] && [[ ! -L "$cache_dir" ]] || return 1
     [[ "$(qt_cache_mode "$cache_dir")" == "700" ]] || return 1
@@ -383,15 +365,8 @@ verify_marked_qt_cache() {
         cmp -s "$cache_dir/MANIFEST.txt" "$authority_manifest" || return 1
     fi
     validate_extracted_package "$cache_dir" "$QT_VERSION" external || return 1
-
-    extended_manifest=$(mktemp "${TMPDIR:-/tmp}/wormswmd-qt-cache-manifest.XXXXXX")
-    write_extended_cache_manifest "$cache_dir" "$cache_dir/MANIFEST.txt" \
-        "$extended_manifest" || status=1
-    if [[ "$status" -eq 0 ]]; then
-        worms_verify_manifest "$cache_dir" "$extended_manifest" || status=1
-    fi
-    rm -f "$extended_manifest"
-    return "$status"
+    worms_verify_manifest_with_extras "$cache_dir" "$cache_dir/MANIFEST.txt" \
+        "$QT_CACHE_MARKER_NAME"
 }
 
 verify_unmarked_legacy_cache() {

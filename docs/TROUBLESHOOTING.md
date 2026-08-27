@@ -152,6 +152,13 @@ For more detail:
 ./fix_worms_wmd.sh --verify --verbose
 ```
 
+Standalone verification distinguishes an original/unfixed unsigned app from a
+complete fixed app with an invalid signature. Original state is repairable by
+applying the fix; a complete fixed app must pass `codesign --verify --deep
+--strict`. Quarantine inspection is recursive and reports only a bounded count,
+not potentially private filenames. Create a support bundle if either strict
+signature or recursive quarantine checks fail.
+
 ## Diagnostic game launcher
 
 Launch the game with extra logging:

@@ -37,9 +37,9 @@ The main installer runs the fix scripts in this logical order:
 7. `scripts/05_verify_installation.sh` - verify framework, plugin, dependency,
    metadata, code-signing, quarantine, and config URL state.
 
-Hard runtime verification runs before ad-hoc signing, and strict signature
-verification remains inside the rollback boundary. Only afterward may the
-installer clear quarantine, reset Qt window geometry, and commit.
+Strict signing remains inside rollback. Standalone checks use deep/strict state:
+invalid complete fixes fail, original apps remain repairable, and recursive
+quarantine summaries omit names. Only then may install finishing steps commit.
 
 Do not reorder these steps unless the verification contract is updated in the
 same change.

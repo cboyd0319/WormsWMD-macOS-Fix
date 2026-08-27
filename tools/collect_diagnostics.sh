@@ -523,24 +523,28 @@ collect_diagnostics() {
     fi
 
     subsection "Code Signing"
-    local codesign_status
-    codesign_status=$(codesign -dv "$GAME_APP" 2>&1 || echo "unsigned")
-    if echo "$codesign_status" | grep -q "not signed"; then
-        warn "App is not signed"
-    elif echo "$codesign_status" | grep -q "adhoc"; then
-        ok "Ad-hoc signed"
-    elif echo "$codesign_status" | grep -q "Authority"; then
-        ok "Signed"
-    else
-        info "Signing status: $codesign_status"
-    fi
+    local signature_classification quarantine_state
+    signature_classification=$(worms_classify_bundle_signature "$GAME_APP")
+    case "$signature_classification" in
+        fixed-valid-adhoc) ok "Strict ad-hoc signature verified" ;;
+        fixed-valid) ok "Strict code signature verified" ;;
+        fixed-unsigned|fixed-invalid|fixed-unavailable)
+            fail "Complete fixed app strict signature: ${signature_classification#fixed-}"
+            ;;
+        original-unsigned|original-invalid|original-unavailable)
+            warn "Original/unfixed app signature: ${signature_classification#original-}"
+            ;;
+        *) info "Signature verifies; runtime fix is incomplete" ;;
+    esac
 
     subsection "Quarantine Status"
-    if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
-        warn "Quarantine flag present (may cause launch issues)"
-    else
-        ok "No quarantine flags"
-    fi
+    quarantine_state=$(worms_quarantine_state "$GAME_APP" 20)
+    case "$quarantine_state" in
+        none) ok "No recursive quarantine flags" ;;
+        present:*) warn "Recursive quarantine: ${quarantine_state#present:} entries (names omitted)" ;;
+        unavailable) warn "Quarantine inspection unavailable" ;;
+        *) warn "Recursive quarantine inspection failed" ;;
+    esac
 
     # ================================================================
     section "QT SOURCE STATUS"

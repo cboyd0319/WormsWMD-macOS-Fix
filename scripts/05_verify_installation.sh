@@ -439,24 +439,49 @@ echo ""
 echo "--- Checking code signing and quarantine ---"
 warnings_before=$warnings
 
-# Check quarantine
-if xattr -l "$GAME_APP" 2>/dev/null | grep -q "quarantine"; then
-    echo "WARNING: Quarantine flag is set (may cause Gatekeeper warnings)"
-    ((warnings++))
-else
-    echo "OK: No quarantine flags"
-fi
+quarantine_state=$(worms_quarantine_state "$GAME_APP" 20)
+case "$quarantine_state" in
+    none)
+        echo "OK: No quarantine flags"
+        ;;
+    present:*)
+        echo "WARNING: Recursive quarantine flags present (${quarantine_state#present:} entries, names omitted)"
+        ((warnings++))
+        ;;
+    unavailable)
+        echo "WARNING: Quarantine inspection is unavailable"
+        ((warnings++))
+        ;;
+    *)
+        echo "WARNING: Recursive quarantine inspection failed"
+        ((warnings++))
+        ;;
+esac
 
-# Check code signing
-codesign_output=$(codesign -dv "$GAME_APP" 2>&1 || echo "not signed")
-if echo "$codesign_output" | grep -q "not signed"; then
-    echo "WARNING: App is not code signed (may cause Gatekeeper warnings)"
-    ((warnings++))
-elif echo "$codesign_output" | grep -q "adhoc"; then
-    echo "OK: Ad-hoc code signature present"
-else
-    echo "OK: Code signature present"
-fi
+signature_classification=$(worms_classify_bundle_signature "$GAME_APP")
+case "$signature_classification" in
+    fixed-valid-adhoc)
+        echo "OK: Strict ad-hoc code signature verified"
+        ;;
+    fixed-valid)
+        echo "OK: Strict code signature verified"
+        ;;
+    fixed-unsigned|fixed-invalid|fixed-unavailable)
+        echo "ERROR: Complete fixed bundle failed strict signature verification (${signature_classification#fixed-})"
+        ((errors++))
+        ;;
+    original-unsigned|original-invalid|original-unavailable)
+        echo "WARNING: Original/unfixed app signature is ${signature_classification#original-}; apply the fix to repair it"
+        ((warnings++))
+        ;;
+    original-valid-adhoc|original-valid)
+        echo "OK: Existing signature verifies; runtime fix is incomplete"
+        ;;
+    *)
+        echo "WARNING: Signature state could not be classified"
+        ((warnings++))
+        ;;
+esac
 
 if [ "$warnings" -eq "$warnings_before" ]; then
     echo "OK: Signing and quarantine checks complete"

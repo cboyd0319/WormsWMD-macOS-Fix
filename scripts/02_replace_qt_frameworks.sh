@@ -88,7 +88,12 @@ validate_qt_prefix() {
             echo "ERROR: Pre-built QT_PREFIX contains unsafe symlinks: $QT_PREFIX"
             exit 1
         }
-        worms_verify_manifest "$QT_PREFIX" "$QT_PREFIX/MANIFEST.txt" || {
+        if [[ -f "$QT_PREFIX/.wormswmd-qt-cache-v1" ]]; then
+            worms_verify_manifest_with_extras "$QT_PREFIX" \
+                "$QT_PREFIX/MANIFEST.txt" .wormswmd-qt-cache-v1
+        else
+            worms_verify_manifest "$QT_PREFIX" "$QT_PREFIX/MANIFEST.txt"
+        fi || {
             echo "ERROR: Pre-built QT_PREFIX manifest verification failed: $QT_PREFIX"
             exit 1
         }

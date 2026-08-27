@@ -78,6 +78,7 @@ ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh
 ./tools/test_preflight_regression.sh
+./tools/test_signature_verification.sh
 ./tools/test_manifest_regression.sh
 ./tools/test_qt_cache_integrity.sh
 ./tools/test_qt_version_pinning.sh

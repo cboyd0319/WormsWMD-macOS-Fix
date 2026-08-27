@@ -164,6 +164,7 @@ or docs-topology changes:
 ./tools/test_backup_saves_regression.sh
 ./tools/test_launcher_friction.sh
 ./tools/test_preflight_regression.sh
+./tools/test_signature_verification.sh
 ./tools/test_manifest_regression.sh
 ./tools/test_qt_cache_integrity.sh
 ./tools/test_qt_version_pinning.sh
