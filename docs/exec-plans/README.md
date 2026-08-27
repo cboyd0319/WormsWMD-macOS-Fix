@@ -31,7 +31,7 @@ the plan before continuing.
 
 ## Current Plans
 
-- [Security remediation PR 1: harness and hook trust](2026-08-27-security-remediation-pr1-harness-hooks.md) - active
+- [Security remediation PR 1: harness and hook trust](2026-08-27-security-remediation-pr1-harness-hooks.md) - completed
   trusted-base contributor review, safe harness inputs, sensitive-change
   reporting, plan status ownership, and Kingfisher hook integrity.
 - [CI cost, secret scanning, and release SBOM](2026-08-26-ci-cost-secrets-sbom.md) - completed

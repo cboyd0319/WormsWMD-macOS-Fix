@@ -1,6 +1,6 @@
 # Security Remediation PR 1: Harness And Hook Trust
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -36,8 +36,8 @@ scanning.
 - [x] Make plan header/index status canonical and remove stale docs status.
 - [x] Harden hook trust, installed binary digest, uninstall, and purge.
 - [x] Run focused/full local gates and review the diff.
-- [ ] Commit and create the PR.
-- [ ] Resolve one Copilot review, verify one hosted CI run, merge, and record PR 2 handoff.
+- [x] Commit and create the PR.
+- [x] Resolve one Copilot review, verify hosted CI, merge, and record the PR 2 handoff.
 
 ## Verification
 
@@ -80,6 +80,11 @@ git status --short
   Red-green regressions now cover official SCP/SSH remote URL forms and empty
   text blobs, which are accepted without weakening unrelated-origin or binary
   detection.
+- 2026-08-27: Final head `05ffba30fd54cf3959df9b1a835f2d88c673610d`
+  passed ShellCheck, Validate Scripts, Zizmor, CodeQL Actions/C/C++/Python/Ruby,
+  and the aggregate CodeQL check. Both Copilot threads were answered and
+  resolved. PR #25 merged to `main` as
+  `4369313328e6c3df7063fdddda5e7e7b3956eb78`.
 
 ## Surprises & Discoveries
 
@@ -109,5 +114,9 @@ git status --short
 
 ## Outcomes & Retrospective
 
-Implementation is in progress. Complete with commits, PR URL, local/hosted
-verification, review disposition, residual risks, and the exact PR 2 base.
+PR #25 shipped the trusted-base boundary, safe harness inventory, advisory
+sensitive-change report, canonical plan status, and exact Kingfisher executable
+verification. Local and hosted gates passed. The sole maintainer cannot approve
+their own PR, so the documented admin bypass was used only after every required
+check passed and all review threads were resolved. PR 2 must start from the
+latest protected `main`, including this closeout record.
