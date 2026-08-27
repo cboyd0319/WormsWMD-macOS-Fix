@@ -4,6 +4,10 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
+No user-facing changes yet.
+
+## 1.7.6 (2026-08-26)
+
 ### Changed
 
 - Support bundles now stay bound to the Steam or GOG installation selected in

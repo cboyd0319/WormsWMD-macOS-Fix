@@ -67,6 +67,9 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Issue 20 GOG rpath and rollback hardening plan](exec-plans/2026-08-26-issue-20-gog-rpath-rollback.md)
   - completed fix for GOG `@rpath` verification, rollback completeness, backup
     identity, and multi-install diagnostics.
+- [v1.7.6 release plan](exec-plans/2026-08-26-v1.7.6-release.md)
+  - active release prep, publication, asset verification, and post-release
+    bootstrap and Qt payload pinning.
 - [v1.7.5 release plan](exec-plans/2026-08-11-v1.7.5-release.md)
   - completed release prep, validation, publication, asset verification, and
     post-release bootstrap pinning.

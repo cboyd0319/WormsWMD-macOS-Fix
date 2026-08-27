@@ -19,7 +19,7 @@ files or official Team17/Worms artwork.
 For most players:
 
 1. Open the [latest release page](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest) and download
-   `WormsWMD-macOS-Fix-v1.7.5.zip`.
+   `WormsWMD-macOS-Fix-v1.7.6.zip`.
 2. Unzip it.
 3. Double-click `Worms W.M.D Fix.command`.
 4. Press `1`.
@@ -36,15 +36,15 @@ For most players:
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
 
-## v1.7.5 At A Glance
+## v1.7.6 At A Glance
 
 | Area | What changed |
 | --- | --- |
-| Qt installation | Copied framework binaries are made writable before `install_name_tool` updates them, addressing issue #19 on macOS 26.6. |
-| Rollback | Failed installs verify staged, target-bound backups and restore every covered executable, including GOG Galaxy. |
+| GOG compatibility | `@rpath/libGalaxy.dylib` is resolved through the executable's Mach-O run paths, while absent weak loads remain optional. |
+| Rollback | Verified storefront-bound backups cover the complete `Contents/MacOS` tree and restore it with a staged swap. |
 | Runtime package | The Qt 5.15.19 archive has a complete 16-dylib closure with canonical, unique members and an updated checksum. |
-| Bootstrap safety | Terminal and double-click bootstraps are pinned to `v1.7.5` and reject install directories that resolve into system paths. |
-| Regression coverage | The installer suite reproduces read-only Qt framework inputs and verifies the corrected mutation path. |
+| Verification | Runtime scanning fails closed on unreadable or linked plugins, escaping dependencies, ambiguous storefronts, and incomplete manifests. |
+| Support safety | Diagnostics preserve the selected Steam or GOG target and strip terminal controls without exposing raw logs or private configuration. |
 
 ## Requirements
 
@@ -59,7 +59,7 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 This release targets macOS 26 Tahoe and later. Earlier macOS versions usually
 do not need the AGL fix. There is one confirmed macOS 15.7.3 report that the Qt
 5.15 refresh improved keyboard buffering or lag, but macOS 15.x is not a
-validated support target for v1.7.5.
+validated support target for v1.7.6.
 
 On macOS 27 Golden Gate, Rosetta may need to be installed again after an
 upgrade. The preview command reports this without changing your Mac; the game
@@ -71,19 +71,19 @@ The release page includes a `.zip.sha256` checksum next to the zip file.
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.5.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.6.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.5.zip: OK
+WormsWMD-macOS-Fix-v1.7.6.zip: OK
 ```
 
 GitHub CLI users can also verify the release attestation:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.5.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.6.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 ## Launcher Menu
@@ -125,7 +125,7 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.5.zip --repo cboyd0319/WormsWMD-ma
 Review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.5/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.6/install.sh
 ```
 
 ## Terminal Install
@@ -133,13 +133,13 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.5
 Use the release zip unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.5/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.6/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The bootstrap is pinned to release `v1.7.5`
-by default. The `v1.7.5` raw tag bootstrap pins the release tag, and the
-mainline maintenance bootstrap verifies the exact `v1.7.5` tag target commit.
+launcher menu as the release zip. The bootstrap is pinned to release `v1.7.6`
+by default. The `v1.7.6` raw tag bootstrap pins the release tag, and the
+mainline maintenance bootstrap verifies the exact `v1.7.6` tag target commit.
 
 ## Pre-Flight Check
 

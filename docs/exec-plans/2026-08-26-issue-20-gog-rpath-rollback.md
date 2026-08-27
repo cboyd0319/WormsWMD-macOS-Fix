@@ -1,6 +1,6 @@
 # Issue 20 GOG rpath and rollback hardening
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -77,7 +77,7 @@ Non-goals:
 - [x] Milestone 9: Add fail-first coverage and fix every material audit finding
   across backup publication/restore, signing, Mach-O verification, archive and
   manifest validation, Qt runtime replacement, and launcher targeting.
-- [ ] Milestone 10: Repeat the full adversarial review, live Steam/GOG tests,
+- [x] Milestone 10: Repeat the full adversarial review, live Steam/GOG tests,
   hosted CI, and Copilot review before restoring completed status.
 
 ## Verification
@@ -195,6 +195,10 @@ disposable copy is created first.
   sanitization strips OSC/CSI plus other controls; launcher rendering no longer
   interprets path backslashes; plugin discovery fails closed on inventory
   errors; and manual restore rejects dual-store identity like automatic restore.
+- 2026-08-26: Closed the last two inline findings plus all five suppressed
+  findings in `f68221c`. The final PR run passed ShellCheck, C validation, and
+  the comprehensive script gate. All review threads were resolved, and PR #22
+  was squash-merged to `main` as `006ed02c08aaf3fff128750ce23e1b69a60db138`.
 
 ## Surprises & Discoveries
 
@@ -243,7 +247,7 @@ disposable copy is created first.
 
 ## Outcomes & Retrospective
 
-The release verdict remains open until Milestones 9 and 10 pass. The current Qt
+The implementation is complete and release-eligible. The current Qt
 candidate has 98 unique members, 16 runtime dependency dylibs, 21 recorded
 framework symlinks, no `.prl` files, and is 11,109,876 bytes. Two independent
 builds produced SHA-256
@@ -267,4 +271,4 @@ Fresh completion evidence:
   x86_64 AGL compilation smoke passed; generated smoke artifacts were removed.
 
 The installed GOG app remained unchanged; all mutations occurred on a disposable
-copy. Release publication remains outside this implementation pass.
+copy. Release publication is tracked separately in the v1.7.6 release plan.
