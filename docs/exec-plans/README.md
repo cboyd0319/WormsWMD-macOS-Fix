@@ -31,7 +31,7 @@ the plan before continuing.
 
 ## Current Plans
 
-- [CI cost, secret scanning, and release SBOM](2026-08-26-ci-cost-secrets-sbom.md) - active
+- [CI cost, secret scanning, and release SBOM](2026-08-26-ci-cost-secrets-sbom.md) - completed
   cost-aware CI consolidation, Kingfisher current-tree scanning, and
   deterministic CycloneDX release evidence.
 - [GitHub security deep dive](2026-08-26-github-security-deep-dive.md) - completed

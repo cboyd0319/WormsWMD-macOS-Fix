@@ -1,6 +1,6 @@
 # CI Cost, Secret Scanning, and Release SBOM
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -69,7 +69,7 @@ Out of scope:
 - [x] Milestone 3: Consolidate and chain CI, integrate Kingfisher, and add SBOM
   generation/publication/attestation.
 - [x] Milestone 4: Update documentation and hosted required-check configuration.
-- [ ] Milestone 5: Run focused/full local gates, one adversarial pass, and one
+- [x] Milestone 5: Run focused/full local gates, one adversarial pass, and one
   meaningful PR check set before merge.
 
 ## Verification
@@ -164,6 +164,10 @@ single macOS job whenever the fail-safe classifier reports a runtime change.
 - 2026-08-26: Adversarial path testing found that Git rename detection could
   hide a runtime source path renamed into an allowlisted documentation path.
   Event-aware diffs now disable rename folding so both paths are classified.
+- 2026-08-26: PR #24 passed CodeQL, Zizmor/Kingfisher, ShellCheck, and the
+  consolidated macOS validation, then merged as `e826613`. All review threads
+  were answered and resolved. The duplicate post-merge macOS run was canceled
+  after its cheap gate completed; the short security runs had already finished.
 
 ## Surprises & Discoveries
 
@@ -191,4 +195,15 @@ single macOS job whenever the fail-safe classifier reports a runtime change.
 
 ## Outcomes & Retrospective
 
-Pending implementation and verification.
+CI now uses one macOS job for runtime changes and no macOS job for allowlisted
+non-runtime changes. Stale runs cancel, cheap checks gate expensive work, and
+security checks remain required. New secrets are blocked by a checksum-pinned
+staged scanner and current-tree CI backstop. Future tags publish a deterministic
+CycloneDX 1.6 SBOM whose Qt inventory is bound to the checksummed embedded lock
+and whose root hash is verified against the built release zip.
+
+The final PR run completed in 17 seconds for ShellCheck, 10 seconds for the
+combined Zizmor/Kingfisher job, and 3 minutes 44 seconds for the single macOS
+job. This removes the former second macOS runner startup; allowlisted docs-only
+changes save the entire macOS job. The first future tag remains the final hosted
+proof of SBOM publication and attestation.
