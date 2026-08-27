@@ -66,8 +66,14 @@ it.
   attestations exist. Repository-level immutability protects future published
   releases; v1.7.6 predates that GitHub setting.
 - Starting with the next tagged release after v1.7.6, releases publish a
-  deterministic CycloneDX SBOM for the complete checksum-locked Qt bottle
-  inventory. GitHub's SBOM attestation binds that inventory to the release zip.
+  deterministic CycloneDX SBOM. Twelve shipped Qt/runtime components are
+  required dependencies; five non-shipped bottle inputs remain build
+  formulation evidence. GitHub's SBOM attestation binds that inventory to the
+  release zip.
+- A checksum-pinned Grype 0.117.0 scan runs only for scheduled/manual/release
+  events or Qt policy, provenance, artifact, VEX, generator, or scanner changes.
+  Tool failure and zero runtime inventory fail; findings begin report-only and
+  retain seven-day evidence for maintainer triage.
 
 ## What it can still do
 

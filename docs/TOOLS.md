@@ -293,3 +293,23 @@ checksummed Qt archive, then converts it into a deterministic CycloneDX 1.6
 JSON SBOM. The release workflow publishes that `.cdx.json` file and creates an
 SBOM attestation that binds it to the release zip. Generation also hashes the
 built zip and rejects a checksum mismatch before writing the SBOM.
+
+`packaging/qt-component-policy.tsv` maps every lock row to supplier identity,
+runtime or build scope, shipped-file evidence, version-neutral purl, reviewed
+NVD CPE identity when runtime, review date, and owner. The SBOM lists the 12
+shipped runtime components as required dependencies and the five non-shipped
+inputs under CycloneDX formulation. Versions always come from the selected
+provenance file.
+
+Run the pinned report-only vulnerability scan locally:
+
+```bash
+/usr/bin/python3 tools/test_qt_vulnerability_policy.py
+./tools/scan_qt_sbom.sh --local-report
+```
+
+The scan requires Grype 0.117.0, fails on tool/policy/VEX errors or zero runtime
+inventory, warns on unmapped runtime identity, and writes deterministic JSON
+under `build/security/`. Vulnerability matches remain visible and do not block
+unrelated PRs during burn-in. Optional VEX rows require a named advisory,
+component, state, rationale, owner, review date, and unexpired review deadline.

@@ -60,6 +60,27 @@ class GenerateSbomTests(unittest.TestCase):
             timeout=10,
         )
 
+    @staticmethod
+    def run_inventory(output: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable,
+                str(GENERATOR),
+                "--inventory-only",
+                "--version",
+                "v1.7.6",
+                "--timestamp",
+                TIMESTAMP,
+                "--output",
+                str(output),
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
     def test_archive_provenance_verification_is_streaming(self) -> None:
         source = GENERATOR.read_text(encoding="utf-8")
         self.assertNotIn(".getmembers(", source)
@@ -85,15 +106,25 @@ class GenerateSbomTests(unittest.TestCase):
             self.assertEqual(document["metadata"]["component"]["version"], "v1.7.6")
 
             components = document["components"]
-            expected_count = (
-                sum(
-                    1
-                    for line in PROVENANCE.read_text(encoding="utf-8").splitlines()
-                    if line and not line.startswith("#")
-                )
-                - 1
+            provenance_names = {
+                line.split("\t", 1)[0]
+                for line in PROVENANCE.read_text(encoding="utf-8").splitlines()
+                if line and not line.startswith("#") and not line.startswith("name\t")
+            }
+            build_components = document["formulation"][0]["components"]
+            self.assertEqual(len(components), 12)
+            self.assertEqual(len(build_components), 5)
+            self.assertEqual(
+                {component["name"] for component in components + build_components},
+                provenance_names,
             )
-            self.assertEqual(len(components), expected_count)
+            self.assertTrue(
+                all(component["scope"] == "required" for component in components)
+            )
+            self.assertTrue(
+                all(component["scope"] == "excluded" for component in build_components)
+            )
+            self.assertTrue(all(component.get("cpe") for component in components))
             refs = [component["bom-ref"] for component in components]
             self.assertEqual(len(refs), len(set(refs)))
             self.assertTrue(
@@ -120,6 +151,23 @@ class GenerateSbomTests(unittest.TestCase):
                 properties["wormswmd:qt-archive-sha256"],
                 CHECKSUM.read_text(encoding="utf-8").split()[0],
             )
+
+    def test_inventory_only_output_is_deterministic_and_scannable(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temp = Path(temporary_directory)
+            first = temp / "first.cdx.json"
+            second = temp / "second.cdx.json"
+            first_run = self.run_inventory(first)
+            second_run = self.run_inventory(second)
+            self.assertEqual(first_run.returncode, 0, first_run.stderr)
+            self.assertEqual(second_run.returncode, 0, second_run.stderr)
+            self.assertEqual(first.read_bytes(), second.read_bytes())
+            document = json.loads(first.read_text(encoding="utf-8"))
+            self.assertEqual(
+                document["metadata"]["component"]["name"], "WormsWMD Qt Runtime"
+            )
+            self.assertEqual(len(document["components"]), 12)
+            self.assertEqual(len(document["formulation"][0]["components"]), 5)
 
     def test_rejects_unsafe_version(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

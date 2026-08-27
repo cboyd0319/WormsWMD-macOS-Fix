@@ -114,6 +114,17 @@ else
             fail "GitHub security workflow is missing Kingfisher marker: $marker"
         fi
     done
+    # shellcheck disable=SC2016
+    for marker in \
+        'GRYPE_VERSION: 0.117.0' \
+        'GRYPE_SHA256: 38525dab1e06f162ebaa02f94d82d1f807076b011a44180cf2777edf1a7b9c26' \
+        'grype_${GRYPE_VERSION}_linux_amd64.tar.gz' \
+        './tools/scan_qt_sbom.sh --local-report' \
+        'retention-days: 7'; do
+        if ! grep -Fq -- "$marker" "$ROOT_DIR/.github/workflows/github-security.yml"; then
+            fail "GitHub security workflow is missing Qt scanner marker: $marker"
+        fi
+    done
 fi
 
 if ! grep -Eq '^[[:space:]]+default-days:[[:space:]]+7[[:space:]]*$' \
@@ -129,13 +140,17 @@ for required_file in \
     "$ROOT_DIR/.githooks/pre-commit" \
     "$ROOT_DIR/tools/ci_changed_paths.sh" \
     "$ROOT_DIR/tools/ci_requires_macos.sh" \
+    "$ROOT_DIR/tools/ci_requires_qt_scan.sh" \
     "$ROOT_DIR/tools/generate_sbom.py" \
+    "$ROOT_DIR/tools/qt_component_policy.py" \
     "$ROOT_DIR/tools/inspect_archive.py" \
     "$ROOT_DIR/tools/install_git_hooks.sh" \
     "$ROOT_DIR/tools/report_sensitive_changes.sh" \
     "$ROOT_DIR/tools/test_ci_changed_paths.sh" \
     "$ROOT_DIR/tools/test_ci_change_classification.sh" \
     "$ROOT_DIR/tools/test_generate_sbom.py" \
+    "$ROOT_DIR/tools/test_qt_vulnerability_policy.py" \
+    "$ROOT_DIR/tools/scan_qt_sbom.sh" \
     "$ROOT_DIR/tools/test_archive_inspector.py" \
     "$ROOT_DIR/tools/test_fetch_qt_homebrew_bottles.rb" \
     "$ROOT_DIR/tools/test_git_hooks.sh" \
@@ -162,6 +177,7 @@ for marker in \
     './tools/test_harness_security.sh' \
     './tools/test_sensitive_change_report.sh' \
     '/usr/bin/python3 tools/test_archive_inspector.py' \
+    '/usr/bin/python3 tools/test_qt_vulnerability_policy.py' \
     'ruby tools/test_fetch_qt_homebrew_bottles.rb' \
     'name: Compile AGL stub'; do
     if ! grep -Fq "$marker" "$ci_workflow"; then

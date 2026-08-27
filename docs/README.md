@@ -60,6 +60,8 @@ current when adding, moving, renaming, or deleting Markdown files.
   - archive and Homebrew bottle safety implementation record.
 - [Security remediation PR 3 plan](exec-plans/2026-08-27-security-remediation-pr3-player-runtime-safety.md)
   - player save/cache/runtime and local-output safety implementation record.
+- [Security remediation PR 4 plan](exec-plans/2026-08-27-security-remediation-pr4-delivery-provenance.md)
+  - delivery provenance, reproducible Qt build, scanner, and release-gate work.
 - [Deep repository audit plan](exec-plans/2026-06-10-deep-repo-audit.md) -
   audit trail for the repository-wide defect pass.
 - [Issue 10 backup stall plan](exec-plans/2026-06-18-issue-10-backup-stall.md)

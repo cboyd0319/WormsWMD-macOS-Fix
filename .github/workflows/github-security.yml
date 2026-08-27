@@ -3,8 +3,11 @@ name: GitHub Security
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
+  release:
+    types: [published]
   schedule:
     - cron: '17 7 * * 1'
   workflow_dispatch:
@@ -22,12 +25,39 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    outputs:
+      qt-scan-required: ${{ steps.qt_scan_scope.outputs.required }}
     steps:
       - name: Checkout
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Classify Qt vulnerability scan scope
+        id: qt_scan_scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          required=false
+          changed_paths="$RUNNER_TEMP/wormswmd-security-changed-paths"
+          if [[ "$EVENT_NAME" == "schedule" \
+              || "$EVENT_NAME" == "workflow_dispatch" \
+              || "$EVENT_NAME" == "release" \
+              || "$REF_NAME" == refs/tags/* ]]; then
+            required=true
+          elif ! ./tools/ci_changed_paths.sh \
+              "$EVENT_NAME" "$BASE_SHA" "$HEAD_SHA" > "$changed_paths"; then
+            required=true
+          elif ./tools/ci_requires_qt_scan.sh < "$changed_paths"; then
+            required=true
+          fi
+          echo "required=$required" >> "$GITHUB_OUTPUT"
 
       - name: Test repository GitHub policy
         run: ./tools/test_github_security.sh
@@ -82,3 +112,51 @@ jobs:
             --confidence medium \
             --quiet \
             --no-update-check
+
+  qt-vulnerability-scan:
+    name: Qt vulnerability report
+    needs: zizmor
+    if: needs.zizmor.outputs.qt-scan-required == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install checksum-pinned Grype
+        env:
+          GRYPE_VERSION: 0.117.0
+          GRYPE_SHA256: 38525dab1e06f162ebaa02f94d82d1f807076b011a44180cf2777edf1a7b9c26
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/grype_${GRYPE_VERSION}_linux_amd64.tar.gz"
+          install_dir="$RUNNER_TEMP/grype-bin"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            --retry 3 --retry-delay 1 --retry-connrefused --max-time 120 \
+            --max-filesize 134217728 --output "$archive" \
+            "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz"
+          chmod 0600 "$archive"
+          printf '%s  %s\n' "$GRYPE_SHA256" "$archive" | shasum -a 256 -c -
+          mkdir -p "$install_dir"
+          tar -xzf "$archive" -C "$install_dir" grype
+          chmod 0755 "$install_dir/grype"
+          echo "$install_dir" >> "$GITHUB_PATH"
+          "$install_dir/grype" version
+
+      - name: Scan scoped Qt runtime SBOM
+        run: ./tools/scan_qt_sbom.sh --local-report
+
+      - name: Upload Qt vulnerability evidence
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qt-vulnerability-report
+          retention-days: 7
+          path: |
+            build/security/qt-runtime.cdx.json
+            build/security/qt-vulnerability-report.json

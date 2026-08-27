@@ -43,21 +43,27 @@ new_fixture() {
         docs/exec-plans/README.md \
         docs/exec-plans/2026-08-27-security-remediation-pr1-harness-hooks.md \
         docs/exec-plans/2026-08-27-security-remediation-pr2-archive-bottle-safety.md \
+        docs/exec-plans/2026-08-27-security-remediation-pr4-delivery-provenance.md \
         docs/runbooks/agent-session.md \
         docs/style/agent-harness.md \
+        packaging/qt-component-policy.tsv \
         packaging/qt-homebrew-lock.tsv \
         .githooks/pre-commit \
         tools/install_git_hooks.sh \
         tools/inspect_archive.py \
+        tools/qt_component_policy.py \
+        tools/ci_requires_qt_scan.sh \
         tools/report_sensitive_changes.sh \
         tools/test_archive_inspector.py \
         tools/test_fetch_qt_homebrew_bottles.rb \
         tools/test_github_security.sh \
         tools/test_harness_security.sh \
         tools/test_qt_cache_integrity.sh \
+        tools/test_qt_vulnerability_policy.py \
         tools/test_signature_verification.sh \
         tools/test_logging_safety.sh \
         tools/test_update_download_safety.sh \
+        tools/scan_qt_sbom.sh \
         tools/test_sensitive_change_report.sh \
         tools/validate_harness.sh; do
         if [[ -e "$ROOT_DIR/$rel" ]]; then

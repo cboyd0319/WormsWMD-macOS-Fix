@@ -56,7 +56,8 @@ jobs:
 
       - name: Test release SBOM generation
         run: python3 tools/test_generate_sbom.py
-
+      - name: Test Qt vulnerability policy
+        run: /usr/bin/python3 tools/test_qt_vulnerability_policy.py
       - name: Test bounded archive inspection
         run: /usr/bin/python3 tools/test_archive_inspector.py
       - name: Test Homebrew bottle safety

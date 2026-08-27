@@ -207,11 +207,20 @@ For future tags, the release workflow:
 7. Uploads notes/assets to a resumable draft, then publishes it immutably.
 8. Refuses to overwrite any published release.
 
-The SBOM lists the release plus the 17 Homebrew bottle components used for the
-bundled Qt runtime. It records bottle/source/formula hashes and source URLs. The
-flat lock proves the complete set, not internal edges, so only the
-release-to-component relationship is asserted. Game files, macOS, Rosetta,
-Xcode, and optional user-installed Homebrew fallbacks are outside its scope.
+The SBOM lists the release plus 12 shipped runtime components as required
+dependencies. Five non-shipped bottle inputs remain explicit CycloneDX
+formulation components. The version-neutral component policy records supplier,
+shipped or negative evidence, NVD CPE identity, rationale, review date, and
+owner; versions come only from selected provenance. The flat lock proves the
+complete input set, not internal build edges. Game files, macOS, Rosetta, Xcode,
+and optional user-installed Homebrew fallbacks are outside its scope.
+
+The GitHub Security workflow installs checksum-pinned Grype 0.117.0 and scans
+only scheduled/manual/release events or Qt artifact, packaging, policy, VEX,
+SBOM, scanner, or workflow changes. Tool failure, invalid/expired VEX, and zero
+runtime inventory fail. Findings and unmapped identity begin report-only with
+seven-day evidence; no advisory is suppressed without component-specific,
+owned, dated, expiring reachability rationale.
 
 v1.7.6 predates SBOM publication and repository-level immutability. Its hosted
 zip checksum and build attestation remain independently verifiable.
@@ -240,6 +249,8 @@ both its build provenance and SBOM relationship.
 ./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
+/usr/bin/python3 tools/test_qt_vulnerability_policy.py
+./tools/scan_qt_sbom.sh --local-report
 /usr/bin/python3 tools/test_archive_inspector.py
 ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/validate_harness.sh
@@ -271,6 +282,7 @@ Runtime verification remains:
 | Admin branch bypass remains enabled | Required checks/review still apply normally; second trusted reviewer needed before enforcement |
 | v1.7.6 is mutable and has no SBOM | Existing checksum/build attestation; future releases immutable with SBOM |
 | First hosted SBOM publication is not yet exercised | Generator passed official CycloneDX schema and zip-root-hash tests; next tag is final end-to-end proof |
+| Qt vulnerability findings are report-only during burn-in | Pinned scanner, exact runtime inventory, deterministic evidence, explicit VEX expiry, and maintainer triage |
 
 ## Reporting a vulnerability
 
