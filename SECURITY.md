@@ -1,456 +1,242 @@
 # Security
 
-This document describes the security model, threat mitigations, and audit status for the Worms W.M.D macOS fix.
+This document defines the security boundaries of the Worms W.M.D macOS fix.
+Detailed installer invariants live in
+[`docs/design/runtime-contracts.md`](docs/design/runtime-contracts.md); player
+download guidance lives in [`docs/TRUST.md`](docs/TRUST.md).
 
-## Security overview
+## Security posture at a glance
 
-The fix is designed to be:
+| Area | State | Primary control |
+| --- | --- | --- |
+| Privilege | Pass | Runs as the current user; no `sudo`, SUID, or system-wide writes |
+| Game mutation | Pass | Validated app boundary, verified backup, transactional rollback |
+| Downloads | Pass | HTTPS plus immutable refs or SHA-256 verification for executable payloads |
+| Release integrity | Pass | Zip checksum, build attestation, draft-first publication, immutable future releases |
+| Release SBOM | Ready | CycloneDX 1.6 plus SBOM attestation begins with the next tagged release |
+| CI security | Pass | Full-SHA allowlisted Actions, least privilege, required Zizmor, CodeQL |
+| New secret prevention | Pass | Enforced staged Kingfisher, required current-tree scan, GitHub push protection |
+| Support privacy | Pass | Sanitized reports; no raw logs, game binaries, saves, or private configs |
 
-- **Transparent**: Open source and fully auditable
-- **Minimal**: Only modifies files within the game bundle
-- **Reversible**: Creates backups before any changes
-- **Unprivileged**: Never requires `sudo` or elevated permissions
-- **Verified**: Downloads require cryptographic checksum validation
+Last reviewed: 2026-08-26.
 
 ## Threat model
 
-This fix is designed to be safe against:
+### Controls provided
 
 | Threat | Mitigation |
-|--------|------------|
-| Malicious code injection | All scripts use `set -euo pipefail`, no `eval` on user input |
-| Path traversal attacks | Archive validation rejects `../`, absolute/control paths, and canonical aliases |
-| Man-in-the-middle attacks | HTTPS with TLS 1.2+ required, checksums verified |
-| Insecure game URLs | HTTP URLs upgraded to HTTPS, staging URLs disabled |
-| Privilege escalation | No `sudo`, no SUID, runs entirely as current user |
-| Symlink attacks | Temp files use `mktemp`; whole bundle trees reject escaping symlinks and hardlinks before recursive mutation |
-| Supply chain attacks | Pre-built packages require SHA256, metadata, manifest, and architecture verification |
+| --- | --- |
+| Command injection | No `eval` on user input; shell boundaries quote and validate paths and values |
+| Path traversal | Archive and tree checks reject absolute, parent, control, alias, and duplicate paths |
+| Symlink/hardlink escape | Mutable trees must remain inside the selected app and reject unsafe links |
+| Partial or wrong-target restore | Backups are verified, app/storefront-bound, staged, and checked after restore |
+| Malicious executable download | Release/Qt payloads use checksums, immutable refs, provenance, and attestations |
+| CI workflow compromise | Full-SHA Action policy, selected-action allowlist, job-scoped tokens, CODEOWNERS |
+| New committed secrets | Local staged scan, required current-tree scan, secret scanning, push protection |
+| Diagnostic data exposure | Support bundles sanitize text and omit raw/private/game/save content |
 
-## What the fix modifies
+### Assumptions and exclusions
 
-### Files modified inside the game bundle
+- The user's macOS account, GitHub, Apple update services, and approved upstream
+  package hosts are not already compromised.
+- The project does not control or rotate Team17 credentials embedded in the
+  original game or found in old vendor-report history.
+- Git hooks can be bypassed with `--no-verify`; required CI and GitHub push
+  protection are the server-side backstop.
+- The fix cannot provide Apple Developer ID notarization for Team17's game.
 
-| Location | Action | Purpose |
-|----------|--------|---------|
-| `Contents/Frameworks/` | Replace Qt frameworks | Upgrade Qt 5.3.2 to 5.15.x |
-| `Contents/Frameworks/AGL.framework/` | Add stub library | Satisfy removed AGL dependency |
-| `Contents/Frameworks/*.dylib` | Add dependency libraries | Bundle required runtime libraries |
-| `Contents/PlugIns/` | Replace Qt plugins | Update platform/image plugins and remove known stale Qt 5.3 categories |
-| `Contents/MacOS/` | Rewrite matching install names and ad-hoc sign nested code | Keep runtime references portable, including GOG Galaxy |
-| `Contents/_CodeSignature/` | Replace signature resources | Match the ad-hoc signed bundle |
-| `Contents/Info.plist` | Update metadata | Add bundle ID, HiDPI flags, min version |
-| `Contents/Resources/DataOSX/*.txt` | Update URLs | Use HTTPS, disable internal staging URLs |
-| `Contents/Resources/CommonData/*.txt` | Update URLs | Use HTTPS for analytics/HTTP config |
+## Runtime boundaries
 
-### Files created outside the game bundle
+The installer may change the selected app's `Contents/Frameworks`, `PlugIns`,
+`MacOS`, `_CodeSignature`, `Info.plist`, and known DataOSX/CommonData config
+files. It may create these user-owned paths outside the bundle:
 
-| Location | Purpose | Cleanup |
-|----------|---------|---------|
-| `~/Documents/WormsWMD-Backup-*/` | Backups of original files | Manual |
-| `~/Documents/WormsWMD-SaveBackups/` | Save game backups (optional tool) | Manual |
-| `~/Library/Logs/WormsWMD-Fix/` | Fix operation logs | Manual |
-| `~/Library/Logs/WormsWMD/` | Launcher logs and crash reports | Manual |
-| `~/.cache/wormswmd-fix/` | Cached Qt frameworks | Manual or `--force` |
-| `~/Library/LaunchAgents/com.wormswmd.fix.watcher.plist` | Optional update watcher | `--uninstall` |
-| `${TMPDIR:-/tmp}/agl_stub_build.*/` | Main installer AGL build directory | Automatic |
+| Path | Purpose | Removal |
+| --- | --- | --- |
+| `~/Documents/WormsWMD-Backup-*/` | Original game-file backups | Manual |
+| `~/Documents/WormsWMD-SaveBackups/` | Optional save backups | Manual |
+| `~/Library/Logs/WormsWMD-Fix/` | Installer logs | Manual |
+| `~/Library/Logs/WormsWMD/` | Launcher/crash logs | Manual |
+| `~/.cache/wormswmd-fix/` | Verified Qt cache | Manual or `--force` |
+| `~/Library/LaunchAgents/com.wormswmd.fix.watcher.plist` | Optional watcher | `--uninstall` |
+| `${TMPDIR:-/tmp}/agl_stub_build.*/` | AGL build workspace | Automatic |
 
-## What the fix does NOT do
+The fix does not modify system directories, collect telemetry, alter `PATH` or
+`DYLD_LIBRARY_PATH`, or install privileged persistence.
 
-- Modify any system files or directories
-- Require or use `sudo`, `doas`, or any privilege escalation
-- Collect, transmit, or store any personal data
-- Access any network services except those listed below
-- Install persistent background services (unless you opt in)
-- Modify `PATH`, `DYLD_LIBRARY_PATH`, or other environment variables
+### Untrusted inputs
 
-## Network security
+| Input | Required validation |
+| --- | --- |
+| `GAME_APP` | Expected executable plus contained, regular, link-safe mutable trees |
+| `INSTALL_DIR` | User project path; not home/system/non-empty foreign repository |
+| `INSTALL_REF` | Defaults to v1.7.6; other refs require explicit developer opt-in |
+| `LOG_FILE` | Regular `.log` beneath `~/Library/Logs` |
+| `QT_PREFIX` | Required Qt 5.15.x layout and explicit custom-prefix opt-in |
 
-### Connections made
+The complete backup, restore, archive, Mach-O, signing, and diagnostics
+contracts are maintained in
+[`runtime-contracts.md`](docs/design/runtime-contracts.md).
 
-| Purpose | Destination | Security |
-|---------|-------------|----------|
-| Qt framework download | `github.com` (repo dist/) | HTTPS + SHA256 checksum |
-| Release bundle download | `github.com` releases | HTTPS + SHA256 checksum + artifact attestation |
-| Repository clone/update | `github.com` | HTTPS via git |
-| Terminal bootstrap script (optional) | `raw.githubusercontent.com` pinned release tag | HTTPS |
-| Update check (optional) | `api.github.com`, `github.com` release assets | HTTPS + SHA256 checksum for downloads |
-| Pre-flight public endpoint check (optional) | `www.team17.com/games/worms-w-m-d`, `store.steampowered.com/app/327030/Worms_WMD/`, `www.gog.com/en/game/worms_wmd` | HTTPS |
-| Maintainer Qt provenance rebuild | `formulae.brew.sh`, `ghcr.io` Homebrew bottle blobs | HTTPS + pinned bottle SHA256 |
-| Rosetta 2 install | Apple servers | System-managed |
-| Xcode CLT install | Apple servers | System-managed |
+## Network and supply-chain controls
 
-### Network security measures
+| Purpose | Destination | Control |
+| --- | --- | --- |
+| Repository/bootstrap/update | `github.com`, `raw.githubusercontent.com`, `api.github.com` | HTTPS, release tag/commit pin, checksum for downloads |
+| Qt runtime | Repository `dist/` or pinned commit | SHA-256, metadata, manifest, layout, links, x86_64 closure |
+| Qt provenance rebuild | `formulae.brew.sh`, `ghcr.io` | Locked bottle/source/formula hashes and tap commit |
+| Kingfisher developer/CI binary | `github.com/mongodb/kingfisher` | Fixed 2.0.0 release and per-platform SHA-256 |
+| Public preflight probes | Team17, Steam, GOG pages | Optional HTTPS reachability only |
+| Rosetta/Xcode tools | Apple services | macOS-managed installation |
+| Release attestation | GitHub Actions OIDC/attestation services | Short-lived OIDC plus job-scoped token |
 
-All network operations use:
+Project-owned `curl` downloads enforce HTTPS, TLS 1.2+, certificate checks,
+timeouts, and bounded retries. Git, `gh`, and Apple system services own their
+TLS settings; project scripts do not weaken them.
 
-- **HTTPS only**: `--proto '=https'` enforced on curl
-- **TLS 1.2 minimum**: `--tlsv1.2` enforced on curl
-- **Retry with backoff**: `--retry 3 --retry-delay 1 --retry-connrefused`
-- **Timeouts**: All requests have `--max-time` limits (10-300 seconds)
-- **Checksum verification**: SHA256 required for pre-built packages
+### Qt package verification
 
-No analytics or telemetry are used, and network access is limited to the endpoints listed above.
+The shipped Qt archive is accepted only after verifying:
 
-### Security note on updates
+1. SHA-256 and Qt 5.15.x/x86_64 metadata.
+2. Whitelisted layout and required frameworks/plugins.
+3. No traversal, control paths, canonical aliases, hardlinks, special files,
+   or escaping symlinks.
+4. Archive/generated manifest and complete non-system Mach-O dependency closure.
+5. `SOURCE_PROVENANCE.tsv`, which locks the 17 Homebrew bottle inputs, source
+   hashes, formula hashes, and tap commit.
 
-The `check_updates.sh --download` option downloads the latest release zip and
-matching `.sha256` file, then verifies the checksum before leaving the zip in
-`~/Downloads`. GitHub release attestations can be verified separately with
-`gh attestation verify`.
+## GitHub and CI controls
 
-## Download verification
+### Hosted repository settings
 
-Release bundles publish both a zip and a matching SHA-256 checksum file. For
-the `v1.7.6` release:
+- `main` requires current ShellCheck, Validate Scripts, and Zizmor checks, one
+  CODEOWNER review, stale-review dismissal, and conversation resolution.
+- Force pushes and branch deletion are disabled. Administrator enforcement is
+  deliberately off because one required review plus one maintainer would make
+  normal maintenance impossible.
+- Default workflow tokens are read-only and cannot approve pull requests.
+- Actions are limited to GitHub-owned actions plus pinned ShellCheck and Zizmor;
+  the hosted policy requires full commit SHAs.
+- Every external contributor requires approval before fork workflows run.
+- CodeQL scans GitHub Actions, C/C++, and Ruby on supported PRs, protected-branch
+  pushes, and weekly. GitHub excludes fork PRs from default CodeQL setup.
+- GitHub secret scanning, push protection, private vulnerability reporting, and
+  Dependabot security updates are enabled. Enhanced partner validity and generic
+  patterns require an unavailable Team/Enterprise Secret Protection plan.
+- Future releases are immutable. GitHub does not retroactively lock v1.7.6.
+
+### Cost-aware required CI
+
+CI cancels stale runs. Cheap Ubuntu ShellCheck, harness, policy, hook, and SBOM
+tests run before macOS. Runtime/unknown/empty/CI/release changes then use one
+macOS job for all regressions plus AGL compilation. Allowlisted documentation,
+community metadata, and agent-guidance changes report that required macOS job as
+skipped-success. A failed diff/classifier always falls back to macOS.
+
+Security/release workflows do not reuse untrusted cross-run caches. Workflow
+artifacts expire after 14 days.
+
+### Staged and CI secret scanning
+
+Run once per clone:
+
+```bash
+./tools/install_git_hooks.sh
+```
+
+This installs checksum-pinned Kingfisher 2.0.0 beneath the local Git directory
+and sets `core.hooksPath=.githooks`. The hook scans staged content and fails
+closed when the scanner is missing or has another version. CI scans the current
+checkout in the existing Zizmor job, sharing its Ubuntu runner.
+
+Both modes redact findings, disable live provider validation and update checks,
+and exclude Git history/internals. The CI scan also avoids extracting the
+vendored Qt archive. The fixed Linux x64 CI asset SHA-256 is:
+
+```text
+d30d71f82e25e8c024f98cce3258c90e17b5be31d0fdb6f30b438d2fac1f130b
+```
+
+## Release integrity and SBOM
+
+For future tags, the release workflow:
+
+1. Validates the harness, shell syntax, and Qt package.
+2. Builds the zip and matching `.zip.sha256`.
+3. Extracts the matching `CHANGELOG.md` section as release notes.
+4. Generates deterministic CycloneDX 1.6 JSON from the locked Qt provenance.
+5. Makes the SBOM root hash equal the actual release zip hash.
+6. Attests build assets and separately binds the SBOM to the zip.
+7. Uploads notes/assets to a resumable draft, then publishes it immutably.
+8. Refuses to overwrite any published release.
+
+The SBOM lists the release plus the 17 Homebrew bottle components used for the
+bundled Qt runtime. It records bottle/source/formula hashes and source URLs. The
+flat lock proves the complete set, not internal edges, so only the
+release-to-component relationship is asserted. Game files, macOS, Rosetta,
+Xcode, and optional user-installed Homebrew fallbacks are outside its scope.
+
+v1.7.6 predates SBOM publication and repository-level immutability. Its hosted
+zip checksum and build attestation remain independently verifiable.
+
+## Verification
+
+### Verify the current release
 
 ```bash
 cd ~/Downloads
 shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.6.zip.sha256
+gh attestation verify WormsWMD-macOS-Fix-v1.7.6.zip \
+  --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
-Expected output:
+Starting with the next release, also download
+`WormsWMD-macOS-Fix-vX.Y.Z.cdx.json`; `gh attestation verify` on the zip returns
+both its build provenance and SBOM relationship.
 
-```text
-WormsWMD-macOS-Fix-v1.7.6.zip: OK
-```
-
-Release bundles also receive GitHub artifact attestations from the release
-workflow:
+### Maintainer security checks
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.6.zip --repo cboyd0319/WormsWMD-macOS-Fix
+./tools/install_git_hooks.sh --check
+./tools/test_git_hooks.sh
+./tools/test_github_security.sh
+./tools/test_ci_change_classification.sh
+python3 tools/test_generate_sbom.py
+./tools/validate_harness.sh
+actionlint .github/workflows/*.yml
+zizmor --persona=pedantic --no-ignores --no-progress .github
+shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" \
+  "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
 ```
 
-The checksum verifies the file content. The attestation verifies that GitHub
-Actions built the asset from this repository.
-
-Tagged releases also publish
-`WormsWMD-macOS-Fix-vX.Y.Z.cdx.json`. This CycloneDX 1.6 SBOM lists every
-checksum-locked Homebrew bottle in the Qt runtime closure. A separate GitHub
-SBOM attestation binds that document to the release zip.
-
-Pre-built Qt framework packages undergo multiple verification steps:
-
-1. **Source verification**: Downloaded only from local `dist/` or the pinned
-   release commit's `dist/` directory; dependency source symlinks are resolved
-   before provenance-prefix allowlisting
-2. **Checksum validation**: SHA256 hash must match the `.sha256` file
-3. **Version and metadata validation**: Package names and `METADATA.txt` must
-   agree on a numeric Qt 5.15.x version and x86_64 architecture
-4. **Archive layout validation**: Only whitelisted paths are allowed:
-   - `Frameworks/` and contents
-   - `PlugIns/` and contents
-   - `METADATA.txt`
-   - `MANIFEST.txt`
-   - `SOURCE_PROVENANCE.tsv`
-5. **Path traversal and link protection**: Archives containing `../`, `/..`,
-   absolute/control-character paths, unsafe symlink targets, hardlinks, special
-   files, or exact/canonical duplicate members are rejected
-6. **Required content validation**: Required Qt frameworks, the Cocoa platform
-   plugin, metadata, and plugin directories must be present after extraction
-7. **Architecture and closure validation**: Framework, plugin, and dependency
-   binaries must be readable Mach-O files with an `x86_64` slice, and required
-   non-system dependencies must exist in the package
-8. **Package manifest validation**: `MANIFEST.txt` is verified when present in
-   the archive; extracted cache directories get a generated manifest when the
-   legacy archive does not include one
-9. **Post-extraction verification**: Confirms expected directories and the
-   extracted cache manifest exist before use
-
-If any verification fails, the script falls back to Homebrew only when a valid Intel Homebrew Qt install is present; otherwise it exits before replacing game frameworks.
-
-## Code signing
-
-The fix applies an ad-hoc code signature to the modified game bundle:
-
-```bash
-codesign --force --deep --sign - "$GAME_APP"
-```
-
-This signature:
-- Allows the app to run without Gatekeeper warnings
-- Does not require an Apple Developer account
-- Is not notarized (Apple notarization would require the original developer)
-- Is verified with `codesign --verify --deep --strict` before the rollback
-  boundary closes; a signing or verification failure restores the backup
-
-The signature can be verified with:
-
-```bash
-codesign -dv --verbose=4 "path/to/Worms W.M.D.app"
-```
-
-## Optional background process
-
-The update watcher (`tools/watch_for_updates.sh --install`) installs a LaunchAgent that:
-
-- Monitors for Steam updates that overwrite the fix
-- Runs locally with no network access
-- Uses `launchctl bootstrap gui/$UID` (user-level, not system-level)
-- Can be completely removed with `--uninstall`
-
-The LaunchAgent plist is created at:
-```
-~/Library/LaunchAgents/com.wormswmd.fix.watcher.plist
-```
-
-## Input validation
-
-### Environment variables
-
-User-controllable environment variables are validated:
-
-| Variable | Validation |
-|----------|------------|
-| `GAME_APP` | Must contain `Contents/MacOS/Worms W.M.D`; nested paths reject control characters, special entries, escaping symlinks, and hardlinks before recursive mutation |
-| `INSTALL_DIR` | Refuses system paths, home directory, non-empty non-repo directories, and Git repositories with a different remote |
-| `INSTALL_REF` | Defaults to pinned release `v1.7.6`; raw tag bootstraps pin the release tag, and the mainline maintenance bootstrap verifies the exact release commit; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
-| `LOG_FILE` | Must be a regular `.log` path under `~/Library/Logs` |
-| `QT_PREFIX` | Verified to contain expected Qt frameworks; direct custom Homebrew prefixes require explicit opt-in |
-
-### User input
-
-All interactive prompts:
-- Use `read ... < /dev/tty` for reliable input even when piped
-- Validate input before use (e.g., numeric range checks)
-- Default to safe options (e.g., "no" for destructive operations)
-
-## Permissions required
-
-| Permission | Why needed | Files affected |
-|------------|------------|----------------|
-| Read game directory | Back up and verify | Game bundle |
-| Write game directory | Apply the fix | Game bundle |
-| Read `/usr/local/` | Copy Qt libraries (Homebrew fallback) | Homebrew cellar |
-| Write `~/Documents/` | Create backups | Backup directories |
-| Write `~/Library/Logs/` | Write logs | Log files |
-| Write `~/.cache/` | Cache Qt frameworks | Cache directory |
-| Run `clang` | Compile AGL stub | Temp build files |
-| Run `launchctl` | Install/remove update watcher | LaunchAgents |
-| Run `osascript` | Notifications (optional tools) | None |
-| Run `pbcopy` | Copy diagnostics (optional) | Clipboard |
-| Run `curl` (preflight) | Test optional public Team17, Steam, and GOG page reachability | None |
-
-## Security audit checklist
-
-Last audit: 2026-08-26
-
-| Category | Status | Notes |
-|----------|--------|-------|
-| Command injection | Pass | No `eval` on user input, no unsafe shell expansion |
-| Path traversal | Pass | Qt and save-backup archive validation, link rejection, no unvalidated path concatenation |
-| Network security | Pass | HTTPS-only, TLS 1.2+, checksums required |
-| Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
-| Symlink attacks | Pass | Main installer uses per-run staging, whole-bundle symlink/hardlink checks, mutation-directory containment, and archive link rejection |
-| Race conditions | Pass | Atomic operations where possible |
-| Secret exposure | Pass | Pinned Kingfisher scans staged/current content without provider validation, current-tree redacted scans are clean, and GitHub push protection is enabled; historical vendor-controlled values are outside project control |
-| Support bundle privacy | Pass | Sanitized bundles include OS, Rosetta, installer-history, runtime-invariant, Qt-package, and backup-integrity context without raw logs, saves, game binaries, or private config contents |
-| Dependency security | Pass | Checksums, metadata, canonical manifests, complete closure checks, and readable x86_64 slices for pre-built Qt |
-| CI pinning | Pass | GitHub Actions use verified full commit SHAs, explicit stable runner labels, a pinned ShellCheck binary version, disabled checkout credential persistence, job-scoped permissions, concurrency limits, and timeouts |
-| Workflow security | Pass | Local policy regression plus required Zizmor and Kingfisher scanning reject mutable Actions, dangerous triggers, new staged/current-tree secrets, direct run-expression expansion, and missing workflow boundaries |
-| Code signing | Pass | Ad-hoc signature applied and strictly verified inside the rollback boundary; quarantine cleared afterward |
-| Input validation | Pass | Environment variables and user input validated |
-| Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
-| Backup restore | Pass | Verified staged v2 backups exactly replace `MacOS`, bind to app/storefront identity, use atomic collision-resistant publication, reject invalid metadata/unrecorded entries, and preserve v1 merge behavior |
-| Release provenance | Pass | Release assets have SHA-256 checksums, build attestations, a CycloneDX SBOM bound to the zip by an SBOM attestation, and draft-first non-overwriting publication |
-
-## GitHub repository controls
-
-- GitHub Actions is restricted to GitHub-owned actions plus the pinned
-  `ludeeus/action-shellcheck` and `zizmorcore/zizmor-action` repositories. The
-  hosted policy requires every action to use a full commit SHA.
-- Default workflow tokens are read-only and cannot approve pull requests.
-  Workflows then deny permissions by default and grant each job only what it
-  needs.
-- Every external contributor requires maintainer approval before forked pull
-  request workflows run.
-- `main` requires strict current CI, Zizmor, one CODEOWNER approval, stale
-  review dismissal, and conversation resolution. Force pushes and deletion are
-  disabled. Administrator enforcement remains deliberately disabled for the
-  single-maintainer constraint documented below.
-- CodeQL default setup scans GitHub Actions, C/C++, and Ruby for supported pull
-  requests and weekly. GitHub excludes fork pull requests from default setup.
-  The initial Actions/C++/Ruby analysis completed without alerts.
-- GitHub secret scanning, push protection, and Dependabot security updates are
-  enabled. Partner validity checks and non-provider patterns are unavailable
-  for this user-owned public repository without GitHub Secret Protection.
-- Repository-level immutable releases are enabled for future publications.
-  The workflow builds a draft first, uploads assets and release notes, then
-  publishes. GitHub does not retroactively make v1.7.6 immutable.
-- Pinned Kingfisher scans staged changes through the repository pre-commit hook
-  and scans the current checkout in required CI. Both modes redact findings,
-  disable live validation, and exclude Git history so Team17-controlled values
-  in old revisions do not become an unactionable project gate.
-
-## Verifying the fix
-
-### Review the code
-
-```bash
-# Main fix script
-less fix_worms_wmd.sh
-
-# Individual steps
-ls -la scripts/
-less scripts/01_build_agl_stub.sh
-
-# Tools
-ls -la tools/
-less tools/check_updates.sh
-
-# AGL stub source
-less src/agl_stub.c
-```
-
-### Run ShellCheck
-
-```bash
-shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
-```
-
-### Preview changes (dry run)
+Runtime verification remains:
 
 ```bash
 ./fix_worms_wmd.sh --dry-run
-```
-
-### Verify after applying
-
-```bash
 ./fix_worms_wmd.sh --verify
-```
-
-### Run pre-flight check
-
-```bash
 ./tools/preflight_check.sh
 ```
 
-This verifies:
-- macOS version and architecture
-- Rosetta 2 installation and package version when available (Apple Silicon)
-- Game installation and fix status
-- Runtime dependencies (FMOD, Steam API, libcurl)
-- Optional public Team17, Steam, and GOG page reachability
-
-### Inspect the AGL stub
-
-```bash
-# View source
-cat src/agl_stub.c
-
-# Check compiled binary
-file "$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app/Contents/Frameworks/AGL.framework/Versions/A/AGL"
-
-# Verify architecture
-lipo -archs "$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app/Contents/Frameworks/AGL.framework/Versions/A/AGL"
-```
-
-## Backups and recovery
-
-The fix automatically creates a backup before making changes:
-
-**Backup location**: `~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS/` after a
-hidden staging backup passes metadata and manifest verification
-
-**Backup contents**:
-- `Frameworks/` - Original Qt frameworks and libraries
-- `PlugIns/` - Original Qt plugins
-- `MacOS/` - Original launch files, main executable, and storefront libraries
-- `_CodeSignature/` - Original signature resources when present
-- `Info.plist` - Original app metadata
-- `DataOSX/` - Original configuration files
-- `CommonData/` - Original shared configuration files
-- `BACKUP_METADATA.tsv` - Canonical source app, storefront, executable identity,
-  complete-MacOS marker, and signature-presence metadata
-- `BACKUP_MANIFEST.tsv` - SHA256 and size manifest for backup verification
-
-**Restore command**:
-
-```bash
-./fix_worms_wmd.sh --restore
-```
-
-## Third-party components
-
-| Component | Source | Verification |
-|-----------|--------|--------------|
-| Qt 5.15.x | Pre-built in repo `dist/`, or Intel Homebrew/custom prefix fallback | SHA256 checksum, metadata, archive/generated manifest, x86_64 slices, supported-series check |
-| GLib, PCRE2, etc. | Bundled with Qt or from Homebrew | Transitive from Qt |
-
-Pre-built Qt packages:
-- Built from a checksum-locked Homebrew Qt 5.15.19 x86_64 bottle closure
-- Packaged with `tools/package_qt_frameworks.sh`
-- Stored in repo `dist/` with SHA256 checksums and source provenance
-- Architecture: x86_64 (runs under Rosetta 2 on Apple Silicon)
-
-As of 2026-07-01, the current Homebrew `qt@5` stable formula is Qt 5.15.19.
-This repository ships `dist/qt-frameworks-x86_64-5.15.19.tar.gz` with
-`dist/qt-frameworks-x86_64-5.15.19.tar.gz.sha256` and
-`dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv`.
-
-Qt package supply-chain process:
-
-1. `dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv` locks every
-   Homebrew bottle in the Qt runtime closure by formula name, version, bottle
-   tag, GHCR blob URL, bottle SHA256, upstream source SHA256, Homebrew formula
-   SHA256, and Homebrew tap commit.
-2. `tools/fetch_qt_homebrew_bottles.rb --lock ... --output ...` fetches those
-   exact blobs, verifies every bottle SHA256 before extraction, builds an
-   isolated Homebrew-like prefix, rewrites Homebrew bottle placeholders to that
-   prefix, verifies no placeholders remain, and confirms QtCore has an x86_64
-   Mach-O slice. Writing a new lock requires an explicit `--version`.
-3. `tools/package_qt_frameworks.sh` packages only Qt 5.15.x inputs, copies the
-   runtime frameworks, plugins, and dylib closure, prunes non-runtime framework
-   headers, embeds `SOURCE_PROVENANCE.tsv`, writes `MANIFEST.txt`, and creates
-   the archive plus checksum.
-4. `scripts/download_qt_frameworks.sh --check` validates the committed archive
-   checksum, metadata, whitelisted layout, tar metadata, manifest, required
-   runtime files, and x86_64 Mach-O slices before installer use.
-
 ## Known limitations
 
-1. **Pre-built packages are not signed**: The pre-built Qt path uses SHA256 checksums, metadata, archive or generated cache manifests, and binary-slice checks, but not cryptographic package signatures. The checksum file is in the same repository.
+| Limitation | Current mitigation |
+| --- | --- |
+| Qt package is not independently signed | Locked inputs, checksums, manifests, Mach-O closure, release attestation |
+| Update downloader verifies checksum but not attestation | Users can run `gh attestation verify` on the downloaded zip |
+| Modified game uses ad-hoc signing | Strict signature verification occurs inside rollback boundary |
+| Legacy backups lack complete identity/integrity | Explicit warning; ambiguous multi-install restore refused |
+| Team17-controlled credentials exist in the game/old report history | Current repo is redacted; project does not validate, rotate, or gate on vendor values |
+| Local hooks can be absent or bypassed | Required current-tree Kingfisher plus GitHub push protection |
+| Admin branch bypass remains enabled | Required checks/review still apply normally; second trusted reviewer needed before enforcement |
+| v1.7.6 is mutable and has no SBOM | Existing checksum/build attestation; future releases immutable with SBOM |
+| First hosted SBOM publication is not yet exercised | Generator passed official CycloneDX schema and zip-root-hash tests; next tag is final end-to-end proof |
 
-2. **Update downloads are checksum-verified but not independently signed**: `check_updates.sh --download` verifies the release zip checksum. Use `gh attestation verify` for release provenance.
+## Reporting a vulnerability
 
-3. **Ad-hoc code signature**: The app is signed with an ad-hoc signature, not a Developer ID. This may trigger Gatekeeper warnings on some systems.
-
-4. **Legacy backups cannot be fully identified or verified**: Backups created
-   before manifest or source-metadata support can still be restored with an
-   explicit warning when one installation is present. Ambiguous multi-install
-   legacy restore is refused.
-
-5. **Game config secrets**: The original game ships with confirmed API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
-
-6. **Historical vendor credentials**: Older `TEAM17_DEVELOPER_REPORT.md`
-   revisions contain patterns matching Team17-controlled credentials. The
-   current tree is redacted and clean. This project cannot validate, rotate, or
-   revoke vendor-owned values and does not scan published history as a blocking
-   commit/CI control.
-
-7. **Solo-maintainer branch bypass**: `main` requires status checks, one
-   CODEOWNER approval, stale-review dismissal, and conversation resolution,
-   but administrator enforcement remains disabled. Enabling it before a second
-   trusted reviewer exists would prevent the sole maintainer from satisfying
-   the review requirement.
-
-8. **Existing release mutability**: Repository-level immutable releases protect
-   future releases. GitHub reports v1.7.6 as mutable because it was published
-   before the control was enabled. Its hosted checksum and attestation remain
-   independently verifiable.
-
-## Reporting security issues
-
-**Do not open a public issue for security vulnerabilities.**
-
-Prefer a [private GitHub vulnerability
+Do not open a public issue containing vulnerabilities, credentials, or exploit
+details. Submit a [private GitHub vulnerability
 report](https://github.com/cboyd0319/WormsWMD-macOS-Fix/security/advisories/new).
-If GitHub private reporting is unavailable, email the maintainer directly with:
-
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
-
-You will receive a response within 48 hours acknowledging the report.
+Reports should include impact, reproduction steps, affected versions, and a
+suggested mitigation when available. An acknowledgement is expected within 48
+hours.
