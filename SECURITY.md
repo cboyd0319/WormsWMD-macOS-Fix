@@ -104,7 +104,9 @@ The shipped Qt archive is accepted only after verifying:
    or escaping symlinks.
 4. Archive/generated manifest and complete non-system Mach-O dependency closure.
 5. `SOURCE_PROVENANCE.tsv`, which locks the 17 Homebrew bottle inputs, source
-   hashes, formula hashes, and tap commit.
+   hashes, formula hashes, and tap commit. SBOM generation requires its
+   standalone copy to be byte-identical to the copy inside the checksummed
+   archive.
 
 ## GitHub and CI controls
 
@@ -151,8 +153,8 @@ closed when the scanner is missing or has another version. CI scans the current
 checkout in the existing Zizmor job, sharing its Ubuntu runner.
 
 Both modes redact findings, disable live provider validation and update checks,
-and exclude Git history/internals. The CI scan also avoids extracting the
-vendored Qt archive. The fixed Linux x64 CI asset SHA-256 is:
+exclude Git history/internals, and avoid extracting or scanning the vendored Qt
+archive. The fixed Linux x64 CI asset SHA-256 is:
 
 ```text
 d30d71f82e25e8c024f98cce3258c90e17b5be31d0fdb6f30b438d2fac1f130b
@@ -165,8 +167,10 @@ For future tags, the release workflow:
 1. Validates the harness, shell syntax, and Qt package.
 2. Builds the zip and matching `.zip.sha256`.
 3. Extracts the matching `CHANGELOG.md` section as release notes.
-4. Generates deterministic CycloneDX 1.6 JSON from the locked Qt provenance.
-5. Makes the SBOM root hash equal the actual release zip hash.
+4. Verifies the locked Qt provenance matches the copy in the checksummed Qt
+   archive, then generates deterministic CycloneDX 1.6 JSON from it.
+5. Hashes the built release zip, verifies its checksum file, and uses that
+   verified digest as the SBOM root hash.
 6. Attests build assets and separately binds the SBOM to the zip.
 7. Uploads notes/assets to a resumable draft, then publishes it immutably.
 8. Refuses to overwrite any published release.
@@ -201,6 +205,7 @@ both its build provenance and SBOM relationship.
 ./tools/install_git_hooks.sh --check
 ./tools/test_git_hooks.sh
 ./tools/test_github_security.sh
+./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
 ./tools/validate_harness.sh

@@ -65,9 +65,9 @@ it.
   replace a published release, and publishes only after checksum assets and
   attestations exist. Repository-level immutability protects future published
   releases; v1.7.6 predates that GitHub setting.
-- Tagged releases publish a deterministic CycloneDX SBOM for the complete
-  checksum-locked Qt bottle inventory. GitHub's SBOM attestation binds that
-  inventory to the release zip.
+- Starting with the next tagged release after v1.7.6, releases publish a
+  deterministic CycloneDX SBOM for the complete checksum-locked Qt bottle
+  inventory. GitHub's SBOM attestation binds that inventory to the release zip.
 
 ## What it can still do
 

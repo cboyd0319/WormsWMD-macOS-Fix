@@ -36,6 +36,7 @@ GitHub workflow or release automation:
 
 ```bash
 ./tools/test_github_security.sh
+./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
 ./tools/test_git_hooks.sh
@@ -69,6 +70,7 @@ Release publication:
 ```bash
 ./tools/validate_harness.sh
 ./tools/test_github_security.sh
+./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
 ./tools/test_git_hooks.sh

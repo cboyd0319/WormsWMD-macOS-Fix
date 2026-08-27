@@ -48,6 +48,9 @@ jobs:
       - name: Test CI change classification
         run: ./tools/test_ci_change_classification.sh
 
+      - name: Test CI changed-path selection
+        run: ./tools/test_ci_changed_paths.sh
+
       - name: Test release SBOM generation
         run: python3 tools/test_generate_sbom.py
 
@@ -57,23 +60,19 @@ jobs:
       - name: Classify macOS validation scope
         id: changes
         env:
+          EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          if [[ -z "$BASE_SHA" || -z "$HEAD_SHA" || "$BASE_SHA" =~ ^0+$ ]] \
-              || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null \
-              || ! git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null; then
+          changed_paths="$RUNNER_TEMP/wormswmd-changed-paths"
+          if ! ./tools/ci_changed_paths.sh \
+              "$EVENT_NAME" "$BASE_SHA" "$HEAD_SHA" > "$changed_paths"; then
+            echo "macos-required=true" >> "$GITHUB_OUTPUT"
+          elif ./tools/ci_requires_macos.sh < "$changed_paths"; then
             echo "macos-required=true" >> "$GITHUB_OUTPUT"
           else
-            changed_paths="$RUNNER_TEMP/wormswmd-changed-paths"
-            if ! git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" > "$changed_paths"; then
-              echo "macos-required=true" >> "$GITHUB_OUTPUT"
-            elif ./tools/ci_requires_macos.sh < "$changed_paths"; then
-              echo "macos-required=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "macos-required=false" >> "$GITHUB_OUTPUT"
-            fi
+            echo "macos-required=false" >> "$GITHUB_OUTPUT"
           fi
 
   validate-scripts:

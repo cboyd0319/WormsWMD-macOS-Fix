@@ -78,6 +78,8 @@ jobs:
           python3 tools/generate_sbom.py \
             --version "$RELEASE_VERSION" \
             --timestamp "$release_timestamp" \
+            --archive "dist/qt-frameworks-x86_64-5.15.19.tar.gz" \
+            --release-archive "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip" \
             --release-checksum "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip.sha256" \
             --output "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.cdx.json"
 

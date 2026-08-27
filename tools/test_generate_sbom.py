@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,11 +21,22 @@ TIMESTAMP = "2026-08-26T12:34:56Z"
 
 
 class GenerateSbomTests(unittest.TestCase):
+    @staticmethod
+    def write_archive(path: Path, provenance: bytes) -> None:
+        with tarfile.open(path, "w:gz") as archive:
+            member = tarfile.TarInfo("SOURCE_PROVENANCE.tsv")
+            member.size = len(provenance)
+            member.mode = 0o644
+            archive.addfile(member, io.BytesIO(provenance))
+
     def run_generator(
         self, output: Path, *extra: str
     ) -> subprocess.CompletedProcess[str]:
+        release_archive = output.parent / "release.zip"
         release_checksum = output.parent / "release.zip.sha256"
-        release_checksum.write_text("f" * 64 + "  release.zip\n", encoding="utf-8")
+        release_archive.write_bytes(b"deterministic release fixture\n")
+        release_hash = hashlib.sha256(release_archive.read_bytes()).hexdigest()
+        release_checksum.write_text(release_hash + "  release.zip\n", encoding="utf-8")
         return subprocess.run(
             [
                 sys.executable,
@@ -35,6 +49,8 @@ class GenerateSbomTests(unittest.TestCase):
                 str(output),
                 "--release-checksum",
                 str(release_checksum),
+                "--release-archive",
+                str(release_archive),
                 *extra,
             ],
             cwd=ROOT,
@@ -89,7 +105,7 @@ class GenerateSbomTests(unittest.TestCase):
             self.assertEqual(sorted(root_dependency["dependsOn"]), sorted(refs))
             self.assertEqual(
                 document["metadata"]["component"]["hashes"][0]["content"],
-                "f" * 64,
+                hashlib.sha256(b"deterministic release fixture\n").hexdigest(),
             )
             properties = {
                 item["name"]: item["value"]
@@ -113,6 +129,8 @@ class GenerateSbomTests(unittest.TestCase):
                     TIMESTAMP,
                     "--output",
                     str(output),
+                    "--release-archive",
+                    str(output.parent / "missing.zip"),
                     "--release-checksum",
                     str(output.parent / "missing.zip.sha256"),
                 ],
@@ -130,6 +148,7 @@ class GenerateSbomTests(unittest.TestCase):
             temp = Path(temporary_directory)
             lock = temp / "duplicate.tsv"
             checksum = temp / "archive.sha256"
+            archive = temp / "archive.tar.gz"
             output = temp / "bad.cdx.json"
             header = "name\tversion\tbottle_tag\tbottle_sha256\tbottle_url\tsource_sha256\truby_source_sha256\ttap_git_head\n"
             row = (
@@ -144,7 +163,9 @@ class GenerateSbomTests(unittest.TestCase):
                 + "\n"
             )
             lock.write_text(header + row + row, encoding="utf-8")
-            checksum.write_text("e" * 64 + "  archive.tar.gz\n", encoding="utf-8")
+            self.write_archive(archive, lock.read_bytes())
+            archive_hash = hashlib.sha256(archive.read_bytes()).hexdigest()
+            checksum.write_text(archive_hash + "  archive.tar.gz\n", encoding="utf-8")
 
             result = self.run_generator(
                 output,
@@ -152,8 +173,67 @@ class GenerateSbomTests(unittest.TestCase):
                 str(lock),
                 "--archive-checksum",
                 str(checksum),
+                "--archive",
+                str(archive),
             )
             self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Duplicate component name", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_rejects_lock_that_differs_from_embedded_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temp = Path(temporary_directory)
+            archive = temp / "archive.tar.gz"
+            checksum = temp / "archive.sha256"
+            output = temp / "bad.cdx.json"
+            embedded = PROVENANCE.read_bytes() + b"# unexpected archive-only change\n"
+            self.write_archive(archive, embedded)
+            archive_hash = hashlib.sha256(archive.read_bytes()).hexdigest()
+            checksum.write_text(archive_hash + "  archive.tar.gz\n", encoding="utf-8")
+
+            result = self.run_generator(
+                output,
+                "--archive",
+                str(archive),
+                "--archive-checksum",
+                str(checksum),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("does not match", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_rejects_release_zip_that_differs_from_its_checksum(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temp = Path(temporary_directory)
+            output = temp / "bad.cdx.json"
+            release_archive = temp / "release.zip"
+            release_checksum = temp / "release.zip.sha256"
+            release_archive.write_bytes(b"release contents\n")
+            release_checksum.write_text("f" * 64 + "  release.zip\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GENERATOR),
+                    "--version",
+                    "v1.7.6",
+                    "--timestamp",
+                    TIMESTAMP,
+                    "--output",
+                    str(output),
+                    "--release-archive",
+                    str(release_archive),
+                    "--release-checksum",
+                    str(release_checksum),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Release zip does not match", result.stderr)
             self.assertFalse(output.exists())
 
 

@@ -76,6 +76,7 @@ Out of scope:
 
 ```bash
 ./tools/test_ci_change_classification.sh
+./tools/test_ci_changed_paths.sh
 python3 tools/test_generate_sbom.py
 ./tools/test_github_security.sh
 ./tools/validate_harness.sh
@@ -149,6 +150,20 @@ single macOS job whenever the fail-safe classifier reports a runtime change.
   staged/CI scans share Git/history/archive exclusions. Hook tests cover root
   anchoring, cleanup-trap policy, exact flags, missing binaries, and wrong
   versions.
+- 2026-08-26: A second review found four valid boundary gaps. Pull requests now
+  use a tested three-dot diff while pushes retain two-dot semantics; staged
+  scans accept only the repository-local pinned scanner or an explicit test
+  override; installer tests exercise platform selection, install, check,
+  uninstall, download/checksum failures, and cleanup in an isolated Git repo;
+  and SBOM generation verifies the standalone provenance is byte-identical to
+  the copy inside the checksummed Qt archive.
+- 2026-08-26: The local second pass also closed two adjacent integrity gaps:
+  the generator now hashes the built release zip instead of trusting only its
+  checksum record, and the hook installer verifies the extracted scanner before
+  placing it in the Git directory. Both failure paths have regression tests.
+- 2026-08-26: Adversarial path testing found that Git rename detection could
+  hide a runtime source path renamed into an allowlisted documentation path.
+  Event-aware diffs now disable rename folding so both paths are classified.
 
 ## Surprises & Discoveries
 

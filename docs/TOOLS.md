@@ -160,6 +160,7 @@ or docs-topology changes:
 ./tools/test_manifest_regression.sh
 ./tools/test_qt_version_pinning.sh
 ./tools/test_github_security.sh
+./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
 ./tools/test_git_hooks.sh
@@ -246,7 +247,9 @@ assets, source, tools, scripts, and `dist/` package into
 `build/release/WormsWMD-macOS-Fix-VERSION/`. It writes `RELEASE_INFO.txt`,
 `RELEASE_MANIFEST.tsv`, an optional zip, and a `.sha256` file for the zip.
 
-For tagged releases, `tools/generate_sbom.py` converts the checksum-locked Qt
-bottle provenance into a deterministic CycloneDX 1.6 JSON SBOM. The release
-workflow publishes that `.cdx.json` file and creates an SBOM attestation that
-binds it to the release zip.
+For tagged releases, `tools/generate_sbom.py` verifies that the standalone Qt
+bottle provenance is byte-identical to `SOURCE_PROVENANCE.tsv` inside the
+checksummed Qt archive, then converts it into a deterministic CycloneDX 1.6
+JSON SBOM. The release workflow publishes that `.cdx.json` file and creates an
+SBOM attestation that binds it to the release zip. Generation also hashes the
+built zip and rejects a checksum mismatch before writing the SBOM.

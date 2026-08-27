@@ -7,6 +7,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 HOOKS_DIR="$ROOT_DIR/.githooks"
 KINGFISHER_VERSION="2.0.0"
+KINGFISHER_TEMP_DIR=""
+
+cleanup_kingfisher_temp() {
+    if [[ -n "$KINGFISHER_TEMP_DIR" ]]; then
+        rm -rf "$KINGFISHER_TEMP_DIR"
+    fi
+}
 
 usage() {
     printf '%s\n' \
@@ -98,6 +105,7 @@ install_kingfisher() {
     local download_url
     local temporary_directory
     local archive
+    local candidate
     local binary
 
     record=$(platform_asset)
@@ -105,7 +113,8 @@ install_kingfisher() {
     expected_sha256=${record#*$'\t'}
     download_url="https://github.com/mongodb/kingfisher/releases/download/v${KINGFISHER_VERSION}/${asset}"
     temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-kingfisher.XXXXXX")
-    trap 'rm -rf "$temporary_directory"' EXIT
+    KINGFISHER_TEMP_DIR="$temporary_directory"
+    trap cleanup_kingfisher_temp EXIT
     archive="$temporary_directory/$asset"
 
     curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
@@ -114,14 +123,20 @@ install_kingfisher() {
     printf '%s  %s\n' "$expected_sha256" "$archive" | shasum -a 256 -c -
     tar -xzf "$archive" -C "$temporary_directory" kingfisher
 
-    binary=$(installed_binary)
-    mkdir -p "$(dirname "$binary")"
-    install -m 0755 "$temporary_directory/kingfisher" "$binary"
-    [[ "$("$binary" --version 2>/dev/null)" == "kingfisher $KINGFISHER_VERSION" ]] || {
+    candidate="$temporary_directory/kingfisher"
+    [[ -x "$candidate" ]] || {
+        printf '%s\n' "ERROR: Downloaded Kingfisher is not executable." >&2
+        return 1
+    }
+    [[ "$("$candidate" --version 2>/dev/null)" == "kingfisher $KINGFISHER_VERSION" ]] || {
         printf '%s\n' "ERROR: Downloaded Kingfisher failed its version check." >&2
         return 1
     }
+    binary=$(installed_binary)
+    mkdir -p "$(dirname "$binary")"
+    install -m 0755 "$candidate" "$binary"
     rm -rf "$temporary_directory"
+    KINGFISHER_TEMP_DIR=""
     trap - EXIT
 }
 

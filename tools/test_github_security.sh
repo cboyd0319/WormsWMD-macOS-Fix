@@ -127,9 +127,11 @@ fi
 
 for required_file in \
     "$ROOT_DIR/.githooks/pre-commit" \
+    "$ROOT_DIR/tools/ci_changed_paths.sh" \
     "$ROOT_DIR/tools/ci_requires_macos.sh" \
     "$ROOT_DIR/tools/generate_sbom.py" \
     "$ROOT_DIR/tools/install_git_hooks.sh" \
+    "$ROOT_DIR/tools/test_ci_changed_paths.sh" \
     "$ROOT_DIR/tools/test_ci_change_classification.sh" \
     "$ROOT_DIR/tools/test_generate_sbom.py" \
     "$ROOT_DIR/tools/test_git_hooks.sh"; do
@@ -144,7 +146,7 @@ ci_workflow="$ROOT_DIR/.github/workflows/ci.yml"
 for marker in \
     'needs: shellcheck' \
     "if: needs.shellcheck.outputs.macos-required == 'true'" \
-    'if ! git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" > "$changed_paths"' \
+    './tools/ci_changed_paths.sh' \
     './tools/ci_requires_macos.sh' \
     'name: Compile AGL stub'; do
     if ! grep -Fq "$marker" "$ci_workflow"; then
@@ -164,6 +166,8 @@ release_workflow="$ROOT_DIR/.github/workflows/release.yml"
 for marker in \
     'retention-days: 14' \
     'python3 tools/generate_sbom.py' \
+    '--archive "dist/qt-frameworks-x86_64-5.15.19.tar.gz"' \
+    '--release-archive "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip"' \
     '--release-checksum "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip.sha256"' \
     'sbom-path: build/release/WormsWMD-macOS-Fix-*.cdx.json' \
     'build/release/*.cdx.json' \

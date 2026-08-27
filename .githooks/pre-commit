@@ -17,7 +17,7 @@ if [[ -n "${WORMSWMD_KINGFISHER_BIN:-}" ]]; then
 elif [[ -x "$GIT_COMMON_DIR/tools/kingfisher" ]]; then
     KINGFISHER_BIN="$GIT_COMMON_DIR/tools/kingfisher"
 else
-    KINGFISHER_BIN=$(command -v kingfisher 2>/dev/null || true)
+    KINGFISHER_BIN=""
 fi
 
 if [[ -z "$KINGFISHER_BIN" || ! -x "$KINGFISHER_BIN" ]]; then

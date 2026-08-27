@@ -318,6 +318,7 @@ check_ci_and_ownership_gates() {
     for required_ci_check in \
         "./tools/validate_harness.sh" \
         "./tools/test_github_security.sh" \
+        "./tools/test_ci_changed_paths.sh" \
         "./tools/test_ci_change_classification.sh" \
         "python3 tools/test_generate_sbom.py" \
         "./tools/test_git_hooks.sh" \
@@ -421,9 +422,11 @@ require_file "docs/style/agent-harness.md"
 require_file "docs/exec-plans/README.md"
 require_file "docs/exec-plans/TEMPLATE.md"
 require_file "tools/extract_release_notes.sh"
+require_file "tools/ci_changed_paths.sh"
 require_file "tools/ci_requires_macos.sh"
 require_file "tools/generate_sbom.py"
 require_file "tools/install_git_hooks.sh"
+require_file "tools/test_ci_changed_paths.sh"
 require_file "tools/test_ci_change_classification.sh"
 require_file "tools/test_generate_sbom.py"
 require_file "tools/test_git_hooks.sh"
