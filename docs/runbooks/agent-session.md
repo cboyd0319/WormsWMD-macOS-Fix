@@ -83,6 +83,8 @@ GitHub workflow or release automation:
 ./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
+/usr/bin/python3 tools/test_archive_inspector.py
+ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/test_git_hooks.sh
 actionlint .github/workflows/*.yml
 zizmor --persona=pedantic --no-ignores --no-progress .github
@@ -117,6 +119,8 @@ Release publication:
 ./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
+/usr/bin/python3 tools/test_archive_inspector.py
+ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/test_git_hooks.sh
 ./tools/test_bootstrap_installer_safety.sh
 ./tools/test_dependency_parsing.sh

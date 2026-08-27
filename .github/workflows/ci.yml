@@ -57,6 +57,11 @@ jobs:
       - name: Test release SBOM generation
         run: python3 tools/test_generate_sbom.py
 
+      - name: Test bounded archive inspection
+        run: /usr/bin/python3 tools/test_archive_inspector.py
+      - name: Test Homebrew bottle safety
+        run: ruby tools/test_fetch_qt_homebrew_bottles.rb
+
       - name: Test enforced Git hooks
         run: ./tools/test_git_hooks.sh
 

@@ -18,7 +18,7 @@ download guidance lives in [`docs/TRUST.md`](docs/TRUST.md).
 | New secret prevention | Pass | Enforced staged Kingfisher, required current-tree scan, GitHub push protection |
 | Support privacy | Pass | Sanitized reports; no raw logs, game binaries, saves, or private configs |
 
-Last reviewed: 2026-08-26.
+Last reviewed: 2026-08-27.
 
 ## Threat model
 
@@ -28,6 +28,7 @@ Last reviewed: 2026-08-26.
 | --- | --- |
 | Command injection | No `eval` on user input; shell boundaries quote and validate paths and values |
 | Path traversal | Archive and tree checks reject absolute, parent, control, alias, and duplicate paths |
+| Archive exhaustion | Python 3.9+ inspector caps compressed/expanded bytes, members, per-member size, and ratio before extraction |
 | Symlink/hardlink escape | Mutable trees must remain inside the selected app and reject unsafe links |
 | Partial or wrong-target restore | Backups are verified, app/storefront-bound, staged, and checked after restore |
 | Malicious executable download | Release/Qt payloads use checksums, immutable refs, provenance, and attestations |
@@ -60,6 +61,7 @@ files. It may create these user-owned paths outside the bundle:
 | `~/.cache/wormswmd-fix/` | Verified Qt cache | Manual or `--force` |
 | `~/Library/LaunchAgents/com.wormswmd.fix.watcher.plist` | Optional watcher | `--uninstall` |
 | `${TMPDIR:-/tmp}/agl_stub_build.*/` | AGL build workspace | Automatic |
+| Same-parent `.stage-*` bottle prefix | Maintainer-only Qt rebuild staging | Automatic |
 
 The fix does not modify system directories, collect telemetry, alter `PATH` or
 `DYLD_LIBRARY_PATH`, or install privileged persistence.
@@ -73,6 +75,7 @@ The fix does not modify system directories, collect telemetry, alter `PATH` or
 | `INSTALL_REF` | Defaults to v1.7.6; other refs require explicit developer opt-in |
 | `LOG_FILE` | Regular `.log` beneath `~/Library/Logs` |
 | `QT_PREFIX` | Required Qt 5.15.x layout and explicit custom-prefix opt-in |
+| Archive files | Bounded owner-only copy, external digest where available, shared profile, same-copy extraction |
 
 The complete backup, restore, archive, Mach-O, signing, and diagnostics
 contracts are maintained in
@@ -84,7 +87,7 @@ contracts are maintained in
 | --- | --- | --- |
 | Repository/bootstrap/update | `github.com`, `raw.githubusercontent.com`, `api.github.com` | HTTPS, release tag/commit pin, checksum for downloads |
 | Qt runtime | Repository `dist/` or pinned commit | SHA-256, metadata, manifest, layout, links, x86_64 closure |
-| Qt provenance rebuild | `formulae.brew.sh`, `ghcr.io` | Locked bottle/source/formula hashes and tap commit |
+| Qt provenance rebuild | `formulae.brew.sh`, `ghcr.io`, approved GitHub storage | Authoritative reviewed lock, exact digest paths, bounded redirects/downloads; bearer removed cross-origin |
 | Kingfisher developer/CI binary | `github.com/mongodb/kingfisher` | Fixed 2.0.0 release and per-platform SHA-256 |
 | Public preflight probes | Team17, Steam, GOG pages | Optional HTTPS reachability only |
 | Rosetta/Xcode tools | Apple services | macOS-managed installation |
@@ -107,6 +110,14 @@ The shipped Qt archive is accepted only after verifying:
    hashes, formula hashes, and tap commit. SBOM generation requires its
    standalone copy to be byte-identical to the copy inside the checksummed
    archive.
+
+The authoritative rebuild input is `packaging/qt-homebrew-lock.tsv`; the
+`dist/` TSV is generated evidence. Bottle rebuilds validate the exact allowlisted
+closure, GHCR digest path, archive profile, formula/version root, revision, and
+bounded embedded formula metadata.
+They do not execute extracted `qmake`. Output is staged beside the target and
+cannot replace or clean a nonempty directory without its exact path-bound
+ownership marker and the matching explicit flag.
 
 ## GitHub and CI controls
 
@@ -213,6 +224,8 @@ both its build provenance and SBOM relationship.
 ./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
+/usr/bin/python3 tools/test_archive_inspector.py
+ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/validate_harness.sh
 actionlint .github/workflows/*.yml
 zizmor --persona=pedantic --no-ignores --no-progress .github
@@ -233,6 +246,7 @@ Runtime verification remains:
 | Limitation | Current mitigation |
 | --- | --- |
 | Qt package is not independently signed | Locked inputs, checksums, manifests, Mach-O closure, release attestation |
+| Archive inspection needs Python 3.9+ | macOS 26 Apple Command Line Tools provide it; mutating archive operations fail with install/update guidance |
 | Update downloader verifies checksum but not attestation | Users can run `gh attestation verify` on the downloaded zip |
 | Modified game uses ad-hoc signing | Strict signature verification occurs inside rollback boundary |
 | Legacy backups lack complete identity/integrity | Explicit warning; ambiguous multi-install restore refused |

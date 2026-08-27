@@ -29,23 +29,29 @@ new_fixture() {
     local fixture="$1"
     local rel
 
-    mkdir -p "$fixture"
-    git -C "$ROOT_DIR" archive HEAD | tar -xf - -C "$fixture"
+    git clone -q --no-hardlinks "$ROOT_DIR" "$fixture"
+    rm -rf "$fixture/.git"
 
     for rel in \
         AGENTS.md \
         .agents/rules/wormswmd-maintenance.md \
         .github/copilot-instructions.md \
+        .github/CODEOWNERS \
         .github/pull_request_template.md \
         .github/workflows/ci.yml \
         docs/README.md \
         docs/exec-plans/README.md \
         docs/exec-plans/2026-08-27-security-remediation-pr1-harness-hooks.md \
+        docs/exec-plans/2026-08-27-security-remediation-pr2-archive-bottle-safety.md \
         docs/runbooks/agent-session.md \
         docs/style/agent-harness.md \
+        packaging/qt-homebrew-lock.tsv \
         .githooks/pre-commit \
         tools/install_git_hooks.sh \
+        tools/inspect_archive.py \
         tools/report_sensitive_changes.sh \
+        tools/test_archive_inspector.py \
+        tools/test_fetch_qt_homebrew_bottles.rb \
         tools/test_github_security.sh \
         tools/test_harness_security.sh \
         tools/test_sensitive_change_report.sh \
@@ -80,7 +86,7 @@ run_validator_bounded() {
     validator_pid=$!
 
     while kill -0 "$validator_pid" 2>/dev/null; do
-        if (( waited >= 50 )); then
+        if (( waited >= 100 )); then
             kill "$validator_pid" 2>/dev/null || true
             wait "$validator_pid" 2>/dev/null || true
             validator_pid=""
@@ -108,7 +114,10 @@ set +e
 run_validator_bounded "$fixture" "$test_dir/baseline.out"
 status=$?
 set -e
-[[ "$status" -eq 0 ]] || fail "baseline harness fixture did not validate"
+if [[ "$status" -ne 0 ]]; then
+    cat "$test_dir/baseline.out" >&2
+    fail "baseline harness fixture did not validate"
+fi
 
 gnu_stat_bin="$test_dir/gnu-stat-bin"
 mkdir -p "$gnu_stat_bin"
@@ -131,7 +140,10 @@ set +e
 run_validator_bounded "$fixture" "$test_dir/gnu-stat.out" "$gnu_stat_bin"
 status=$?
 set -e
-[[ "$status" -eq 0 ]] || fail "harness validator rejected GNU stat output fallback"
+if [[ "$status" -ne 0 ]]; then
+    cat "$test_dir/gnu-stat.out" >&2
+    fail "harness validator rejected GNU stat output fallback"
+fi
 
 fixture="$test_dir/unsafe-sources"
 new_fixture "$fixture"

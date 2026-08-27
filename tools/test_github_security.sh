@@ -130,11 +130,14 @@ for required_file in \
     "$ROOT_DIR/tools/ci_changed_paths.sh" \
     "$ROOT_DIR/tools/ci_requires_macos.sh" \
     "$ROOT_DIR/tools/generate_sbom.py" \
+    "$ROOT_DIR/tools/inspect_archive.py" \
     "$ROOT_DIR/tools/install_git_hooks.sh" \
     "$ROOT_DIR/tools/report_sensitive_changes.sh" \
     "$ROOT_DIR/tools/test_ci_changed_paths.sh" \
     "$ROOT_DIR/tools/test_ci_change_classification.sh" \
     "$ROOT_DIR/tools/test_generate_sbom.py" \
+    "$ROOT_DIR/tools/test_archive_inspector.py" \
+    "$ROOT_DIR/tools/test_fetch_qt_homebrew_bottles.rb" \
     "$ROOT_DIR/tools/test_git_hooks.sh" \
     "$ROOT_DIR/tools/test_harness_security.sh" \
     "$ROOT_DIR/tools/test_sensitive_change_report.sh"; do
@@ -154,6 +157,8 @@ for marker in \
     './tools/report_sensitive_changes.sh' \
     './tools/test_harness_security.sh' \
     './tools/test_sensitive_change_report.sh' \
+    '/usr/bin/python3 tools/test_archive_inspector.py' \
+    'ruby tools/test_fetch_qt_homebrew_bottles.rb' \
     'name: Compile AGL stub'; do
     if ! grep -Fq "$marker" "$ci_workflow"; then
         fail "CI workflow is missing cost-control marker: $marker"

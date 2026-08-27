@@ -163,6 +163,8 @@ or docs-topology changes:
 ./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
+/usr/bin/python3 tools/test_archive_inspector.py
+ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/test_git_hooks.sh
 ```
 
@@ -209,39 +211,45 @@ headers from the runtime package, and is intended for maintainers replacing the
 distribution archive in `dist/`. The packager and installer fallback reject Qt
 versions outside the supported 5.15.x series. `QT_DEP_PREFIX` may be set when
 packaging from an isolated Homebrew-like prefix whose transitive dylib
-dependencies are outside `QT_PREFIX`. `QT_SOURCE_PROVENANCE_FILE` embeds the
-Homebrew bottle lock as `SOURCE_PROVENANCE.tsv` in the archive.
+dependencies are outside `QT_PREFIX`. Packaging always validates and embeds the
+reviewed `packaging/qt-homebrew-lock.tsv`; the similarly named `dist/` TSV is
+generated evidence, not build authority.
 
 Rebuild the committed Qt 5.15.19 runtime package from the pinned Homebrew
 bottle lock:
 
 ```bash
 ./tools/fetch_qt_homebrew_bottles.rb \
-  --lock dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv \
+  --lock packaging/qt-homebrew-lock.tsv \
   --output /tmp/wormswmd-qt51519-prefix
 
 SOURCE_DATE_EPOCH=1781740800 \
 QT_PREFIX=/tmp/wormswmd-qt51519-prefix/opt/qt@5 \
 QT_DEP_PREFIX=/tmp/wormswmd-qt51519-prefix \
 QT_PACKAGE_VERSION=5.15.19 \
-QT_SOURCE_PROVENANCE_FILE=dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv \
 ./tools/package_qt_frameworks.sh --output dist --version 5.15.19
 
 (cd dist && shasum -a 256 -c qt-frameworks-x86_64-5.15.19.tar.gz.sha256)
 ./scripts/download_qt_frameworks.sh --check
 ```
 
-To intentionally refresh the bottle lock for a newer Qt 5.15.x artifact, write
-a new lock from current Homebrew metadata with an explicit `--version`, inspect
-the diff, then rebuild:
+The fetcher bounds downloads and redirects, verifies the copied archive digest,
+uses the shared bottle inspector, checks exact formula/version/revision roots
+against embedded formula metadata, never executes `qmake`, and stages output beside
+the selected target. It refuses foreign nonempty targets. Reuse requires the
+path-bound marker and `--replace-owned-output`; removal requires
+`--clean-owned-output`.
+
+To refresh one formula and its dependency rows, write a separate candidate,
+review its reported field changes and diff, then replace the authoritative lock
+in a dedicated reviewed change:
 
 ```bash
 ./tools/fetch_qt_homebrew_bottles.rb \
-  --formula qt@5 \
+  --lock packaging/qt-homebrew-lock.tsv \
+  --refresh-formula qt@5 \
   --version 5.15.19 \
-  --tag sonoma \
-  --output /tmp/wormswmd-qt51519-prefix \
-  --write-lock dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv
+  --write-lock /tmp/qt-homebrew-lock.candidate.tsv
 ```
 
 Build the player-facing release folder and zip:

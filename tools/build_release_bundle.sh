@@ -211,6 +211,7 @@ for rel in \
     "assets" \
     "dist" \
     "docs" \
+    "packaging" \
     "scripts" \
     "src" \
     "tools"; do

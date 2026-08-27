@@ -56,6 +56,8 @@ current when adding, moving, renaming, or deleting Markdown files.
 - [Execution plan template](exec-plans/TEMPLATE.md) - reusable plan scaffold.
 - [Security remediation PR 1 plan](exec-plans/2026-08-27-security-remediation-pr1-harness-hooks.md)
   - harness and hook trust implementation record.
+- [Security remediation PR 2 plan](exec-plans/2026-08-27-security-remediation-pr2-archive-bottle-safety.md)
+  - archive and Homebrew bottle safety implementation record.
 - [Deep repository audit plan](exec-plans/2026-06-10-deep-repo-audit.md) -
   audit trail for the repository-wide defect pass.
 - [Issue 10 backup stall plan](exec-plans/2026-06-18-issue-10-backup-stall.md)
