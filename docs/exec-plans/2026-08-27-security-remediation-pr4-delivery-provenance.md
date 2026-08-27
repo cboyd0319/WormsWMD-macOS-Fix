@@ -37,7 +37,7 @@ releases, unrelated dependency versions, and independent-builder claims.
 - [x] Generate scoped SBOM evidence and actionable pinned scanner reports.
 - [x] Normalize Mach-O paths, compare artifacts deeply, and prove TIFF runtime.
 - [x] Add protected exact-main two-build nonpublishing rebuild evidence.
-- [ ] Refresh only the reviewed libtiff 4.7.2 lock input.
+- [x] Refresh only the reviewed libtiff 4.7.2 lock input.
 - [ ] Split release privilege and add incident recovery.
 - [ ] Run full local/adversarial gates, merge one reviewed PR, and record PR 5 base.
 
@@ -82,12 +82,23 @@ git status --short
   uses two separate caches/roots, requires byte-identical package evidence,
   deep comparison and TIFF success, then attests/uploads seven-day candidate
   evidence with read plus short-lived attestation scopes only.
+- 2026-08-27: Raw refresh proposed eight changed rows; review retained only the
+  required libtiff 4.7.2 row and left all other inputs byte-identical to shipped
+  provenance. A full isolated 17-bottle fetch exposed and fixed staging-path
+  relocation plus safe contained soname aliases. Local candidate `90c0d19e...`
+  is x86_64, canonical, embeds the curated lock, and passes comparison/TIFF.
 
 ## Surprises & Discoveries
 
 - Current provenance has three relevant forms: the authoritative packaging
   lock, a versioned standalone file in `dist`, and the archive-embedded copy.
   Tag publication must require byte equality across all three.
+- Bottle relocation originally embedded the temporary staging prefix before
+  publishing it. Relocation now targets the canonical final output and rejects
+  any staging path left in Mach-O metadata.
+- Locked Homebrew sonames can be contained leaf symlinks. Resolution now
+  canonicalizes the alias, then applies existing root, regular-file, single-link,
+  and x86_64 checks to the target; escaping aliases still fail.
 
 ## Decision Log
 
@@ -99,6 +110,8 @@ git status --short
 - LC_UUID must be recomputed after path changes; changing load commands alone
   preserves UUID drift from the pre-normalized binary.
 - No tag may be created between the PR 4 lock transition and PR 5 artifact merge.
+- Current formula resolution is evidence, not authority; dependency/tap churn
+  is rejected unless the refreshed bottle requires it for compatibility.
 
 ## Outcomes & Retrospective
 

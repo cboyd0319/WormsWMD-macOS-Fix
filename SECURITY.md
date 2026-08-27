@@ -148,6 +148,13 @@ They do not execute extracted `qmake`. Output is staged beside the target and
 cannot replace or clean a nonempty directory without its exact path-bound
 ownership marker and the matching explicit flag.
 
+PR 4 intentionally advances only the authoritative libtiff row from 4.7.1 to
+4.7.2 while `dist` retains current 4.7.1 provenance. The other 16 rows remain
+unchanged. No tag or release is allowed in this state; tag publication must
+require byte equality among the packaging lock, versioned standalone
+provenance, and archive-embedded provenance. PR 5 restores that equality with
+the protected candidate artifact.
+
 ## GitHub and CI controls
 
 ### Hosted repository settings
@@ -297,6 +304,7 @@ Runtime verification remains:
 | v1.7.6 is mutable and has no SBOM | Existing checksum/build attestation; future releases immutable with SBOM |
 | First hosted SBOM publication is not yet exercised | Generator passed official CycloneDX schema and zip-root-hash tests; next tag is final end-to-end proof |
 | Qt vulnerability findings are report-only during burn-in | Pinned scanner, exact runtime inventory, deterministic evidence, explicit VEX expiry, and maintainer triage |
+| Packaging lock is temporarily ahead of `dist` | No tag; release equality gate; PR 5 must use the protected candidate and restore three-way provenance equality |
 
 ## Reporting a vulnerability
 

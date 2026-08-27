@@ -112,11 +112,14 @@ grep -Fq 'worms_supported_qt5_version "$homebrew_version"' "$ROOT_DIR/fix_worms_
     || fail "installer fallback does not enforce supported Homebrew Qt 5.15.x versions"
 grep -Fq 'SOURCE_PROVENANCE.tsv' "$ROOT_DIR/scripts/download_qt_frameworks.sh" \
     || fail "Qt archive validator does not allow source provenance"
+# shellcheck disable=SC2016
 grep -Fq 'normalize_qt_macho_tree.sh" "$WORK_DIR"' \
     "$ROOT_DIR/tools/package_qt_frameworks.sh" \
     || fail "Qt packager does not normalize Mach-O state before manifest creation"
+# shellcheck disable=SC2016
 normalizer_line=$(grep -nF 'normalize_qt_macho_tree.sh" "$WORK_DIR"' \
     "$ROOT_DIR/tools/package_qt_frameworks.sh" | head -1 | cut -d: -f1)
+# shellcheck disable=SC2016
 manifest_line=$(grep -nF 'worms_write_manifest "$WORK_DIR"' \
     "$ROOT_DIR/tools/package_qt_frameworks.sh" | head -1 | cut -d: -f1)
 [[ "$normalizer_line" -lt "$manifest_line" ]] \
@@ -127,9 +130,29 @@ if grep -Eq 'qmake.*-query|capture!.*qmake|system.*qmake' \
 fi
 [[ -x "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" ]] \
     || fail "Homebrew bottle provenance fetcher is missing or not executable"
-cmp -s "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" \
-    "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv" \
-    || fail "generated dist provenance does not match the reviewed packaging lock"
+if ! cmp -s "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" \
+    "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv"; then
+    /usr/bin/python3 - \
+        "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" \
+        "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv" <<'PY' \
+        || fail "packaging/dist transition differs outside the reviewed libtiff row"
+import csv
+import sys
+
+def rows(path):
+    lines = [line for line in open(path, encoding="utf-8")
+             if line.strip() and not line.startswith("#")]
+    return {row["name"]: row for row in csv.DictReader(lines, delimiter="\t")}
+
+packaging, shipped = map(rows, sys.argv[1:])
+changed = sorted(name for name in packaging if packaging[name] != shipped.get(name))
+if changed != ["libtiff"]:
+    raise SystemExit(1)
+if packaging["libtiff"]["version"] != "4.7.2" \
+        or shipped["libtiff"]["version"] != "4.7.1":
+    raise SystemExit(1)
+PY
+fi
 
 committed_package="$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.tar.gz"
 committed_checksum=$(awk 'NR == 1 {print $1; exit}' "${committed_package}.sha256")

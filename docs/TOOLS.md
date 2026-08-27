@@ -306,10 +306,17 @@ in a dedicated reviewed change:
 ```bash
 ./tools/fetch_qt_homebrew_bottles.rb \
   --lock packaging/qt-homebrew-lock.tsv \
-  --refresh-formula qt@5 \
-  --version 5.15.19 \
+  --refresh-formula libtiff \
+  --version 4.7.2 \
   --write-lock /tmp/qt-homebrew-lock.candidate.tsv
 ```
+
+For the v1.7.7 transition, review that raw candidate and retain only the
+libtiff row. Current formula resolution also proposes unrelated dependency/tap
+churn; it is not authoritative merely because it is current. The committed
+packaging lock intentionally gets ahead of the 4.7.1 provenance in `dist` until
+the protected rebuild and artifact-only PR restore three-way byte equality.
+Do not create a tag during this transition.
 
 Build the player-facing release folder and zip:
 

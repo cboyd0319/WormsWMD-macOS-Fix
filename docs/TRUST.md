@@ -79,6 +79,11 @@ it.
   hosted runner, requires byte identity and deep comparison, runs the TIFF
   probe, and publishes only an attested seven-day workflow artifact. A later
   artifact PR must match that digest; the workflow cannot publish a release.
+- The packaging lock may intentionally get ahead of the shipped archive for one
+  reviewed source-only PR. During that interval the versioned standalone and
+  embedded `dist` provenance still describe current bytes, no tag is allowed,
+  and release publication must fail. PR 5 must copy the protected candidate
+  bytes and restore equality across the lock and both provenance copies.
 
 ## What it can still do
 

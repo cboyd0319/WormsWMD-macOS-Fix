@@ -271,6 +271,33 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     assert_equal(['freetype'], changes.map(&:first))
   end
 
+  def test_staged_relocation_targets_the_final_published_prefix
+    target = Fetcher::OutputTarget.new(
+      path: File.join(@tmp, 'published-prefix'), state: :absent
+    )
+    relocated_arguments = nil
+    Fetcher.stub(:install_entries!, nil) do
+      Fetcher.stub(:relocate_macho!, lambda { |staging, published|
+        relocated_arguments = [staging, published]
+        0
+      }) do
+        Fetcher.stub(:validate_qt!, ['/staged/qt', '5.15.19']) do
+          Fetcher.stub(:write_ownership_marker, nil) do
+            Fetcher.stub(:validate_output_target, target) do
+              Fetcher.stub(:publish_staging!, nil) do
+                Fetcher.build_prefix!([entry], target, File.join(@tmp, 'cache'))
+              end
+            end
+          end
+        end
+      end
+    end
+
+    refute_nil(relocated_arguments)
+    assert_match(/[.]published-prefix[.]stage-/, relocated_arguments.first)
+    assert_equal(target.path, relocated_arguments.last)
+  end
+
   def test_refresh_cli_writes_a_separate_candidate_and_reports_only_changed_rows
     original = Fetcher.read_lock(LOCK)
     current = original.find { |item| item.fetch('name') == 'freetype' }
