@@ -141,6 +141,9 @@ changes must not silently drop existing behavior coverage.
   validity checks or non-provider patterns. Current GitHub documentation limits
   those controls to eligible Team/Enterprise Secret Protection repositories;
   core scanning and push protection remain enabled.
+- 2026-08-26: Follow-up owner context confirmed the historical patterns are
+  Team17-controlled values outside this project's rotation authority. Current
+  staged/tree scanning remains clean and intentionally excludes Git history.
 
 ## Surprises & Discoveries
 
@@ -176,7 +179,7 @@ changes must not silently drop existing behavior coverage.
 The repository now enforces immutable Action SHAs, a minimal action allowlist,
 all-external workflow approval, strict CI plus Zizmor checks, CodeQL default
 setup, secret scanning/push protection, and immutable future releases. Local and
-hosted verification passed. Remaining risks are documented: six historical
-generic-key patterns needing credential-owner confirmation, no standard SBOM,
-the necessary solo-maintainer admin bypass, unavailable paid secret-scanning
-enhancements, and the non-retroactive mutability of v1.7.6.
+hosted verification passed. Remaining risks are documented: vendor-controlled
+values in old history, the necessary solo-maintainer admin bypass, unavailable
+paid secret-scanning enhancements, and the non-retroactive mutability of
+v1.7.6. A follow-up pass owns standard SBOM publication.

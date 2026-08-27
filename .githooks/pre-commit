@@ -1,0 +1,45 @@
+#!/bin/bash
+# Block commits that introduce secrets into the staged change.
+
+set -euo pipefail
+
+ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    printf '%s\n' "ERROR: Run this hook inside the WormsWMD-macOS-Fix repository." >&2
+    exit 1
+}
+GIT_COMMON_DIR=$(git -C "$ROOT_DIR" rev-parse --git-common-dir)
+if [[ "$GIT_COMMON_DIR" != /* ]]; then
+    GIT_COMMON_DIR="$ROOT_DIR/$GIT_COMMON_DIR"
+fi
+
+if [[ -n "${WORMSWMD_KINGFISHER_BIN:-}" ]]; then
+    KINGFISHER_BIN="$WORMSWMD_KINGFISHER_BIN"
+elif [[ -x "$GIT_COMMON_DIR/tools/kingfisher" ]]; then
+    KINGFISHER_BIN="$GIT_COMMON_DIR/tools/kingfisher"
+else
+    KINGFISHER_BIN=$(command -v kingfisher 2>/dev/null || true)
+fi
+
+if [[ -z "$KINGFISHER_BIN" || ! -x "$KINGFISHER_BIN" ]]; then
+    printf '%s\n' \
+        "ERROR: Kingfisher 2.0.0 is required before committing." \
+        "Run ./tools/install_git_hooks.sh from the repository root." >&2
+    exit 1
+fi
+
+if [[ "$("$KINGFISHER_BIN" --version 2>/dev/null)" != "kingfisher 2.0.0" ]]; then
+    printf '%s\n' \
+        "ERROR: The pre-commit hook requires Kingfisher 2.0.0." \
+        "Run ./tools/install_git_hooks.sh to install the pinned scanner." >&2
+    exit 1
+fi
+
+exec "$KINGFISHER_BIN" scan . \
+    --staged \
+    --git-history none \
+    --exclude '**/.git/**' \
+    --redact \
+    --no-validate \
+    --confidence medium \
+    --quiet \
+    --no-update-check

@@ -3,16 +3,8 @@ name: GitHub Security
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/**'
-      - 'tools/extract_release_notes.sh'
-      - 'tools/test_github_security.sh'
   pull_request:
     branches: [main]
-    paths:
-      - '.github/**'
-      - 'tools/extract_release_notes.sh'
-      - 'tools/test_github_security.sh'
   schedule:
     - cron: '17 7 * * 1'
   workflow_dispatch:
@@ -51,3 +43,33 @@ jobs:
           min-severity: high
           persona: regular
           version: 1.29.0
+
+      - name: Install checksum-pinned Kingfisher
+        env:
+          KINGFISHER_SHA256: d30d71f82e25e8c024f98cce3258c90e17b5be31d0fdb6f30b438d2fac1f130b
+          KINGFISHER_VERSION: 2.0.0
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/kingfisher-linux-x64.tgz"
+          install_dir="$RUNNER_TEMP/kingfisher-bin"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            --retry 3 --retry-delay 1 --retry-connrefused --max-time 120 \
+            --output "$archive" \
+            "https://github.com/mongodb/kingfisher/releases/download/v${KINGFISHER_VERSION}/kingfisher-linux-x64.tgz"
+          printf '%s  %s\n' "$KINGFISHER_SHA256" "$archive" | shasum -a 256 -c -
+          mkdir -p "$install_dir"
+          tar -xzf "$archive" -C "$install_dir" kingfisher
+          "$install_dir/kingfisher" --version
+
+      - name: Scan current tree with Kingfisher
+        run: |
+          "$RUNNER_TEMP/kingfisher-bin/kingfisher" scan . \
+            --git-history none \
+            --exclude '**/.git/**' \
+            --exclude 'dist/*.tar.gz' \
+            --no-extract-archives \
+            --redact \
+            --no-validate \
+            --confidence medium \
+            --quiet \
+            --no-update-check

@@ -8,6 +8,8 @@
 
 # Build artifacts
 build/
+__pycache__/
+*.py[cod]
 *.dylib
 *.o
 *.a

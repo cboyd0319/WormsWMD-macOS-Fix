@@ -124,6 +124,11 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.6.zip --repo cboyd0319/WormsWMD-ma
 The checksum verifies the file content. The attestation verifies that GitHub
 Actions built the asset from this repository.
 
+Tagged releases also publish
+`WormsWMD-macOS-Fix-vX.Y.Z.cdx.json`. This CycloneDX 1.6 SBOM lists every
+checksum-locked Homebrew bottle in the Qt runtime closure. A separate GitHub
+SBOM attestation binds that document to the release zip.
+
 Pre-built Qt framework packages undergo multiple verification steps:
 
 1. **Source verification**: Downloaded only from local `dist/` or the pinned
@@ -238,16 +243,16 @@ Last audit: 2026-08-26
 | Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
 | Symlink attacks | Pass | Main installer uses per-run staging, whole-bundle symlink/hardlink checks, mutation-directory containment, and archive link rejection |
 | Race conditions | Pass | Atomic operations where possible |
-| Secret exposure | Follow-up | Current-tree redacted scan is clean and GitHub push protection is enabled; historical generic-key patterns in the redacted vendor report still require credential-owner validity/rotation confirmation |
+| Secret exposure | Pass | Pinned Kingfisher scans staged/current content without provider validation, current-tree redacted scans are clean, and GitHub push protection is enabled; historical vendor-controlled values are outside project control |
 | Support bundle privacy | Pass | Sanitized bundles include OS, Rosetta, installer-history, runtime-invariant, Qt-package, and backup-integrity context without raw logs, saves, game binaries, or private config contents |
 | Dependency security | Pass | Checksums, metadata, canonical manifests, complete closure checks, and readable x86_64 slices for pre-built Qt |
 | CI pinning | Pass | GitHub Actions use verified full commit SHAs, explicit stable runner labels, a pinned ShellCheck binary version, disabled checkout credential persistence, job-scoped permissions, concurrency limits, and timeouts |
-| Workflow security | Pass | Local policy regression plus path-scoped, version-pinned Zizmor scanning reject mutable Actions, dangerous triggers, direct run-expression expansion, and missing workflow boundaries |
+| Workflow security | Pass | Local policy regression plus required Zizmor and Kingfisher scanning reject mutable Actions, dangerous triggers, new staged/current-tree secrets, direct run-expression expansion, and missing workflow boundaries |
 | Code signing | Pass | Ad-hoc signature applied and strictly verified inside the rollback boundary; quarantine cleared afterward |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
 | Backup restore | Pass | Verified staged v2 backups exactly replace `MacOS`, bind to app/storefront identity, use atomic collision-resistant publication, reject invalid metadata/unrecorded entries, and preserve v1 merge behavior |
-| Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations; publication stages a resumable draft and refuses to overwrite a published release |
+| Release provenance | Pass | Release assets have SHA-256 checksums, build attestations, a CycloneDX SBOM bound to the zip by an SBOM attestation, and draft-first non-overwriting publication |
 
 ## GitHub repository controls
 
@@ -272,6 +277,10 @@ Last audit: 2026-08-26
 - Repository-level immutable releases are enabled for future publications.
   The workflow builds a draft first, uploads assets and release notes, then
   publishes. GitHub does not retroactively make v1.7.6 immutable.
+- Pinned Kingfisher scans staged changes through the repository pre-commit hook
+  and scans the current checkout in required CI. Both modes redact findings,
+  disable live validation, and exclude Git history so Team17-controlled values
+  in old revisions do not become an unactionable project gate.
 
 ## Verifying the fix
 
@@ -414,24 +423,19 @@ Qt package supply-chain process:
 
 5. **Game config secrets**: The original game ships with confirmed API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
 
-6. **Historical credential patterns**: Redacted history scanning identifies six
-   generic-key patterns in older `TEAM17_DEVELOPER_REPORT.md` revisions. The
-   current tree is clean. Only the credential owner can confirm whether those
-   values were real, remain valid, or were rotated; do not copy them into
-   issues, logs, prompts, or new commits.
+6. **Historical vendor credentials**: Older `TEAM17_DEVELOPER_REPORT.md`
+   revisions contain patterns matching Team17-controlled credentials. The
+   current tree is redacted and clean. This project cannot validate, rotate, or
+   revoke vendor-owned values and does not scan published history as a blocking
+   commit/CI control.
 
-7. **Dependency inventory format**: The Qt runtime closure has a deterministic,
-   checksum-locked `SOURCE_PROVENANCE.tsv`, but releases do not yet publish a
-   standard SPDX or CycloneDX SBOM. The GitHub dependency graph therefore
-   reports no package components for this shell/C repository.
-
-8. **Solo-maintainer branch bypass**: `main` requires status checks, one
+7. **Solo-maintainer branch bypass**: `main` requires status checks, one
    CODEOWNER approval, stale-review dismissal, and conversation resolution,
    but administrator enforcement remains disabled. Enabling it before a second
    trusted reviewer exists would prevent the sole maintainer from satisfying
    the review requirement.
 
-9. **Existing release mutability**: Repository-level immutable releases protect
+8. **Existing release mutability**: Repository-level immutable releases protect
    future releases. GitHub reports v1.7.6 as mutable because it was published
    before the control was enabled. Its hosted checksum and attestation remain
    independently verifiable.

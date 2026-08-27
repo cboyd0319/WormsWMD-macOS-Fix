@@ -31,6 +31,9 @@ the plan before continuing.
 
 ## Current Plans
 
+- [CI cost, secret scanning, and release SBOM](2026-08-26-ci-cost-secrets-sbom.md) - active
+  cost-aware CI consolidation, Kingfisher current-tree scanning, and
+  deterministic CycloneDX release evidence.
 - [GitHub security deep dive](2026-08-26-github-security-deep-dive.md) - completed
   audit and hardening of Actions, releases, hosted controls, secrets, and
   supply-chain evidence using the local OWASP cheat sheets as reference.

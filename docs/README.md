@@ -66,6 +66,9 @@ current when adding, moving, renaming, or deleting Markdown files.
   - completed fix for missing AGL and required Qt runtime partial installs.
 - [Issue 19 QtCore bad file descriptor plan](exec-plans/2026-08-11-issue-19-qtcore-bad-fd.md)
   - completed fix for read-only copied Qt framework binaries on macOS 26.6.
+- [CI cost, secret scanning, and release SBOM](exec-plans/2026-08-26-ci-cost-secrets-sbom.md)
+  - active cost-aware CI consolidation, Kingfisher current-tree scanning, and
+    deterministic CycloneDX release evidence.
 - [GitHub security deep dive](exec-plans/2026-08-26-github-security-deep-dive.md)
   - completed hardening of Actions, releases, hosted controls, secrets, and
     supply-chain evidence using local OWASP guidance as reference.

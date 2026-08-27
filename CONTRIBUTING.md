@@ -65,6 +65,7 @@ Optional for Homebrew fallback testing:
 ```bash
 git clone https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
+./tools/install_git_hooks.sh
 ```
 
 ### Verify your setup
@@ -72,6 +73,9 @@ cd WormsWMD-macOS-Fix
 ```bash
 ./tools/validate_harness.sh
 ./tools/test_github_security.sh
+./tools/test_ci_change_classification.sh
+python3 tools/test_generate_sbom.py
+./tools/test_git_hooks.sh
 shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
 for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --help
@@ -119,6 +123,9 @@ At minimum, run:
 ```bash
 ./tools/validate_harness.sh
 ./tools/test_github_security.sh
+./tools/test_ci_change_classification.sh
+python3 tools/test_generate_sbom.py
+./tools/test_git_hooks.sh
 shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
 for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
 ./fix_worms_wmd.sh --dry-run
@@ -141,3 +148,8 @@ Include:
 
 Trust-sensitive files are covered by `.github/CODEOWNERS`; expect maintainer
 review and passing CI before changes are merged to `main`.
+
+The repository-local pre-commit hook runs pinned Kingfisher against staged
+changes. Git hooks cannot install themselves in a fresh clone, so run
+`./tools/install_git_hooks.sh` once per clone. The hook fails closed when its
+checksum-pinned Kingfisher 2.0.0 binary is missing or has the wrong version.

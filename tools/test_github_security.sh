@@ -103,6 +103,17 @@ else
         "$ROOT_DIR/.github/workflows/github-security.yml"; then
         fail "GitHub security workflow must pin the zizmor binary version"
     fi
+    for marker in \
+        'KINGFISHER_VERSION: 2.0.0' \
+        'KINGFISHER_SHA256: d30d71f82e25e8c024f98cce3258c90e17b5be31d0fdb6f30b438d2fac1f130b' \
+        '--git-history none' \
+        "--exclude '**/.git/**'" \
+        '--no-validate' \
+        '--redact'; do
+        if ! grep -Fq -- "$marker" "$ROOT_DIR/.github/workflows/github-security.yml"; then
+            fail "GitHub security workflow is missing Kingfisher marker: $marker"
+        fi
+    done
 fi
 
 if ! grep -Eq '^[[:space:]]+default-days:[[:space:]]+7[[:space:]]*$' \
@@ -113,6 +124,36 @@ fi
 if [[ ! -f "$ROOT_DIR/.github/pull_request_template.md" ]]; then
     fail ".github/pull_request_template.md is required"
 fi
+
+for required_file in \
+    "$ROOT_DIR/.githooks/pre-commit" \
+    "$ROOT_DIR/tools/ci_requires_macos.sh" \
+    "$ROOT_DIR/tools/generate_sbom.py" \
+    "$ROOT_DIR/tools/install_git_hooks.sh" \
+    "$ROOT_DIR/tools/test_ci_change_classification.sh" \
+    "$ROOT_DIR/tools/test_generate_sbom.py" \
+    "$ROOT_DIR/tools/test_git_hooks.sh"; do
+    if [[ ! -f "$required_file" ]]; then
+        fail "required GitHub security file is missing: ${required_file#"$ROOT_DIR"/}"
+    fi
+done
+
+ci_workflow="$ROOT_DIR/.github/workflows/ci.yml"
+# These are literal workflow source markers, not shell expressions.
+# shellcheck disable=SC2016
+for marker in \
+    'needs: shellcheck' \
+    "if: needs.shellcheck.outputs.macos-required == 'true'" \
+    'if ! git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" > "$changed_paths"' \
+    './tools/ci_requires_macos.sh' \
+    'name: Compile AGL stub'; do
+    if ! grep -Fq "$marker" "$ci_workflow"; then
+        fail "CI workflow is missing cost-control marker: $marker"
+    fi
+done
+if grep -Fq 'name: Validate C Code' "$ci_workflow"; then
+    fail "CI workflow must not start a separate macOS C validation job"
+fi
 if ! grep -Fq '/security/advisories/new' "$ROOT_DIR/.github/ISSUE_TEMPLATE/config.yml"; then
     fail "issue chooser must route vulnerability reports to private advisories"
 fi
@@ -122,10 +163,14 @@ release_workflow="$ROOT_DIR/.github/workflows/release.yml"
 # shellcheck disable=SC2016
 for marker in \
     'retention-days: 14' \
+    'python3 tools/generate_sbom.py' \
+    '--release-checksum "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip.sha256"' \
+    'sbom-path: build/release/WormsWMD-macOS-Fix-*.cdx.json' \
+    'build/release/*.cdx.json' \
     'gh release create "$GITHUB_REF_NAME" --draft' \
     'gh release edit "$GITHUB_REF_NAME" --draft=false' \
     'Refusing to overwrite published release'; do
-    if ! grep -Fq "$marker" "$release_workflow"; then
+    if ! grep -Fq -- "$marker" "$release_workflow"; then
         fail "release workflow is missing safe publication marker: $marker"
     fi
 done

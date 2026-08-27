@@ -49,6 +49,9 @@ change.
 ```bash
 ./tools/validate_harness.sh
 ./tools/test_github_security.sh
+./tools/test_ci_change_classification.sh
+python3 tools/test_generate_sbom.py
+./tools/test_git_hooks.sh
 ./tools/test_bootstrap_installer_safety.sh
 ./tools/test_dependency_parsing.sh
 ./tools/test_issue_10_regression.sh
@@ -72,6 +75,7 @@ for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix
 ./tools/backup_saves.sh --help
 ./tools/build_release_bundle.sh --version local-smoke --skip-zip
 ./tools/extract_release_notes.sh 1.7.6
+./tools/install_git_hooks.sh --check
 clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
 ```
 

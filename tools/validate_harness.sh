@@ -318,6 +318,9 @@ check_ci_and_ownership_gates() {
     for required_ci_check in \
         "./tools/validate_harness.sh" \
         "./tools/test_github_security.sh" \
+        "./tools/test_ci_change_classification.sh" \
+        "python3 tools/test_generate_sbom.py" \
+        "./tools/test_git_hooks.sh" \
         "./tools/test_bootstrap_installer_safety.sh" \
         "./tools/test_issue_10_regression.sh" \
         "./tools/test_issue_11_game_detection.sh" \
@@ -342,6 +345,7 @@ check_ci_and_ownership_gates() {
 
     for required_owner in \
         "/.agents/** @cboyd0319" \
+        "/.githooks/** @cboyd0319" \
         "/.github/** @cboyd0319" \
         "/AGENTS.md @cboyd0319" \
         "/docs/exec-plans/** @cboyd0319" \
@@ -404,6 +408,7 @@ require_file "AGENTS.md"
 require_file ".agents/README.md"
 require_file ".agents/CLAUDE.md"
 require_file ".agents/rules/wormswmd-maintenance.md"
+require_file ".githooks/pre-commit"
 require_file ".github/CODEOWNERS"
 require_file ".github/copilot-instructions.md"
 require_file ".github/workflows/ci.yml"
@@ -416,6 +421,12 @@ require_file "docs/style/agent-harness.md"
 require_file "docs/exec-plans/README.md"
 require_file "docs/exec-plans/TEMPLATE.md"
 require_file "tools/extract_release_notes.sh"
+require_file "tools/ci_requires_macos.sh"
+require_file "tools/generate_sbom.py"
+require_file "tools/install_git_hooks.sh"
+require_file "tools/test_ci_change_classification.sh"
+require_file "tools/test_generate_sbom.py"
+require_file "tools/test_git_hooks.sh"
 require_file "tools/test_github_security.sh"
 
 check_harness_markers

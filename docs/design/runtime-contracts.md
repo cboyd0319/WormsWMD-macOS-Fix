@@ -186,8 +186,10 @@ scripts, tools, docs, original project assets, and verified `dist/` packages.
 It must not include `.git`, local build output, downloaded sample projects,
 game binaries, save files, support bundles, logs, secrets, or user data.
 
-Release bundles must include `RELEASE_INFO.txt` and `RELEASE_MANIFEST.tsv`.
-When a zip is produced, a matching `.sha256` file must be written next to it.
+Release bundles must include `RELEASE_INFO.txt` and `RELEASE_MANIFEST.tsv`; a
+zip requires a matching `.sha256`. Tagged GitHub releases also publish a
+deterministic CycloneDX SBOM from the locked Qt provenance and attest the SBOM
+against the release zip.
 
 Visual assets bundled by this repository must be original or have a committed
 redistribution license and attribution. Do not commit official Team17/Worms art

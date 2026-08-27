@@ -3,6 +3,7 @@
 * @cboyd0319
 
 /.agents/** @cboyd0319
+/.githooks/** @cboyd0319
 /.github/** @cboyd0319
 /.github/ISSUE_TEMPLATE/** @cboyd0319
 /.github/workflows/** @cboyd0319

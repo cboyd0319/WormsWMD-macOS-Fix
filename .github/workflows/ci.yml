@@ -19,11 +19,14 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    outputs:
+      macos-required: ${{ steps.changes.outputs.macos-required }}
     steps:
       - name: Checkout
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Run ShellCheck
@@ -36,8 +39,47 @@ jobs:
         env:
           SHELLCHECK_OPTS: -e SC2034 -e SC1091
 
+      - name: Validate agent harness docs
+        run: ./tools/validate_harness.sh
+
+      - name: Test GitHub security policy
+        run: ./tools/test_github_security.sh
+
+      - name: Test CI change classification
+        run: ./tools/test_ci_change_classification.sh
+
+      - name: Test release SBOM generation
+        run: python3 tools/test_generate_sbom.py
+
+      - name: Test enforced Git hooks
+        run: ./tools/test_git_hooks.sh
+
+      - name: Classify macOS validation scope
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$BASE_SHA" || -z "$HEAD_SHA" || "$BASE_SHA" =~ ^0+$ ]] \
+              || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null \
+              || ! git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null; then
+            echo "macos-required=true" >> "$GITHUB_OUTPUT"
+          else
+            changed_paths="$RUNNER_TEMP/wormswmd-changed-paths"
+            if ! git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" > "$changed_paths"; then
+              echo "macos-required=true" >> "$GITHUB_OUTPUT"
+            elif ./tools/ci_requires_macos.sh < "$changed_paths"; then
+              echo "macos-required=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "macos-required=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
   validate-scripts:
     name: Validate Scripts
+    needs: shellcheck
+    if: needs.shellcheck.outputs.macos-required == 'true'
     runs-on: macos-26-intel
     timeout-minutes: 20
     permissions:
@@ -60,11 +102,15 @@ jobs:
           done
           echo "All scripts have valid syntax!"
 
-      - name: Validate agent harness docs
-        run: ./tools/validate_harness.sh
-
-      - name: Test GitHub security policy
-        run: ./tools/test_github_security.sh
+      - name: Compile AGL stub
+        run: |
+          clang -Wall -Wextra -Werror -arch x86_64 \
+            -dynamiclib \
+            -o /tmp/AGL_test \
+            -framework OpenGL \
+            src/agl_stub.c
+          file /tmp/AGL_test
+          rm /tmp/AGL_test
 
       - name: Test bootstrap installer safety
         run: ./tools/test_bootstrap_installer_safety.sh
@@ -118,28 +164,3 @@ jobs:
       - name: Build release bundle smoke test
         run: |
           ./tools/build_release_bundle.sh --version ci --skip-zip
-
-  validate-c-code:
-    name: Validate C Code
-    runs-on: macos-26-intel
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        # actions/checkout v7.0.1
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-
-      - name: Check AGL stub compiles
-        run: |
-          echo "Compiling AGL stub..."
-          clang -Wall -Wextra -Werror -arch x86_64 \
-            -dynamiclib \
-            -o /tmp/AGL_test \
-            -framework OpenGL \
-            src/agl_stub.c
-          echo "AGL stub compiles successfully!"
-          file /tmp/AGL_test
-          rm /tmp/AGL_test

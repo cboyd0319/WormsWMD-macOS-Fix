@@ -69,6 +69,18 @@ jobs:
           RELEASE_VERSION: ${{ steps.release_names.outputs.version }}
         run: ./tools/extract_release_notes.sh "${RELEASE_VERSION#v}" > build/release/RELEASE_NOTES.md
 
+      - name: Generate release SBOM
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_VERSION: ${{ steps.release_names.outputs.version }}
+        run: |
+          release_timestamp=$(git show -s --format=%cI "$GITHUB_SHA")
+          python3 tools/generate_sbom.py \
+            --version "$RELEASE_VERSION" \
+            --timestamp "$release_timestamp" \
+            --release-checksum "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip.sha256" \
+            --output "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.cdx.json"
+
       - name: Attest release assets
         # actions/attest v4.2.2
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
@@ -76,6 +88,14 @@ jobs:
           subject-path: |
             build/release/WormsWMD-macOS-Fix-*.zip
             build/release/WormsWMD-macOS-Fix-*.zip.sha256
+
+      - name: Attest release SBOM
+        if: startsWith(github.ref, 'refs/tags/v')
+        # actions/attest v4.2.2
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: build/release/WormsWMD-macOS-Fix-*.zip
+          sbom-path: build/release/WormsWMD-macOS-Fix-*.cdx.json
 
       - name: Upload workflow artifact
         # actions/upload-artifact v7.0.1
@@ -86,6 +106,7 @@ jobs:
           path: |
             build/release/WormsWMD-macOS-Fix-*.zip
             build/release/WormsWMD-macOS-Fix-*.zip.sha256
+            build/release/WormsWMD-macOS-Fix-*.cdx.json
 
       - name: Publish GitHub release assets
         if: startsWith(github.ref, 'refs/tags/v')
@@ -101,5 +122,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" --draft --verify-tag --notes-file build/release/RELEASE_NOTES.md
           fi
-          gh release upload "$GITHUB_REF_NAME" build/release/*.zip build/release/*.zip.sha256 --clobber
+          gh release upload "$GITHUB_REF_NAME" build/release/*.zip build/release/*.zip.sha256 build/release/*.cdx.json --clobber
           gh release edit "$GITHUB_REF_NAME" --draft=false
