@@ -112,6 +112,15 @@ grep -Fq 'worms_supported_qt5_version "$homebrew_version"' "$ROOT_DIR/fix_worms_
     || fail "installer fallback does not enforce supported Homebrew Qt 5.15.x versions"
 grep -Fq 'SOURCE_PROVENANCE.tsv' "$ROOT_DIR/scripts/download_qt_frameworks.sh" \
     || fail "Qt archive validator does not allow source provenance"
+grep -Fq 'normalize_qt_macho_tree.sh" "$WORK_DIR"' \
+    "$ROOT_DIR/tools/package_qt_frameworks.sh" \
+    || fail "Qt packager does not normalize Mach-O state before manifest creation"
+normalizer_line=$(grep -nF 'normalize_qt_macho_tree.sh" "$WORK_DIR"' \
+    "$ROOT_DIR/tools/package_qt_frameworks.sh" | head -1 | cut -d: -f1)
+manifest_line=$(grep -nF 'worms_write_manifest "$WORK_DIR"' \
+    "$ROOT_DIR/tools/package_qt_frameworks.sh" | head -1 | cut -d: -f1)
+[[ "$normalizer_line" -lt "$manifest_line" ]] \
+    || fail "Qt packager normalizes Mach-O state after creating its manifest"
 if grep -Eq 'qmake.*-query|capture!.*qmake|system.*qmake' \
     "$ROOT_DIR/tools/package_qt_frameworks.sh" "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb"; then
     fail "Qt maintainer tooling executes untrusted extracted qmake"

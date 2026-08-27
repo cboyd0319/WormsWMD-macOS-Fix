@@ -159,6 +159,18 @@ Maintainer packages should be reproducible where possible: deterministic file
 ordering, normalized timestamps from `SOURCE_DATE_EPOCH`, stable ownership in
 the tar stream, `gzip -n`, and a generated `MANIFEST.txt`.
 
+Before manifest creation, packaging canonicalizes framework IDs to
+`@rpath/<Framework>.framework/Versions/5/<Framework>`, dylib/plugin IDs to
+`@rpath/<basename>`, and internal imports to those forms. It removes component
+`LC_RPATH` entries and recomputes `LC_UUID` from UUID-neutral bytes. Remaining
+build-root, Homebrew, custom-prefix, or unexpected absolute loads fail.
+
+Artifact comparison covers digest, members/types/modes/symlinks, manifest,
+metadata, provenance, hashes, architectures, Mach-O IDs/imports/rpaths,
+embedded URLs, entitlements, and signatures. Version-aware comparison may
+classify version/hash changes as expected but never structural drift. The TIFF
+runtime probe uses direct `clang++` plus `QImageReader`, not extracted `qmake`.
+
 The reviewed bottle closure is `packaging/qt-homebrew-lock.tsv`; `dist/` keeps
 generated evidence. Fetching bounds exact GHCR digest downloads, drops
 cross-origin authorization, validates without `qmake`, and stages beside the

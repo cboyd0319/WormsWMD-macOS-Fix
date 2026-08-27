@@ -126,6 +126,13 @@ The shipped Qt archive is accepted only after verifying:
    hashes, formula hashes, and tap commit. SBOM generation requires its
    standalone copy to be byte-identical to the copy inside the checksummed
    archive.
+6. Canonical `@rpath` IDs/imports, no component rpaths or build-prefix loads,
+   and deterministic UUIDs computed after load-command normalization.
+
+Maintainer comparison separately records archive/member/mode/symlink,
+manifest/metadata/provenance/hash, architecture/load-command/URL, entitlement,
+and signature evidence. A direct x86_64 `QImageReader` probe decodes a synthetic
+TIFF against the current package before artifact refresh.
 
 The authoritative rebuild input is `packaging/qt-homebrew-lock.tsv`; the
 `dist/` TSV is generated evidence. Bottle rebuilds validate the exact allowlisted
@@ -273,6 +280,7 @@ Runtime verification remains:
 | Limitation | Current mitigation |
 | --- | --- |
 | Qt package is not independently signed | Locked inputs, checksums, manifests, Mach-O closure, release attestation |
+| Clean rebuilds use one hosted runner | Two cache-free roots, deterministic UUID/load commands, deep comparison, and explicit same-runner wording |
 | Archive inspection needs Python 3.9+ | macOS 26 Apple Command Line Tools provide it; mutating archive operations fail with install/update guidance |
 | Update downloader verifies an exact checksum but not attestation | Users can run `gh attestation verify` on the downloaded zip |
 | Modified game uses ad-hoc signing | Strict deep verification in rollback and classified standalone checks |

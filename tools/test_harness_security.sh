@@ -52,6 +52,10 @@ new_fixture() {
         tools/install_git_hooks.sh \
         tools/inspect_archive.py \
         tools/qt_component_policy.py \
+        tools/qt_artifact_evidence.py \
+        tools/normalize_macho_uuid.py \
+        tools/normalize_qt_macho_tree.sh \
+        tools/compare_qt_artifacts.sh \
         tools/ci_requires_qt_scan.sh \
         tools/report_sensitive_changes.sh \
         tools/test_archive_inspector.py \
@@ -60,6 +64,9 @@ new_fixture() {
         tools/test_harness_security.sh \
         tools/test_qt_cache_integrity.sh \
         tools/test_qt_vulnerability_policy.py \
+        tools/test_normalize_macho_uuid.py \
+        tools/test_qt_artifact_comparison.sh \
+        tools/test_qt_tiff_runtime.sh \
         tools/test_signature_verification.sh \
         tools/test_logging_safety.sh \
         tools/test_update_download_safety.sh \

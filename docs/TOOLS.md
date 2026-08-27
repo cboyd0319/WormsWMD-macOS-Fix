@@ -256,6 +256,28 @@ QT_PACKAGE_VERSION=5.15.19 \
 ./scripts/download_qt_frameworks.sh --check
 ```
 
+Packaging normalizes every Mach-O ID and internal import to `@rpath`, removes
+build-specific `LC_RPATH` values, and recomputes `LC_UUID` from UUID-neutral
+bytes before manifest creation. Unexpected absolute or missing internal loads
+fail. This removes temporary prefix identity without using `qmake`.
+
+Compare two Qt artifacts or allow reviewed version/hash-only changes:
+
+```bash
+./tools/compare_qt_artifacts.sh first.tar.gz second.tar.gz
+./tools/compare_qt_artifacts.sh first.tar.gz second.tar.gz \
+  --allow-version-change --report comparison.json
+./tools/test_qt_artifact_comparison.sh
+./tools/test_qt_tiff_runtime.sh
+```
+
+The comparator inspects bounded copies and reports archive digest, member type,
+mode, symlink, manifest, metadata, provenance, per-file hash, architecture,
+Mach-O ID/import/rpath, embedded URL, entitlement, and signature evidence. The
+TIFF test fetches only the checksum-locked Qt bottle for headers, compiles a
+direct x86_64 `QImageReader` probe with `clang++`, and decodes a deterministic
+1x1 TIFF against the shipped runtime under Rosetta. It never executes `qmake`.
+
 The fetcher bounds downloads and redirects, verifies the copied archive digest,
 uses the shared bottle inspector, checks exact formula/version/revision roots
 against embedded formula metadata, never executes `qmake`, and stages output beside

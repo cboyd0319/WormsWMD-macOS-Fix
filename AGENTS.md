@@ -66,6 +66,9 @@ their tests, scripts, hooks, binaries, workflows, or instructions.
 python3 tools/test_generate_sbom.py
 /usr/bin/python3 tools/test_qt_vulnerability_policy.py
 ./tools/scan_qt_sbom.sh --local-report
+/usr/bin/python3 tools/test_normalize_macho_uuid.py
+./tools/test_qt_artifact_comparison.sh
+./tools/test_qt_tiff_runtime.sh
 /usr/bin/python3 tools/test_archive_inspector.py
 ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/test_git_hooks.sh

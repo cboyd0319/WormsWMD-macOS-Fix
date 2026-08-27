@@ -452,7 +452,7 @@ check_harness_line_caps() {
     check_line_cap ".github/copilot-instructions.md" 80
     check_line_cap "docs/style/agent-harness.md" 260
     check_line_cap "docs/runbooks/agent-session.md" 240
-    check_line_cap "docs/design/runtime-contracts.md" 260
+    check_line_cap "docs/design/runtime-contracts.md" 280
     check_line_cap "docs/exec-plans/TEMPLATE.md" 120
     check_line_cap "docs/exec-plans/README.md" 160
     check_line_cap "tools/validate_harness.sh" 720
@@ -482,6 +482,7 @@ check_ci_and_ownership_gates() {
         "./tools/test_ci_change_classification.sh" \
         "python3 tools/test_generate_sbom.py" \
         "/usr/bin/python3 tools/test_qt_vulnerability_policy.py" \
+        "/usr/bin/python3 tools/test_normalize_macho_uuid.py" \
         "/usr/bin/python3 tools/test_archive_inspector.py" \
         "ruby tools/test_fetch_qt_homebrew_bottles.rb" \
         "./tools/test_git_hooks.sh" \
@@ -501,6 +502,8 @@ check_ci_and_ownership_gates() {
         "./tools/test_manifest_regression.sh" \
         "./tools/test_qt_cache_integrity.sh" \
         "./tools/test_qt_version_pinning.sh" \
+        "./tools/test_qt_artifact_comparison.sh" \
+        "./tools/test_qt_tiff_runtime.sh" \
         "./tools/build_release_bundle.sh --version ci --skip-zip"; do
         if [[ -f "$ci_file" ]] && ! grep -Fq "$required_ci_check" "$ci_file"; then
             fail ".github/workflows/ci.yml does not run required check: $required_ci_check"
@@ -605,6 +608,10 @@ require_file "tools/ci_requires_qt_scan.sh"
 require_file "tools/generate_sbom.py"
 require_file "tools/qt_component_policy.py"
 require_file "tools/scan_qt_sbom.sh"
+require_file "tools/compare_qt_artifacts.sh"
+require_file "tools/normalize_qt_macho_tree.sh"
+require_file "tools/normalize_macho_uuid.py"
+require_file "tools/qt_artifact_evidence.py"
 require_file "tools/inspect_archive.py"
 require_file "tools/install_git_hooks.sh"
 require_file "tools/report_sensitive_changes.sh"
@@ -612,6 +619,9 @@ require_file "tools/test_ci_changed_paths.sh"
 require_file "tools/test_ci_change_classification.sh"
 require_file "tools/test_generate_sbom.py"
 require_file "tools/test_qt_vulnerability_policy.py"
+require_file "tools/test_normalize_macho_uuid.py"
+require_file "tools/test_qt_artifact_comparison.sh"
+require_file "tools/test_qt_tiff_runtime.sh"
 require_file "tools/test_archive_inspector.py"
 require_file "tools/test_fetch_qt_homebrew_bottles.rb"
 require_file "tools/test_git_hooks.sh"

@@ -35,7 +35,7 @@ releases, unrelated dependency versions, and independent-builder claims.
 
 - [x] Define all 17 component identities/scopes and prove policy failures.
 - [x] Generate scoped SBOM evidence and actionable pinned scanner reports.
-- [ ] Normalize Mach-O paths, compare artifacts deeply, and prove TIFF runtime.
+- [x] Normalize Mach-O paths, compare artifacts deeply, and prove TIFF runtime.
 - [ ] Add protected exact-main two-build nonpublishing rebuild evidence.
 - [ ] Refresh only the reviewed libtiff 4.7.2 lock input.
 - [ ] Split release privilege and add incident recovery.
@@ -72,6 +72,12 @@ git status --short
 - 2026-08-27: Pinned Grype 0.117.0 parsed all 12 runtime components. Two local
   runs produced identical SBOM/report hashes and four report-only libtiff CPE
   matches with no suppression. Hosted burn-in remains part of the PR gate.
+- 2026-08-27: All 35 current Mach-O files exposed 132 temporary/absolute load
+  records. Packaging now canonicalizes IDs/imports, removes rpaths, and derives
+  UUIDs from neutral bytes; two synthetic roots become hash-identical and the
+  normalized current package validates. Deep exact/version-aware comparison
+  rejects structural drift. A direct x86_64 QImageReader probe decoded a
+  deterministic 1x1 TIFF against the current runtime under Rosetta.
 
 ## Surprises & Discoveries
 
@@ -86,6 +92,8 @@ git status --short
 - Version stays outside component policy; selected lock/provenance supplies it.
 - Two clean builds on one hosted runner prove clean same-runner reproducibility,
   not independent builders.
+- LC_UUID must be recomputed after path changes; changing load commands alone
+  preserves UUID drift from the pre-normalized binary.
 - No tag may be created between the PR 4 lock transition and PR 5 artifact merge.
 
 ## Outcomes & Retrospective

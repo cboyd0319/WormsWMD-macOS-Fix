@@ -143,6 +143,10 @@ for required_file in \
     "$ROOT_DIR/tools/ci_requires_qt_scan.sh" \
     "$ROOT_DIR/tools/generate_sbom.py" \
     "$ROOT_DIR/tools/qt_component_policy.py" \
+    "$ROOT_DIR/tools/qt_artifact_evidence.py" \
+    "$ROOT_DIR/tools/normalize_macho_uuid.py" \
+    "$ROOT_DIR/tools/normalize_qt_macho_tree.sh" \
+    "$ROOT_DIR/tools/compare_qt_artifacts.sh" \
     "$ROOT_DIR/tools/inspect_archive.py" \
     "$ROOT_DIR/tools/install_git_hooks.sh" \
     "$ROOT_DIR/tools/report_sensitive_changes.sh" \
@@ -150,6 +154,9 @@ for required_file in \
     "$ROOT_DIR/tools/test_ci_change_classification.sh" \
     "$ROOT_DIR/tools/test_generate_sbom.py" \
     "$ROOT_DIR/tools/test_qt_vulnerability_policy.py" \
+    "$ROOT_DIR/tools/test_normalize_macho_uuid.py" \
+    "$ROOT_DIR/tools/test_qt_artifact_comparison.sh" \
+    "$ROOT_DIR/tools/test_qt_tiff_runtime.sh" \
     "$ROOT_DIR/tools/scan_qt_sbom.sh" \
     "$ROOT_DIR/tools/test_archive_inspector.py" \
     "$ROOT_DIR/tools/test_fetch_qt_homebrew_bottles.rb" \
@@ -178,10 +185,18 @@ for marker in \
     './tools/test_sensitive_change_report.sh' \
     '/usr/bin/python3 tools/test_archive_inspector.py' \
     '/usr/bin/python3 tools/test_qt_vulnerability_policy.py' \
+    '/usr/bin/python3 tools/test_normalize_macho_uuid.py' \
     'ruby tools/test_fetch_qt_homebrew_bottles.rb' \
     'name: Compile AGL stub'; do
     if ! grep -Fq "$marker" "$ci_workflow"; then
         fail "CI workflow is missing cost-control marker: $marker"
+    fi
+done
+for marker in \
+    './tools/test_qt_artifact_comparison.sh' \
+    './tools/test_qt_tiff_runtime.sh'; do
+    if ! grep -Fq "$marker" "$ci_workflow"; then
+        fail "CI workflow is missing Qt artifact check: $marker"
     fi
 done
 if grep -Fq 'name: Validate C Code' "$ci_workflow"; then

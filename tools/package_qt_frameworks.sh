@@ -42,12 +42,16 @@ source "$REPO_DIR/scripts/common.sh"
 source "$REPO_DIR/scripts/ui.sh"
 worms_color_init
 
-for cmd in date find gzip lipo mktemp otool realpath ruby shasum tar; do
+for cmd in date file find gzip install_name_tool lipo mktemp otool realpath ruby shasum strings tar; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         worms_print_error "Missing required command: $cmd"
         exit 1
     fi
 done
+[[ -x /usr/bin/python3 ]] || {
+    worms_print_error "Apple Python 3 is required for deterministic Mach-O UUIDs"
+    exit 1
+}
 
 print_help() {
     cat << EOF
@@ -493,6 +497,9 @@ for dependency_file in "$DEPS_DIR"/*; do
 done
 rmdir "$DEPS_DIR" 2>/dev/null || true
 rm -f "$COPIED_DEPS_FILE"
+
+worms_print_step "Normalizing Mach-O load commands..."
+"$REPO_DIR/tools/normalize_qt_macho_tree.sh" "$WORK_DIR"
 
 while IFS= read -r -d '' binary; do
     if file "$binary" 2>/dev/null | grep -Fq 'Mach-O'; then
