@@ -455,7 +455,7 @@ check_harness_line_caps() {
     check_line_cap "docs/design/runtime-contracts.md" 260
     check_line_cap "docs/exec-plans/TEMPLATE.md" 120
     check_line_cap "docs/exec-plans/README.md" 160
-    check_line_cap "tools/validate_harness.sh" 680
+    check_line_cap "tools/validate_harness.sh" 690
     check_line_cap ".github/workflows/ci.yml" 180
     check_line_cap ".github/workflows/github-security.yml" 120
     check_line_cap ".github/workflows/release.yml" 140
@@ -495,6 +495,7 @@ check_ci_and_ownership_gates() {
         "./tools/test_launcher_friction.sh" \
         "./tools/test_preflight_regression.sh" \
         "./tools/test_manifest_regression.sh" \
+        "./tools/test_qt_cache_integrity.sh" \
         "./tools/test_qt_version_pinning.sh" \
         "./tools/build_release_bundle.sh --version ci --skip-zip"; do
         if [[ -f "$ci_file" ]] && ! grep -Fq "$required_ci_check" "$ci_file"; then
@@ -606,6 +607,7 @@ require_file "tools/test_archive_inspector.py"
 require_file "tools/test_fetch_qt_homebrew_bottles.rb"
 require_file "tools/test_git_hooks.sh"
 require_file "tools/test_harness_security.sh"
+require_file "tools/test_qt_cache_integrity.sh"
 require_file "tools/test_sensitive_change_report.sh"
 require_file "tools/test_github_security.sh"
 

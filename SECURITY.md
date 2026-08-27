@@ -58,7 +58,7 @@ files. It may create these user-owned paths outside the bundle:
 | `~/Documents/WormsWMD-SaveBackups/` | Optional save backups | Manual |
 | `~/Library/Logs/WormsWMD-Fix/` | Installer logs | Manual |
 | `~/Library/Logs/WormsWMD/` | Launcher/crash logs | Manual |
-| `~/.cache/wormswmd-fix/` | Verified Qt cache | Manual or `--force` |
+| `~/.cache/wormswmd-fix/` | Archive-digest-bound Qt cache | `--prune-cache` for marked legacy caches |
 | `~/Library/LaunchAgents/com.wormswmd.fix.watcher.plist` | Optional watcher | `--uninstall` |
 | `${TMPDIR:-/tmp}/agl_stub_build.*/` | AGL build workspace | Automatic |
 | Same-parent `.stage-*` bottle prefix | Maintainer-only Qt rebuild staging | Automatic |

@@ -165,6 +165,7 @@ or docs-topology changes:
 ./tools/test_launcher_friction.sh
 ./tools/test_preflight_regression.sh
 ./tools/test_manifest_regression.sh
+./tools/test_qt_cache_integrity.sh
 ./tools/test_qt_version_pinning.sh
 ./tools/test_github_security.sh
 ./tools/test_ci_changed_paths.sh
@@ -202,14 +203,19 @@ Check or refresh the pre-built Qt package used by the installer:
 ```bash
 ./scripts/download_qt_frameworks.sh --check
 ./scripts/download_qt_frameworks.sh --force
+./scripts/download_qt_frameworks.sh --prune-cache
 ```
 
 `scripts/download_qt_frameworks.sh --check` validates local package checksums,
 metadata, required files, safe tar layout, archive manifests when present, and
 x86_64 binary slices before reporting the pre-built Qt package as available.
-Before installer use, extracted cache directories have a verified manifest;
-legacy archives get one generated after extraction. Remote fallback checks the
-pinned release commit for `dist/` contents.
+Cache paths include the full verified archive digest and are mode `0700`.
+Every reuse checks the cache manifest against the inspected archive copy;
+cache-local regeneration cannot become authority. Archives without manifests
+re-extract on every use. Valid version-only caches are renamed to reported
+recoverable `.legacy-*` paths, and `--prune-cache` removes only exact
+marker-owned retained legacy caches. Remote fallback checks the pinned release
+commit for `dist/` contents.
 
 `tools/package_qt_frameworks.sh` accepts either Intel Homebrew `qt@5` or an
 explicit Qt prefix. It writes deterministic gzip archives using

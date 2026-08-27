@@ -161,16 +161,15 @@ jobs:
 
       - name: Test manifest regression
         run: ./tools/test_manifest_regression.sh
-
+      - name: Test Qt cache integrity
+        run: ./tools/test_qt_cache_integrity.sh
       - name: Test Qt version pinning
         run: ./tools/test_qt_version_pinning.sh
-
       - name: Check script permissions
         run: |
           echo "Verifying scripts are executable..."
           chmod +x fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
           echo "Done!"
-
       - name: Test --help flag
         run: |
           ./fix_worms_wmd.sh --help
