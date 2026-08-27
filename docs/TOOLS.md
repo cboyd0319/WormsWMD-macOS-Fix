@@ -84,8 +84,10 @@ Check for new versions of the fix:
 ./tools/check_updates.sh --download
 ```
 
-`--download` retrieves the latest release zip and its matching `.sha256` file,
-then verifies the checksum before leaving the zip in `~/Downloads`.
+`--download` stages the release zip and checksum in an owner-only directory,
+accepts one exact text or binary SHA-256 record for that zip basename, and
+publishes both files to `~/Downloads` only after verification. Existing output
+must be a regular, nonlinked file; a failed update preserves safe prior files.
 
 ## Controller helper
 

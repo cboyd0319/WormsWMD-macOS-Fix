@@ -243,6 +243,67 @@ worms_file_sha256() {
     shasum -a 256 "$path" | awk '{print $1}'
 }
 
+worms_read_exact_sha256_record() {
+    local checksum_file="$1"
+    local expected_basename="$2"
+    local line hash remainder line_count byte_dump link_count size
+
+    if [[ "$expected_basename" == */* ]] \
+        || worms_has_control_chars "$expected_basename" \
+        || [[ ! -f "$checksum_file" ]] || [[ -L "$checksum_file" ]]; then
+        return 1
+    fi
+    link_count=$(worms_file_link_count "$checksum_file") || return 1
+    [[ "$link_count" == "1" ]] || return 1
+    size=$(worms_file_size "$checksum_file") || return 1
+    if [[ ! "$size" =~ ^[0-9]+$ ]] || [[ "$size" -le 0 ]] \
+        || [[ "$size" -gt 4096 ]]; then
+        return 1
+    fi
+    byte_dump=$(LC_ALL=C od -An -v -tu1 "$checksum_file" 2>/dev/null) || return 1
+    if printf '%s\n' "$byte_dump" | awk '
+        {
+            for (field = 1; field <= NF; field++) {
+                if (($field < 32 && $field != 10) || $field == 127) {
+                    forbidden = 1
+                }
+            }
+        }
+        END {exit forbidden ? 0 : 1}
+    '; then
+        return 1
+    fi
+    line_count=$(awk 'END {print NR}' "$checksum_file" 2>/dev/null || echo 0)
+    [[ "$line_count" == "1" ]] || return 1
+    IFS= read -r line < "$checksum_file" || [[ -n "$line" ]] || return 1
+    worms_has_control_chars "$line" && return 1
+
+    hash=${line%% *}
+    remainder=${line#"$hash"}
+    [[ "$hash" =~ ^[a-fA-F0-9]{64}$ ]] || return 1
+    if [[ "$remainder" != "  $expected_basename" ]] \
+        && [[ "$remainder" != " *$expected_basename" ]]; then
+        return 1
+    fi
+    printf '%s\n' "$hash" | tr 'A-F' 'a-f'
+}
+
+worms_verify_exact_sha256_file() {
+    local payload_file="$1"
+    local checksum_file="$2"
+    local expected_basename="$3"
+    local expected actual link_count
+
+    [[ -f "$payload_file" ]] && [[ ! -L "$payload_file" ]] || return 1
+    link_count=$(worms_file_link_count "$payload_file") || return 1
+    [[ "$link_count" == "1" ]] || return 1
+    expected=$(worms_read_exact_sha256_record \
+        "$checksum_file" "$expected_basename") || return 1
+    actual=$(worms_file_sha256 "$payload_file") || return 1
+    actual=$(printf '%s\n' "$actual" | tr 'A-F' 'a-f')
+    [[ "$actual" == "$expected" ]]
+}
+
 worms_select_python3() {
     local candidate
     local seen=""
@@ -484,7 +545,7 @@ worms_resolve_macho_rpath_dependency() {
 worms_file_link_count() {
     local path="$1"
 
-    stat -f "%l" "$path" 2>/dev/null || stat -c "%h" "$path" 2>/dev/null || echo 1
+    stat -f "%l" "$path" 2>/dev/null || stat -c "%h" "$path" 2>/dev/null
 }
 
 worms_has_control_chars() {

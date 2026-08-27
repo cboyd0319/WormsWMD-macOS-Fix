@@ -56,6 +56,7 @@ new_fixture() {
         tools/test_harness_security.sh \
         tools/test_qt_cache_integrity.sh \
         tools/test_signature_verification.sh \
+        tools/test_update_download_safety.sh \
         tools/test_sensitive_change_report.sh \
         tools/validate_harness.sh; do
         if [[ -e "$ROOT_DIR/$rel" ]]; then

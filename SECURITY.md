@@ -98,6 +98,12 @@ Project-owned `curl` downloads enforce HTTPS, TLS 1.2+, certificate checks,
 timeouts, and bounded retries. Git, `gh`, and Apple system services own their
 TLS settings; project scripts do not weaken them.
 
+Update downloads are staged with owner-only permissions. Verification accepts
+one bounded SHA-256 record only when it names the exact release zip, hashes the
+regular nonlinked payload directly, and publishes only after success. Existing
+links, hardlinks, and special-file destinations are rejected; safe prior files
+survive download or verification failure.
+
 ### Qt package verification
 
 The shipped Qt archive is accepted only after verifying:
@@ -248,7 +254,7 @@ Runtime verification remains:
 | --- | --- |
 | Qt package is not independently signed | Locked inputs, checksums, manifests, Mach-O closure, release attestation |
 | Archive inspection needs Python 3.9+ | macOS 26 Apple Command Line Tools provide it; mutating archive operations fail with install/update guidance |
-| Update downloader verifies checksum but not attestation | Users can run `gh attestation verify` on the downloaded zip |
+| Update downloader verifies an exact checksum but not attestation | Users can run `gh attestation verify` on the downloaded zip |
 | Modified game uses ad-hoc signing | Strict deep verification in rollback and classified standalone checks |
 | Legacy backups lack complete identity/integrity | Explicit warning; ambiguous multi-install restore refused |
 | Team17-controlled credentials exist in the game/old report history | Current repo is redacted; project does not validate, rotate, or gate on vendor values |

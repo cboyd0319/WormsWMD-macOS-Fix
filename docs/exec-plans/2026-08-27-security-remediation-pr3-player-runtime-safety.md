@@ -32,7 +32,7 @@ settings, tags, release publication, and PR 4 delivery/provenance work.
 - [x] Authenticate Qt cache reuse against archive authority.
 - [x] Contain Homebrew dependency sources canonically.
 - [x] Classify strict signatures and recursive quarantine.
-- [ ] Bind update downloads to exact checksums and atomic publish.
+- [x] Bind update downloads to exact checksums and atomic publish.
 - [ ] Harden traces, diagnostics, crashes, and LaunchAgent updates.
 - [ ] Run local and adversarial gates, merge one reviewed PR, and record PR 4 base.
 
@@ -87,6 +87,11 @@ git status --short
   recursively counts quarantine without filenames. Unit and consumer tests pass.
   Read-only live state is `fixed-valid-adhoc`/`none` for Steam and
   `original-unsigned`/`none` for the unfixed `/Applications` copy.
+- 2026-08-27: Update downloads now accept one bounded checksum record naming
+  the exact release zip, reject control bytes and unsafe existing targets, and
+  stage both artifacts owner-only before rollback-aware publication. Text and
+  binary records, decoys, extra records, NUL/CR controls, mismatches,
+  interruption, replacement, links, hardlinks, FIFOs, and temp cleanup pass.
 
 ## Surprises & Discoveries
 
@@ -109,6 +114,8 @@ git status --short
 - Original/unfixed signature failures remain repairable warnings; complete fixed
   failures or unavailable verification are errors. Installer rollback signing
   stays unchanged.
+- Release checksum records are parsed as data and bound to the expected basename;
+  remote checksum text is never executed through checksum-tool path semantics.
 
 ## Outcomes & Retrospective
 

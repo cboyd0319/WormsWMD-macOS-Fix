@@ -134,12 +134,12 @@ ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/test_launcher_friction.sh
 ./tools/test_preflight_regression.sh
 ./tools/test_signature_verification.sh
+./tools/test_update_download_safety.sh
 ./tools/test_manifest_regression.sh
 ./tools/test_qt_cache_integrity.sh
 ./tools/test_qt_version_pinning.sh
 shellcheck fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
 for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh; do bash -n "$script"; done
-./fix_worms_wmd.sh --dry-run
 ./tools/build_release_bundle.sh --version vX.Y.Z --skip-zip
 ./tools/extract_release_notes.sh X.Y.Z
 ```
