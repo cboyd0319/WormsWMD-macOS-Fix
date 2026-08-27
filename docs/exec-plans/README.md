@@ -31,7 +31,7 @@ the plan before continuing.
 
 ## Current Plans
 
-- [v1.7.6 release](2026-08-26-v1.7.6-release.md) - active release preparation,
+- [v1.7.6 release](2026-08-26-v1.7.6-release.md) - completed release preparation,
   publication, asset verification, and post-release commit pinning for issue #20.
 - [Issue 20 GOG rpath and rollback hardening](2026-08-26-issue-20-gog-rpath-rollback.md) - completed
   deep audit of GOG dependency verification, rollback, archive integrity,

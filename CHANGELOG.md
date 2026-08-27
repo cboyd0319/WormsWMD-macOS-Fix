@@ -6,6 +6,16 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 No user-facing changes yet.
 
+## Mainline maintenance after 1.7.6 (2026-08-26)
+
+### Security
+
+- Pinned mainline bootstrap commit verification to the `v1.7.6` tag target.
+  This follow-up commit lives on `main` after the release tag so one-line
+  installers can verify the exact release commit.
+- Pinned Qt payload downloads to the same immutable tag commit containing the
+  rebuilt archive, manifest, and checksum shipped in v1.7.6.
+
 ## 1.7.6 (2026-08-26)
 
 ### Changed
