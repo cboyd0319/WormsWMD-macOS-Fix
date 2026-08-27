@@ -125,6 +125,19 @@ if grep -Fq "Multiple game installations found" <<< "$multi_output"; then
     fail "noninteractive multiple-install discovery polluted stdout with menu text: $multi_output"
 fi
 
+multi_dry_run_output=$(HOME="$multi_home" "$installer" --dry-run </dev/null 2>&1 || true)
+if grep -Fq "[dry-run] Game found: $multi_steam_app" <<< "$multi_dry_run_output"; then
+    fail "noninteractive dry-run silently targeted Steam when multiple installations exist: $multi_dry_run_output"
+fi
+grep -Fq 'Set GAME_APP to preview against a custom location.' <<< "$multi_dry_run_output" \
+    || fail "noninteractive dry-run did not require an explicit multi-install target: $multi_dry_run_output"
+if grep -Fq '/dev/tty: Device not configured' <<< "$multi_dry_run_output"; then
+    fail "noninteractive dry-run emitted raw /dev/tty errors: $multi_dry_run_output"
+fi
+if grep -Fq 'Target: /Contents/' <<< "$multi_dry_run_output"; then
+    fail "noninteractive dry-run printed an empty-root mutation target: $multi_dry_run_output"
+fi
+
 verify_link_home="$tmp_dir/verify-link-home"
 verify_link_app="$verify_link_home/Applications/Worms W.M.D.app"
 verify_link_target="$tmp_dir/linked-dataosx"

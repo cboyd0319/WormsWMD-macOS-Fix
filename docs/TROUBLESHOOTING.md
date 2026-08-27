@@ -120,7 +120,9 @@ Run the verification script to identify missing dependencies:
 The verifier resolves `@rpath` through the executable's Mach-O `LC_RPATH`
 commands. A bundled resolved dependency is valid, and a missing weak-load
 dependency is reported as an optional warning. A required unresolved dependency
-still fails. Run `--verbose` to show the resolved bundle-relative target:
+still fails. Direct token paths that escape `Contents`, relative install names,
+and unreadable required Mach-O architectures also fail. Run `--verbose` to show
+the resolved bundle-relative target:
 
 ```bash
 ./scripts/05_verify_installation.sh --verbose

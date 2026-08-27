@@ -26,8 +26,10 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/../dist}"
 QT_PREFIX="${QT_PREFIX:-/usr/local/opt/qt@5}"
+QT_PREFIX_REAL=""
 QT_PACKAGE_VERSION="${QT_PACKAGE_VERSION:-}"
 QT_DEP_PREFIX="${QT_DEP_PREFIX:-}"
+QT_DEP_PREFIX_REAL=""
 QT_PACKAGE_SOURCE_LABEL="${QT_PACKAGE_SOURCE_LABEL:-}"
 QT_SOURCE_PROVENANCE_FILE="${QT_SOURCE_PROVENANCE_FILE:-}"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1704067200}"
@@ -39,7 +41,7 @@ source "$REPO_DIR/scripts/common.sh"
 source "$REPO_DIR/scripts/ui.sh"
 worms_color_init
 
-for cmd in date find gzip lipo mktemp otool shasum tar; do
+for cmd in date find gzip lipo mktemp otool realpath shasum tar; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         worms_print_error "Missing required command: $cmd"
         exit 1
@@ -181,8 +183,14 @@ dependency_path_allowed() {
     if [[ "$path" == "$QT_PREFIX"/* ]]; then
         return 0
     fi
+    if [[ -n "$QT_PREFIX_REAL" ]] && [[ "$path" == "$QT_PREFIX_REAL"/* ]]; then
+        return 0
+    fi
 
     if [[ -n "$QT_DEP_PREFIX" ]] && [[ "$path" == "$QT_DEP_PREFIX"/* ]]; then
+        return 0
+    fi
+    if [[ -n "$QT_DEP_PREFIX_REAL" ]] && [[ "$path" == "$QT_DEP_PREFIX_REAL"/* ]]; then
         return 0
     fi
 
@@ -209,6 +217,50 @@ prune_framework_for_runtime() {
 
     rm -rf "$framework_dir/Headers"
     rm -rf "$framework_dir/Versions/5/Headers"
+    rm -f "$framework_dir/Versions/5/Resources/"*.prl
+}
+
+resolve_packaging_dependency() {
+    local binary="$1"
+    local dependency="$2"
+    local dependency_suffix rpath expanded candidate candidate_real
+
+    case "$dependency" in
+        @rpath/*)
+            dependency_suffix=${dependency#@rpath/}
+            while IFS= read -r rpath; do
+                [[ -n "$rpath" ]] || continue
+                expanded=$(worms_expand_macho_path "$rpath" "$binary" "$binary" || true)
+                [[ -n "$expanded" ]] || continue
+                candidate="${expanded%/}/$dependency_suffix"
+                [[ -f "$candidate" ]] || continue
+                candidate_real=$(realpath "$candidate" 2>/dev/null || true)
+                [[ -n "$candidate_real" ]] || continue
+                if dependency_path_allowed "$candidate_real"; then
+                    printf '%s\n' "$candidate_real"
+                    return 0
+                fi
+            done < <(worms_macho_rpaths "$binary")
+            ;;
+        @executable_path/*|@loader_path/*)
+            candidate=$(worms_expand_macho_path "$dependency" "$binary" "$binary" || true)
+            if [[ -f "$candidate" ]]; then
+                candidate_real=$(realpath "$candidate" 2>/dev/null || true)
+                if [[ -n "$candidate_real" ]] && dependency_path_allowed "$candidate_real"; then
+                    printf '%s\n' "$candidate_real"
+                    return 0
+                fi
+            fi
+            ;;
+        /*)
+            if [[ -f "$dependency" ]] && dependency_path_allowed "$dependency"; then
+                printf '%s\n' "$dependency"
+                return 0
+            fi
+            ;;
+    esac
+
+    return 1
 }
 
 normalize_archive_inputs() {
@@ -267,6 +319,14 @@ worms_reject_control_chars "$QT_PREFIX" "QT_PREFIX"
 worms_reject_control_chars "$QT_DEP_PREFIX" "QT_DEP_PREFIX"
 worms_reject_control_chars "$QT_PACKAGE_SOURCE_LABEL" "QT_PACKAGE_SOURCE_LABEL"
 worms_reject_control_chars "$QT_SOURCE_PROVENANCE_FILE" "QT_SOURCE_PROVENANCE_FILE"
+QT_PREFIX_REAL=$(cd "$QT_PREFIX" && pwd -P)
+if [[ -n "$QT_DEP_PREFIX" ]]; then
+    if [[ ! -d "$QT_DEP_PREFIX" ]]; then
+        worms_print_error "Dependency prefix not found: $QT_DEP_PREFIX"
+        exit 1
+    fi
+    QT_DEP_PREFIX_REAL=$(cd "$QT_DEP_PREFIX" && pwd -P)
+fi
 CREATED_AT=$(format_epoch_utc "$SOURCE_DATE_EPOCH")
 TOUCH_TIME=$(format_epoch_touch "$SOURCE_DATE_EPOCH")
 SOURCE_LABEL=$(qt_source_label)
@@ -357,45 +417,80 @@ touch "$COPIED_DEPS_FILE"
 
 copy_deps() {
     local binary="$1"
-    local binary_name
+    local binary_id dep source_dep dep_name
 
-    binary_name=$(basename "$binary")
+    binary_id=$(worms_macho_install_id "$binary" || true)
 
     while IFS= read -r dep; do
-        # Only package external dylib dependencies that can travel with the app.
-        if dependency_path_allowed "$dep"; then
-            [[ "$dep" == *.dylib ]] || continue
-            local dep_name
-            dep_name=$(basename "$dep")
+        [[ -n "$dep" ]] || continue
+        [[ "$dep" == "$binary_id" ]] && continue
+        case "$dep" in
+            /usr/lib/*|/System/Library/*)
+                continue
+                ;;
+        esac
 
-            # otool -L includes a dylib's own install ID. It is metadata, not a
-            # dependency, and copying it duplicated every Qt plugin at the
-            # Frameworks root in older packages.
-            [[ "$dep_name" == "$binary_name" ]] && continue
-
-            # Skip if already copied
-            if grep -Fqx -- "$dep_name" "$COPIED_DEPS_FILE"; then
+        source_dep=$(resolve_packaging_dependency "$binary" "$dep" || true)
+        if [[ -z "$source_dep" ]]; then
+            if worms_macho_dependency_is_weak "$binary" "$dep"; then
+                echo "  Optional dependency unavailable: $dep"
                 continue
             fi
-
-            if [[ -f "$dep" ]]; then
-                cp "$dep" "$DEPS_DIR/"
-                validate_packaged_binary "$DEPS_DIR/$dep_name"
-                echo "$dep_name" >> "$COPIED_DEPS_FILE"
-                echo "  Copied $dep_name"
-
-                # Recursively check this dependency
-                copy_deps "$dep"
-            fi
+            worms_print_error "Could not resolve dependency for packaging: $dep ($binary)"
+            return 1
         fi
-    done < <(
-        worms_otool_dependencies "$binary" \
-            | while IFS= read -r candidate; do
-                if dependency_path_allowed "$candidate"; then
-                    printf '%s\n' "$candidate"
+
+        [[ "$source_dep" == *.dylib ]] || continue
+        dep_name=$(basename "$dep")
+
+        if grep -Fqx -- "$dep_name" "$COPIED_DEPS_FILE"; then
+            continue
+        fi
+
+        cp -L "$source_dep" "$DEPS_DIR/$dep_name"
+        validate_packaged_binary "$DEPS_DIR/$dep_name"
+        echo "$dep_name" >> "$COPIED_DEPS_FILE"
+        echo "  Copied $dep_name"
+
+        copy_deps "$source_dep"
+    done < <(worms_otool_dependencies "$binary")
+}
+
+validate_packaged_dependency_closure() {
+    local binary="$1"
+    local dependency install_id framework_name dependency_name
+
+    install_id=$(worms_macho_install_id "$binary" || true)
+
+    while IFS= read -r dependency; do
+        [[ -n "$dependency" ]] || continue
+        [[ "$dependency" == "$install_id" ]] && continue
+        case "$dependency" in
+            /usr/lib/*|/System/Library/*)
+                ;;
+            *".framework/"*)
+                framework_name=$(basename "${dependency%%.framework/*}")
+                if [[ ! -d "$FRAMEWORKS_DIR/$framework_name.framework" ]]; then
+                    worms_print_error "Packaged dependency closure is missing $framework_name.framework for $binary"
+                    return 1
                 fi
-            done
-    )
+                ;;
+            *.dylib)
+                dependency_name=$(basename "$dependency")
+                if [[ ! -f "$FRAMEWORKS_DIR/$dependency_name" ]]; then
+                    if worms_macho_dependency_is_weak "$binary" "$dependency"; then
+                        continue
+                    fi
+                    worms_print_error "Packaged dependency closure is missing $dependency_name for $binary"
+                    return 1
+                fi
+                ;;
+            *)
+                worms_print_error "Packaged binary has an unportable dependency: $binary -> $dependency"
+                return 1
+                ;;
+        esac
+    done < <(worms_otool_dependencies "$binary")
 }
 
 # Scan all frameworks
@@ -418,9 +513,18 @@ done
 
 # Move dependencies to Frameworks dir (where they'll be installed)
 worms_print_step "Organizing dependencies..."
-mv "$DEPS_DIR"/* "$FRAMEWORKS_DIR/" 2>/dev/null || true
+for dependency_file in "$DEPS_DIR"/*; do
+    [[ -f "$dependency_file" ]] || continue
+    mv "$dependency_file" "$FRAMEWORKS_DIR/"
+done
 rmdir "$DEPS_DIR" 2>/dev/null || true
 rm -f "$COPIED_DEPS_FILE"
+
+while IFS= read -r -d '' binary; do
+    if file "$binary" 2>/dev/null | grep -Fq 'Mach-O'; then
+        validate_packaged_dependency_closure "$binary"
+    fi
+done < <(find "$FRAMEWORKS_DIR" "$PLUGINS_DIR" -type f -print0)
 
 # Count what we packaged
 fw_count=$(find "$FRAMEWORKS_DIR" -name "*.framework" -type d | wc -l | tr -d ' ')
@@ -466,6 +570,7 @@ if [[ -f "$WORK_DIR/SOURCE_PROVENANCE.tsv" ]]; then
     manifest_inputs+=(SOURCE_PROVENANCE.tsv)
 fi
 worms_write_manifest "$WORK_DIR" "$WORK_DIR/MANIFEST.txt" "${manifest_inputs[@]}"
+worms_validate_tree_symlinks "$WORK_DIR"
 worms_verify_manifest "$WORK_DIR" "$WORK_DIR/MANIFEST.txt"
 
 # Normalize timestamps for reproducible archives.

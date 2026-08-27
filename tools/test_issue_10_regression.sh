@@ -100,6 +100,12 @@ if [[ "$unique_backup" != "$tmp_dir/backup-1" ]]; then
     fail "unique directory path did not add a numeric suffix"
 fi
 
+ln -s missing "$tmp_dir/dangling.tar.gz"
+unique_dangling=$(worms_unique_path "$tmp_dir/dangling" ".tar.gz")
+if [[ "$unique_dangling" != "$tmp_dir/dangling-1.tar.gz" ]]; then
+    fail "unique path reused a dangling symlink target"
+fi
+
 (
     HOME="$tmp_dir/home"
     LOG_DIR=""

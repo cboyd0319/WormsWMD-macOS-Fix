@@ -605,6 +605,22 @@ collect_diagnostics() {
 
             while IFS= read -r dep; do
                 case "$dep" in
+                    @executable_path/*|@loader_path/*)
+                        resolved=$(worms_expand_macho_path "$dep" "$game_exec" "$game_exec" || true)
+                        if [[ -z "$resolved" ]] \
+                            || ! worms_path_inside_root "$GAME_APP/Contents" "$resolved"; then
+                            fail "$dep resolves outside the selected app"
+                            dependency_issues=$((dependency_issues + 1))
+                        elif [[ -f "$resolved" ]]; then
+                            ok "$dep resolves to ${resolved#"$GAME_APP"/}"
+                        elif worms_macho_dependency_is_weak "$game_exec" "$dep"; then
+                            warn "$dep is optional and missing"
+                            dependency_issues=$((dependency_issues + 1))
+                        else
+                            fail "$dep is required and missing"
+                            dependency_issues=$((dependency_issues + 1))
+                        fi
+                        ;;
                     @rpath/*)
                         resolved=$(worms_resolve_macho_rpath_dependency "$game_exec" "$dep" "$game_exec" "$GAME_APP" || true)
                         if [[ -n "$resolved" ]]; then
@@ -619,6 +635,12 @@ collect_diagnostics() {
                         ;;
                     /usr/local/*)
                         warn "External dependency: $dep"
+                        dependency_issues=$((dependency_issues + 1))
+                        ;;
+                    /usr/lib/*|/System/Library/*)
+                        ;;
+                    *)
+                        fail "Unportable relative dependency: $dep"
                         dependency_issues=$((dependency_issues + 1))
                         ;;
                 esac
@@ -926,7 +948,7 @@ write_runtime_invariants() {
     local frameworks_dir="$GAME_APP/Contents/Frameworks"
     local plugins_dir="$GAME_APP/Contents/PlugIns"
     local agl_path="$frameworks_dir/AGL.framework/Versions/A/AGL"
-    local required_fw required_plugin required_dylib binary archs size rel_path qt_info
+    local required_fw required_plugin required_dylib binary dylib archs size rel_path qt_info
 
     {
         echo "Required runtime invariant matrix"
@@ -938,6 +960,19 @@ write_runtime_invariants() {
         if [[ ! -d "$GAME_APP" ]]; then
             echo "FAIL game app not found"
         else
+            echo "Storefront libraries"
+            echo "--------------------"
+            for dylib in "$GAME_APP/Contents/MacOS/"*.dylib; do
+                [[ -f "$dylib" ]] || continue
+                archs=$(lipo -archs "$dylib" 2>/dev/null || echo "unknown")
+                if echo "$archs" | tr ' ' '\n' | grep -qx "x86_64"; then
+                    echo "PASS MacOS dylib: $(basename "$dylib") ($archs)"
+                else
+                    echo "FAIL MacOS dylib missing x86_64: $(basename "$dylib") ($archs)"
+                fi
+            done
+
+            echo ""
             echo "AGL"
             echo "---"
             if [[ -f "$agl_path" ]]; then

@@ -131,16 +131,18 @@ The fix creates a timestamped backup before making changes.
 
 Automatic restore verifies the backup manifest when `BACKUP_MANIFEST.tsv` is
 present and cancels instead of restoring from a mismatched backup. New backups
-also record their source app in `BACKUP_METADATA.tsv`, so a Steam backup cannot
-be applied to GOG or vice versa. Older backups without source metadata are
-restored with a warning only when the selected installation is unambiguous.
+are published only after verification and record their source app/storefront in
+`BACKUP_METADATA.tsv`, so a Steam backup cannot be applied to GOG or vice versa.
+Metadata that is missing from its manifest or malformed is rejected. Older
+backups without source metadata are restored with a warning only when the
+selected installation is unambiguous.
 
 ### Restore manually
 
 Prefer automatic restore when possible because it performs manifest validation.
 Manual restore is useful for inspection or recovery, but it bypasses the
-automated manifest and storefront checks. Confirm both `game_app_path` and
-`game_source` in `BACKUP_METADATA.tsv` before copying files manually.
+automated file-integrity checks. The example below reproduces the path and
+storefront identity checks, but you must inspect the manifest before copying.
 
 ```bash
 # Find your backup
@@ -158,9 +160,25 @@ fi
 # New backups must match the selected app.
 if [[ -f "$BACKUP_DIR/BACKUP_METADATA.tsv" ]]; then
   BACKUP_GAME_APP=$(awk -F '\t' '$1 == "game_app_path" {sub(/^[^\t]*\t/, ""); print; exit}' "$BACKUP_DIR/BACKUP_METADATA.tsv")
+  BACKUP_GAME_SOURCE=$(awk -F '\t' '$1 == "game_source" {print $2; exit}' "$BACKUP_DIR/BACKUP_METADATA.tsv")
   SELECTED_GAME_APP=$(cd "$GAME_APP" && pwd -P)
   [[ "$BACKUP_GAME_APP" == "$SELECTED_GAME_APP" ]] || {
     echo "Backup belongs to a different game installation." >&2
+    exit 1
+  }
+
+  GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
+  GAME_DEPENDENCIES=$(otool -arch x86_64 -L "$GAME_EXEC" 2>/dev/null || true)
+  if grep -Fqi 'libGalaxy.dylib' <<< "$GAME_DEPENDENCIES"; then
+    SELECTED_GAME_SOURCE=gog
+  elif grep -Fqi 'libsteam_api.dylib' <<< "$GAME_DEPENDENCIES"; then
+    SELECTED_GAME_SOURCE=steam
+  else
+    echo "Could not identify the selected Steam or GOG installation." >&2
+    exit 1
+  fi
+  [[ "$BACKUP_GAME_SOURCE" == "$SELECTED_GAME_SOURCE" ]] || {
+    echo "Backup belongs to a different storefront." >&2
     exit 1
   }
 fi
@@ -170,9 +188,9 @@ rm -rf "$GAME_APP/Contents/PlugIns"
 cp -R "$BACKUP_DIR/Frameworks" "$GAME_APP/Contents/"
 cp -R "$BACKUP_DIR/PlugIns" "$GAME_APP/Contents/"
 
-# Restore the original main executable when present in a current backup.
-if [[ -f "$BACKUP_DIR/MacOS/Worms W.M.D" ]]; then
-  cp -p "$BACKUP_DIR/MacOS/Worms W.M.D" "$GAME_APP/Contents/MacOS/Worms W.M.D"
+# Restore original launch files, executable, and storefront libraries.
+if [[ -d "$BACKUP_DIR/MacOS" ]]; then
+  cp -R "$BACKUP_DIR/MacOS/." "$GAME_APP/Contents/MacOS/"
 fi
 
 # Restore or remove fixer-created signature resources according to metadata.

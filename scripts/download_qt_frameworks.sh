@@ -171,7 +171,10 @@ validate_macho_x86_64() {
 
     command -v lipo >/dev/null 2>&1 || return 0
     archs=$(lipo -archs "$binary" 2>/dev/null || true)
-    [[ -n "$archs" ]] || return 0
+    if [[ -z "$archs" ]]; then
+        echo -e "${RED}ERROR:${NC} Unable to inspect Mach-O architecture: $binary"
+        return 1
+    fi
 
     if ! echo "$archs" | tr ' ' '\n' | grep -qx "x86_64"; then
         echo -e "${RED}ERROR:${NC} Missing x86_64 slice: $binary ($archs)"
@@ -226,6 +229,10 @@ validate_extracted_package() {
 
     if [[ ! -f "$extract_dir/PlugIns/platforms/libqcocoa.dylib" ]]; then
         echo -e "${RED}ERROR:${NC} Package is missing PlugIns/platforms/libqcocoa.dylib."
+        return 1
+    fi
+    if [[ ! -f "$extract_dir/PlugIns/imageformats/libqsvg.dylib" ]]; then
+        echo -e "${RED}ERROR:${NC} Package is missing PlugIns/imageformats/libqsvg.dylib."
         return 1
     fi
 

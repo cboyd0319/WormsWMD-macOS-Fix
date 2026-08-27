@@ -91,6 +91,10 @@ PLIST
 cat > "$fake_bin/lipo" <<'STUB'
 #!/bin/bash
 if [[ "${1:-}" == "-archs" ]]; then
+    if [[ "${WORMS_TEST_UNREADABLE_ARCH:-}" == "1" ]] \
+        && [[ "${2:-}" == */Contents/MacOS/Worms\ W.M.D ]]; then
+        exit 1
+    fi
     printf '%s\n' "x86_64"
     exit 0
 fi
@@ -107,8 +111,17 @@ if [[ "${1:-}" == "-L" ]]; then
             printf '\t@rpath/libGalaxy.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
             printf '\t@rpath/libGalaxyCSharp.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
             printf '\t@rpath/libglib-2.0.0.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
+            if [[ "${WORMS_TEST_DIRECT_ESCAPE:-}" == "1" ]]; then
+                printf '\t@loader_path/../../../outside-direct.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
+                printf '\tlibRelative.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
+            fi
             if [[ "${WORMS_TEST_STRONG_MISSING:-}" == "1" ]]; then
                 printf '\t@rpath/libMissingStrong.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
+            fi
+            ;;
+        */Contents/MacOS/libGalaxy.dylib)
+            if [[ "${WORMS_TEST_MACOS_UNSAFE:-}" == "1" ]]; then
+                printf '\t/usr/local/lib/libUnexpectedGalaxyDependency.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
             fi
             ;;
         *QtCore.framework*)
@@ -222,6 +235,7 @@ if PATH="$fake_bin:$PATH" worms_resolve_macho_rpath_dependency \
     "$game_app" >/dev/null; then
     fail "@rpath resolution accepted a symlink target outside the app bundle"
 fi
+rm -f "$game_app/Contents/MacOS/libEscaping.dylib"
 
 owner_bin="$tmp_dir/owner-bin"
 owner_plugin="$game_app/Contents/PlugIns/imageformats/libowner.dylib"
@@ -294,6 +308,54 @@ if grep -Fq "ERROR: Main executable has unresolved @rpath dependency: @rpath/lib
     fail "verifier rejected a Galaxy dependency resolved by LC_RPATH"
 fi
 
+: > "$tmp_dir/outside-direct.dylib"
+set +e
+direct_escape_output=$(
+    PATH="$fake_bin:$PATH" \
+        GAME_APP="$game_app" \
+        WORMS_TEST_DIRECT_ESCAPE=1 \
+        "$ROOT_DIR/scripts/05_verify_installation.sh" 2>&1
+)
+direct_escape_status=$?
+set -e
+if [[ "$direct_escape_status" -eq 0 ]]; then
+    fail "verifier accepted direct or relative dependencies outside the app bundle"
+fi
+grep -Fq '@loader_path/../../../outside-direct.dylib' <<< "$direct_escape_output" \
+    || fail "verifier did not report an escaping @loader_path dependency: $direct_escape_output"
+grep -Fq 'libRelative.dylib' <<< "$direct_escape_output" \
+    || fail "verifier did not report a relative dependency: $direct_escape_output"
+
+set +e
+macos_library_output=$(
+    PATH="$fake_bin:$PATH" \
+        GAME_APP="$game_app" \
+        WORMS_TEST_MACOS_UNSAFE=1 \
+        "$ROOT_DIR/scripts/05_verify_installation.sh" 2>&1
+)
+macos_library_status=$?
+set -e
+if [[ "$macos_library_status" -eq 0 ]]; then
+    fail "verifier ignored an unsafe dependency in Contents/MacOS/libGalaxy.dylib"
+fi
+grep -Fq 'libUnexpectedGalaxyDependency.dylib' <<< "$macos_library_output" \
+    || fail "verifier did not report the unsafe Galaxy library dependency: $macos_library_output"
+
+set +e
+unreadable_arch_output=$(
+    PATH="$fake_bin:$PATH" \
+        GAME_APP="$game_app" \
+        WORMS_TEST_UNREADABLE_ARCH=1 \
+        "$ROOT_DIR/scripts/05_verify_installation.sh" 2>&1
+)
+unreadable_arch_status=$?
+set -e
+if [[ "$unreadable_arch_status" -eq 0 ]]; then
+    fail "verifier accepted an unreadable main executable architecture"
+fi
+grep -Fq 'Unable to read architectures for Main executable' <<< "$unreadable_arch_output" \
+    || fail "verifier did not report the unreadable main executable architecture: $unreadable_arch_output"
+
 set +e
 missing_output=$(
     PATH="$fake_bin:$PATH" \
@@ -308,6 +370,22 @@ if [[ "$missing_status" -eq 0 ]]; then
 fi
 grep -Fq "ERROR: Main executable has unresolved @rpath dependency: @rpath/libMissingStrong.dylib" <<< "$missing_output" \
     || fail "verifier did not report the unresolved strong dependency: $missing_output"
+
+set +e
+wrapped_verify_output=$(
+    PATH="$fake_bin:$PATH" \
+        GAME_APP="$game_app" \
+        WORMS_TEST_STRONG_MISSING=1 \
+        "$ROOT_DIR/fix_worms_wmd.sh" --verify 2>&1
+)
+wrapped_verify_status=$?
+set -e
+if [[ "$wrapped_verify_status" -eq 0 ]]; then
+    fail "top-level verification accepted an unresolved strong dependency"
+fi
+if grep -Fq 'An error occurred during the fix process.' <<< "$wrapped_verify_output"; then
+    fail "read-only verification reported a mutating installer failure: $wrapped_verify_output"
+fi
 
 prebuilt_output=$(
     PATH="$fake_bin:$PATH" \

@@ -1,6 +1,6 @@
 # Issue 20 GOG rpath and rollback hardening
 
-Status: Completed
+Status: Active
 
 ## Problem
 
@@ -18,11 +18,12 @@ In scope:
 - Resolve bundled `@rpath` dependencies using Mach-O load commands and treat
   unresolved weak dependencies as optional.
 - Make install-name rewriting fail clearly when an intended mutation fails.
-- Back up, restore, and verify the main executable.
+- Back up, restore, and verify the complete `Contents/MacOS` tree because deep
+  signing mutates both the main executable and GOG's `libGalaxy.dylib`.
 - Bind new backups to the canonical source app and prevent cross-install
   automatic restore.
-- Keep pre-verification failures transactional by applying optional signing,
-  quarantine, and preference changes only after hard runtime verification.
+- Keep runtime and signing failures transactional; apply untracked quarantine
+  and preference changes only after runtime and strict signature verification.
 - Preserve the selected game path through friendly-launcher diagnostics.
 - Improve sanitized dependency evidence, failure summaries, manifest mapping,
   ANSI removal, and duplicate-manifest handling.
@@ -71,6 +72,13 @@ Non-goals:
   documentation indexes.
 - [x] Milestone 7: Run focused red-green checks, full shell syntax/ShellCheck,
   harness validation, package validation, and non-mutating live metadata probes.
+- [x] Milestone 8: Stop release work and reopen the full trust-boundary audit
+  after repeated review rounds exposed additional integrity gaps.
+- [x] Milestone 9: Add fail-first coverage and fix every material audit finding
+  across backup publication/restore, signing, Mach-O verification, archive and
+  manifest validation, Qt runtime replacement, and launcher targeting.
+- [ ] Milestone 10: Repeat the full adversarial review, live Steam/GOG tests,
+  hosted CI, and Copilot review before restoring completed status.
 
 ## Verification
 
@@ -136,6 +144,42 @@ disposable copy is created first.
   missing weak `@executable_path` dependencies. Mutation containment now covers
   `Contents/MacOS`, new-backup restore requires path and storefront identity,
   and weak-load handling is consistent across supported Mach-O path tokens.
+- 2026-08-26: Reopened the audit and stopped merge/release work after the next
+  Copilot pass found unmanifested metadata, special-entry, canonical archive
+  alias, and manual-restore gaps. A fresh local adversarial pass also confirmed
+  that deep signing changes GOG's `libGalaxy.dylib` even though current backups
+  cover only the main executable, and identified additional false-success and
+  partial-backup exposure paths. The prior completion verdict is withdrawn
+  until the expanded audit and verification milestones pass.
+- 2026-08-26: Added fail-first regressions for canonical tar aliases, FIFOs,
+  control-character paths, duplicate manifest symlinks, dangling output links,
+  save archive aliases, direct Mach-O escapes, relative dependencies, ignored
+  GOG libraries, unreadable architectures, stale Qt 5.3 plugins, interrupted
+  backup publication, signing rollback, nested app links/hardlinks, and wrong
+  storefront launch fallback.
+- 2026-08-26: Fixed the confirmed audit defects. Backups now stage and verify
+  before publication, cover all `MacOS` files, and keep signing inside rollback.
+  Shared tree/archive validation rejects canonical aliases, control paths,
+  unsupported entries, duplicate manifest paths, escaping links, and hardlinks.
+  Runtime verification covers direct token containment, relative names, GOG
+  dylibs, every plugin category, and unreadable Mach-O files.
+- 2026-08-26: Rebuilt Qt twice from all 17 checksum-locked provenance bottles.
+  Both builds produced SHA-256
+  `0fb27b25821fa1034134a575169eea40620fa93240a79041a0933967271521f1`
+  with 16 dependency dylibs, `libsharpyuv.0.dylib`, no `.prl` files, and a
+  verified dependency closure.
+- 2026-08-26: Validated disposable clones of both installed storefronts. GOG
+  passed apply, zero-warning post-sign verification, strict signature checking,
+  and visual main-menu rendering; restore reproduced all 3,097 recorded
+  files/symlink targets and both original executable/Galaxy hashes. Steam passed
+  upgrade from the v1.7.5-fixed state, stale-plugin removal, storefront metadata
+  binding, verification, and whole-surface restore comparison. Both installed
+  source apps remained unchanged.
+- 2026-08-26: The final local pass also found that noninteractive multi-install
+  auto-detection attempted unusable `/dev/tty`, then silently retained the
+  default Steam path. Detection now clears ambiguous targets and dry-run uses a
+  safe placeholder instead of `/Contents`; read-only verification failures no
+  longer print a mutating-installer rollback error.
 
 ## Surprises & Discoveries
 
@@ -154,6 +198,16 @@ disposable copy is created first.
 - Shared manifest verification checked recorded files but did not reject extra
   unrecorded files, even though restore copies directory trees. Verification now
   fails closed on extras across game, save, Qt, and release manifests.
+- Bash subshells inherited the installer's `EXIT` cleanup trap. A command
+  substitution or interactive spinner could therefore delete a managed build
+  or backup-staging directory owned by the top-level process. Cleanup now runs
+  only at `BASH_SUBSHELL=0`.
+- `codesign --deep` changes the GOG `libGalaxy.dylib` hash as well as the main
+  executable. A disposable probe confirmed both mutations, invalidating the
+  earlier main-executable-only rollback claim.
+- The earlier 15-dylib archive shipped WebP libraries but omitted their
+  `@rpath/libsharpyuv.0.dylib` closure, so the installer skipped all WebP
+  components. Packaging now resolves dependency run paths before copying.
 
 ## Decision Log
 
@@ -163,27 +217,22 @@ disposable copy is created first.
   dependencies and external absolute targets as errors.
 - Bind backups to canonical app paths and fail closed on ambiguous legacy
   restores instead of adding a new backup-selection API.
-- Move optional finishing touches after hard runtime verification rather than
-  attempting to serialize and restore recursive xattrs and user preferences.
+- Move quarantine and preference changes after the rollback boundary rather
+  than attempting to serialize recursive xattrs and user preferences.
+- Keep ad-hoc signing inside the rollback boundary and require strict signature
+  verification. Only quarantine and preference changes remain outside because
+  they are not serialized in the game backup.
 - Back up existing `_CodeSignature` resources and record their presence so
   manual restore can remove fixer-created signature resources when the original
   app did not have them.
 
 ## Outcomes & Retrospective
 
-Issue #20 is fixed without a `libGalaxy.dylib` special case. Mach-O verification
-now resolves bundled run paths and recognizes weak loads, while required missing
-dependencies still fail. Rollback covers the executable and signature resources,
-new backups are bound to their source app, ambiguous and untrusted restore state
-fails before mutation, and finishing touches occur after the hard verification
-boundary. Diagnostics retain the selected Steam or GOG target and produce
-smaller, clearer support bundles.
-
-The Qt archive was deterministically repaired from the existing verified,
-provenance-locked payload. Its checksum passes; it contains 104 unique members,
-15 runtime dependency dylibs, no duplicate plugin copies, 21 recorded framework
-symlinks, and is 11,102,530 bytes. A second independent repack produced the same
-SHA-256 `6e3d4783cd55a03e3e0237856da718d942dafe0e0e32b12338d5e228a65b9998`.
+The release verdict remains open until Milestones 9 and 10 pass. The current Qt
+candidate has 98 unique members, 16 runtime dependency dylibs, 21 recorded
+framework symlinks, no `.prl` files, and is 11,109,876 bytes. Two independent
+builds produced SHA-256
+`0fb27b25821fa1034134a575169eea40620fa93240a79041a0933967271521f1`.
 
 Fresh completion evidence:
 

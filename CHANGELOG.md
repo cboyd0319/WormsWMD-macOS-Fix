@@ -10,10 +10,11 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   the friendly launcher, report Mach-O run-path resolution, label backup source
   metadata, remove ANSI fragments, and include only one copy of identical
   backup manifests.
-- The Qt 5.15.19 package now contains 15 actual runtime dependency dylibs
-  without duplicate plugin entries or duplicate tar members.
-- Optional quarantine removal, ad-hoc signing, and Qt geometry reset now happen
-  only after hard runtime verification succeeds.
+- The Qt 5.15.19 package now contains the complete 16-dylib runtime closure,
+  including `libsharpyuv.0.dylib`, without duplicate plugin/tar entries or
+  build-only `.prl` metadata.
+- Quarantine removal and Qt geometry reset now happen only after hard runtime
+  and ad-hoc signature verification succeeds.
 
 ### Fixed
 
@@ -22,14 +23,18 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   dependencies as warnings. Required unresolved dependencies still fail.
 - Applied the weak-load warning policy consistently to missing
   `@executable_path` and `@loader_path` dependencies.
-- Fixed game-bundle backup and rollback coverage for the main executable and
-  existing code-signature resources.
+- Fixed game-bundle backup and rollback coverage for the complete `MacOS`
+  directory, including GOG's `libGalaxy.dylib`, and existing signature resources.
+- Build and verify backups under a hidden staging name before publishing them
+  for restore, preventing interrupted backups from being selected as legacy.
 - Bound new backups to their canonical source app and prevented an automatic
   restore from applying a GOG backup to Steam, or a Steam backup to GOG.
 - Required both canonical path and storefront identity to match before an
   automatic restore, including when different installations reuse a path.
 - Rejected game bundles whose mutable `Contents/MacOS` directory resolves
   outside the selected app.
+- Rejected nested bundle symlinks, hardlinks, special entries, and control-byte
+  paths that recursive signing or mutation could otherwise follow.
 - Fixed friendly-launcher option 7 so an interactive Steam or GOG selection is
   used for the actual launch action.
 - Made install-name rewrite failures and AGL compiler failures actionable
@@ -42,6 +47,17 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   validation reject unreadable archives and duplicate members before extraction.
 - Added v2 manifest coverage for symlink paths and target digests while keeping
   existing v1 backups compatible with their legacy guarantees.
+- Rejected canonical archive aliases, duplicate manifest paths, special entries,
+  and control-character paths across game, save, Qt, and release integrity checks.
+- Made missing or malformed current backup metadata fail closed instead of
+  falling through to the legacy restore path.
+- Rejected direct Mach-O dependencies that escape the app, unportable relative
+  dependencies, and unreadable required architectures; verification now checks
+  GOG libraries in `Contents/MacOS` and every installed Qt plugin category.
+- Removed stale Qt 5.3 accessibility and print-support plugins when installing
+  Qt 5.15, and stopped GOG launch failures from falling back to Steam.
+- Made ad-hoc signing and signature verification transactional so partial
+  signing failures restore all covered game binaries.
 
 ## Mainline maintenance after 1.7.5 (2026-08-11)
 

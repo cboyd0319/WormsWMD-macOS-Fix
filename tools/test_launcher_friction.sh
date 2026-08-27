@@ -201,6 +201,9 @@ mkdir -p "$multi_bin"
 cat > "$multi_bin/open" <<'STUB'
 #!/bin/bash
 printf '%s\n' "$*" >> "$WORMS_TEST_OPEN_LOG"
+if [[ -n "${WORMS_TEST_OPEN_FAIL_PATH:-}" ]] && [[ "${1:-}" == "$WORMS_TEST_OPEN_FAIL_PATH" ]]; then
+    exit 1
+fi
 exit 0
 STUB
 chmod +x "$multi_bin/open"
@@ -214,6 +217,18 @@ grep -Fxq "$multi_gog_app" "$multi_open_log" \
     || fail "launcher did not pass the selected GOG app to open: $(cat "$multi_open_log")"
 if grep -Fq 'steam://run/327030' "$multi_open_log"; then
     fail "launcher ignored the selected GOG app and launched Steam"
+fi
+
+failed_gog_open_log="$tmp_dir/failed-gog-open.log"
+printf '7\n%s\n\nq\n' "$multi_gog_choice" | \
+    HOME="$multi_home" \
+    PATH="$multi_bin:$PATH" \
+    WORMS_TEST_OPEN_LOG="$failed_gog_open_log" \
+    WORMS_TEST_OPEN_FAIL_PATH="$multi_gog_app" \
+    bash "$launcher" > "$tmp_dir/failed-gog-launch.out" 2>&1 \
+    || fail "launcher menu failed after the selected GOG app could not be opened"
+if grep -Fq 'steam://run/327030' "$failed_gog_open_log"; then
+    fail "launcher fell back to Steam after the selected GOG installation failed to open"
 fi
 
 printf 'q\n' | bash "$launcher" > "$tmp_dir/menu.out" 2>&1 \

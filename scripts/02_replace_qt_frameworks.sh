@@ -66,6 +66,12 @@ validate_qt_prefix() {
 
     worms_reject_control_chars "$QT_PREFIX" "QT_PREFIX"
 
+    if worms_path_inside_root "$GAME_APP" "$QT_PREFIX" \
+        || worms_path_inside_root "$QT_PREFIX" "$GAME_APP"; then
+        echo "ERROR: QT_PREFIX and GAME_APP must be separate directory trees."
+        exit 1
+    fi
+
     if [[ "$QT_SOURCE" == "homebrew" ]] && [[ "$QT_PREFIX" != "/usr/local/opt/qt@5" ]]; then
         if ! worms_bool_true "${WORMSWMD_ALLOW_CUSTOM_QT_PREFIX:-}"; then
             echo "ERROR: Refusing custom Homebrew QT_PREFIX without WORMSWMD_ALLOW_CUSTOM_QT_PREFIX=1"
@@ -238,6 +244,10 @@ if [[ "$QT_SOURCE" == "prebuild" ]]; then
 fi
 
 echo "=== Replacing Qt Plugins ==="
+
+# Qt 5.15 no longer ships these Qt 5.3 plugin categories. Remove only the
+# known legacy directories so unrelated game or user plugin directories remain.
+rm -rf "$GAME_PLUGINS/accessible" "$GAME_PLUGINS/printsupport"
 
 # Replace platform plugin
 echo "Replacing libqcocoa.dylib..."

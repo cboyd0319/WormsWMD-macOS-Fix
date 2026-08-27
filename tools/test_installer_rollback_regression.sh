@@ -56,6 +56,7 @@ mkdir -p \
 printf '#!/bin/bash\nexit 0\n' > "$game_app/Contents/MacOS/Worms W.M.D"
 chmod +x "$game_app/Contents/MacOS/Worms W.M.D"
 printf 'original framework\n' > "$game_app/Contents/Frameworks/original-framework.txt"
+: > "$game_app/Contents/Frameworks/libsteam_api.dylib"
 printf 'original platform plugin\n' > "$game_app/Contents/PlugIns/platforms/original-platform.dylib"
 printf 'original image plugin\n' > "$game_app/Contents/PlugIns/imageformats/original-image.dylib"
 printf '<plist version="1.0"><dict></dict></plist>\n' > "$game_app/Contents/Info.plist"
@@ -198,6 +199,53 @@ grep -Fxq 'original image plugin' "$game_app/Contents/PlugIns/imageformats/origi
 
 backup_count=$(find "$test_home/Documents" -mindepth 1 -maxdepth 1 -type d -name 'WormsWMD-Backup-*' -print 2>/dev/null | wc -l | tr -d ' ')
 [[ "$backup_count" == "1" ]] || fail "expected one preserved rollback backup, found $backup_count"
+if find "$test_home/Documents" -mindepth 1 -maxdepth 1 -name '.WormsWMD-Backup.partial.*' -print -quit | grep -q .; then
+    fail "installer left an incomplete backup staging directory"
+fi
+
+partial_home="$tmp_dir/partial-home"
+partial_game_app="$partial_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+partial_bin="$tmp_dir/partial-bin"
+mkdir -p \
+    "$partial_bin" \
+    "$partial_game_app/Contents/MacOS" \
+    "$partial_game_app/Contents/Frameworks" \
+    "$partial_game_app/Contents/PlugIns/platforms" \
+    "$partial_game_app/Contents/PlugIns/imageformats"
+printf '#!/bin/bash\nexit 0\n' > "$partial_game_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$partial_game_app/Contents/MacOS/Worms W.M.D"
+: > "$partial_game_app/Contents/Frameworks/libsteam_api.dylib"
+printf 'original framework\n' > "$partial_game_app/Contents/Frameworks/original.txt"
+printf 'original plugin\n' > "$partial_game_app/Contents/PlugIns/platforms/original.dylib"
+cat > "$partial_bin/cp" <<'STUB'
+#!/bin/bash
+for arg in "$@"; do
+    if [[ "$arg" == */Contents/PlugIns ]]; then
+        printf '%s\n' 'synthetic backup copy failure' >&2
+        exit 91
+    fi
+done
+exec /bin/cp "$@"
+STUB
+chmod +x "$partial_bin/cp"
+set +e
+partial_output=$(
+    HOME="$partial_home" \
+        PATH="$partial_bin:$fake_bin:$PATH" \
+        GAME_APP="$partial_game_app" \
+        "$ROOT_DIR/fix_worms_wmd.sh" --force 2>&1
+)
+partial_status=$?
+set -e
+if [[ "$partial_status" -eq 0 ]]; then
+    fail "installer succeeded despite an interrupted backup copy"
+fi
+if find "$partial_home/Documents" -mindepth 1 -maxdepth 1 -type d -name 'WormsWMD-Backup-*' -print -quit | grep -q .; then
+    fail "interrupted backup was published as a restorable backup: $partial_output"
+fi
+if find "$partial_home/Documents" -mindepth 1 -maxdepth 1 -name '.WormsWMD-Backup.partial.*' -print -quit | grep -q .; then
+    fail "interrupted backup staging directory was not cleaned up"
+fi
 
 printf 'Installer rollback regression check passed.\n'
 
@@ -209,11 +257,15 @@ readonly_qt_prefix="$tmp_dir/readonly-qt"
 mkdir -p \
     "$readonly_bin" \
     "$readonly_game_app/Contents/MacOS" \
+    "$readonly_game_app/Contents/PlugIns/accessible" \
+    "$readonly_game_app/Contents/PlugIns/printsupport" \
     "$readonly_qt_prefix/lib" \
     "$readonly_qt_prefix/plugins/platforms" \
     "$readonly_qt_prefix/plugins/imageformats"
 printf '#!/bin/bash\nexit 0\n' > "$readonly_game_app/Contents/MacOS/Worms W.M.D"
 chmod +x "$readonly_game_app/Contents/MacOS/Worms W.M.D"
+printf 'stale Qt 5.3 plugin\n' > "$readonly_game_app/Contents/PlugIns/accessible/libqtaccessiblewidgets.dylib"
+printf 'stale Qt 5.3 plugin\n' > "$readonly_game_app/Contents/PlugIns/printsupport/libcocoaprintersupport.dylib"
 
 for framework in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
     framework_binary="$readonly_qt_prefix/lib/$framework.framework/Versions/5/$framework"
@@ -254,6 +306,10 @@ for framework in QtCore QtGui QtWidgets QtOpenGL QtPrintSupport QtDBus QtSvg; do
     [[ -w "$installed_binary" ]] \
         || fail "installed $framework framework binary is not owner-writable"
 done
+[[ ! -e "$readonly_game_app/Contents/PlugIns/accessible" ]] \
+    || fail "Qt replacement left the stale Qt 5.3 accessible plugin directory"
+[[ ! -e "$readonly_game_app/Contents/PlugIns/printsupport" ]] \
+    || fail "Qt replacement left the stale Qt 5.3 print support plugin directory"
 
 printf 'Read-only Qt framework regression check passed.\n'
 
@@ -273,6 +329,8 @@ mkdir -p \
 printf '#!/bin/bash\nexit 0\n' > "$config_game_app/Contents/MacOS/Worms W.M.D"
 chmod +x "$config_game_app/Contents/MacOS/Worms W.M.D"
 config_exec_original=$(cat "$config_game_app/Contents/MacOS/Worms W.M.D")
+printf 'original galaxy library\n' > "$config_game_app/Contents/MacOS/libGalaxy.dylib"
+config_galaxy_original=$(cat "$config_game_app/Contents/MacOS/libGalaxy.dylib")
 printf 'original framework\n' > "$config_game_app/Contents/Frameworks/original-framework.txt"
 printf 'original platform plugin\n' > "$config_game_app/Contents/PlugIns/platforms/original-platform.dylib"
 printf 'original image plugin\n' > "$config_game_app/Contents/PlugIns/imageformats/original-image.dylib"
@@ -341,7 +399,8 @@ case "${1:-}" in
         printf 'fake universal macho\n' > "$out"
         ;;
     -archs)
-        if [[ "${2:-}" == *"AGL.framework"* ]]; then
+        if [[ "${WORMS_TEST_FAIL_AGL_VERIFY:-}" == "1" ]] \
+            && [[ "${2:-}" == *"AGL.framework"* ]]; then
             printf '%s\n' "arm64"
         else
             printf '%s\n' "x86_64"
@@ -371,6 +430,15 @@ if [[ "${1:-}" == "-L" ]]; then
     printf '\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1.0.0)\n'
     exit 0
 fi
+if [[ "${1:-}" == "-l" ]] && [[ "${2:-}" == */Contents/MacOS/Worms\ W.M.D ]]; then
+    cat <<'LOADS'
+Load command 1
+          cmd LC_RPATH
+      cmdsize 48
+         path @executable_path/../Frameworks (offset 12)
+LOADS
+    exit 0
+fi
 exit 1
 STUB
 
@@ -382,6 +450,9 @@ for target in "$@"; do
 done
 if [[ "$target" == */Contents/MacOS/Worms\ W.M.D ]]; then
     printf '%s\n' '# mutated install names' >> "$target"
+    if [[ "${WORMS_TEST_FORCE_HASH_MISMATCH:-}" == "1" ]]; then
+        : > "$WORMS_TEST_HASH_MISMATCH_MARKER"
+    fi
 fi
 exit 0
 STUB
@@ -398,17 +469,20 @@ STUB
 
 cat > "$config_fake_bin/shasum" <<'STUB'
 #!/bin/bash
-for arg in "$@"; do
-    case "$arg" in
-        "$WORMS_TEST_GAME_APP"/Contents/*)
-            for candidate in "$@"; do
-                [[ "$candidate" == "$WORMS_TEST_GAME_APP"/Contents/* ]] || continue
-                printf '%064d  %s\n' 0 "$candidate"
-            done
-            exit 0
-            ;;
-    esac
-done
+if [[ "${WORMS_TEST_FORCE_HASH_MISMATCH:-}" == "1" ]] \
+    && [[ -f "$WORMS_TEST_HASH_MISMATCH_MARKER" ]]; then
+    for arg in "$@"; do
+        case "$arg" in
+            "$WORMS_TEST_GAME_APP"/Contents/*)
+                for candidate in "$@"; do
+                    [[ "$candidate" == "$WORMS_TEST_GAME_APP"/Contents/* ]] || continue
+                    printf '%064d  %s\n' 0 "$candidate"
+                done
+                exit 0
+                ;;
+        esac
+    done
+fi
 exec /usr/bin/shasum "$@"
 STUB
 
@@ -420,6 +494,9 @@ config_output=$(
         PATH="$config_fake_bin:$PATH" \
         GAME_APP="$config_game_app" \
         WORMS_TEST_GAME_APP="$config_game_app" \
+        WORMS_TEST_FAIL_AGL_VERIFY=1 \
+        WORMS_TEST_FORCE_HASH_MISMATCH=1 \
+        WORMS_TEST_HASH_MISMATCH_MARKER="$tmp_dir/config-hash-mismatch" \
         "$ROOT_DIR/fix_worms_wmd.sh" --force 2>&1
 )
 config_status=$?
@@ -443,13 +520,61 @@ config_exec_after=$(cat "$config_game_app/Contents/MacOS/Worms W.M.D")
 if [[ "$config_exec_after" != "$config_exec_original" ]]; then
     fail "main executable was not restored after a post-path-fix rollback"
 fi
+config_galaxy_after=$(cat "$config_game_app/Contents/MacOS/libGalaxy.dylib")
+if [[ "$config_galaxy_after" != "$config_galaxy_original" ]]; then
+    fail "Galaxy library was not restored after rollback"
+fi
 
 config_backup=$(find "$config_home/Documents" -mindepth 1 -maxdepth 1 -type d -name 'WormsWMD-Backup-*' -print -quit)
 [[ -n "$config_backup" ]] || fail "post-path-fix rollback did not preserve its backup"
 grep -Fq $'MacOS/Worms W.M.D' "$config_backup/BACKUP_MANIFEST.tsv" \
     || fail "backup manifest does not cover the mutable main executable"
+grep -Fq $'MacOS/libGalaxy.dylib' "$config_backup/BACKUP_MANIFEST.tsv" \
+    || fail "backup manifest does not cover the GOG library mutated by deep signing"
 grep -Fq $'BACKUP_METADATA.tsv' "$config_backup/BACKUP_MANIFEST.tsv" \
     || fail "backup manifest does not cover source-app identity metadata"
+
+sign_home="$tmp_dir/sign-home"
+sign_game_app="$sign_home/GOG Games/Worms W.M.D/Worms W.M.D.app"
+sign_bin="$tmp_dir/sign-bin"
+mkdir -p "$(dirname "$sign_game_app")" "$sign_bin"
+cp -R "$config_game_app" "$sign_game_app"
+sign_exec_before=$(shasum -a 256 "$sign_game_app/Contents/MacOS/Worms W.M.D" | awk '{print $1}')
+sign_galaxy_before=$(shasum -a 256 "$sign_game_app/Contents/MacOS/libGalaxy.dylib" | awk '{print $1}')
+cat > "$sign_bin/codesign" <<'STUB'
+#!/bin/bash
+if [[ "${1:-}" == "--force" ]]; then
+    printf '%s\n' '# partial signing mutation' >> "$WORMS_TEST_SIGN_APP/Contents/MacOS/Worms W.M.D"
+    printf '%s\n' '# partial signing mutation' >> "$WORMS_TEST_SIGN_APP/Contents/MacOS/libGalaxy.dylib"
+    printf '%s\n' 'synthetic codesign failure' >&2
+    exit 92
+fi
+exit 0
+STUB
+chmod +x "$sign_bin/codesign"
+set +e
+sign_output=$(
+    HOME="$sign_home" \
+        PATH="$sign_bin:$config_fake_bin:$PATH" \
+        GAME_APP="$sign_game_app" \
+        WORMS_TEST_GAME_APP="$sign_game_app" \
+        WORMS_TEST_HASH_MISMATCH_MARKER="$tmp_dir/unused-hash-mismatch" \
+        WORMS_TEST_SIGN_APP="$sign_game_app" \
+        "$ROOT_DIR/fix_worms_wmd.sh" --force 2>&1
+)
+sign_status=$?
+set -e
+if [[ "$sign_status" -eq 0 ]]; then
+    fail "installer treated a partial codesign failure as success: $sign_output"
+fi
+grep -Fq 'Could not apply the ad-hoc code signature' <<< "$sign_output" \
+    || fail "installer hid the codesign failure: $sign_output"
+grep -Fq 'Rolled back to original game files.' <<< "$sign_output" \
+    || fail "codesign failure did not trigger rollback: $sign_output"
+[[ "$(shasum -a 256 "$sign_game_app/Contents/MacOS/Worms W.M.D" | awk '{print $1}')" == "$sign_exec_before" ]] \
+    || fail "codesign rollback did not restore the main executable"
+[[ "$(shasum -a 256 "$sign_game_app/Contents/MacOS/libGalaxy.dylib" | awk '{print $1}')" == "$sign_galaxy_before" ]] \
+    || fail "codesign rollback did not restore libGalaxy.dylib"
 
 restore_home="$tmp_dir/multi-restore-home"
 restore_steam_app="$restore_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
@@ -515,6 +640,39 @@ if [[ "$unmanifested_status" -eq 0 ]]; then
 fi
 grep -Fxq 'steam original' "$restore_steam_app/Contents/Frameworks/store-marker.txt" \
     || fail "unmanifested backup metadata allowed a cross-install mutation"
+
+single_restore_home="$tmp_dir/single-restore-home"
+single_restore_app="$single_restore_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+single_unmanifested_backup="$single_restore_home/Documents/WormsWMD-Backup-20988000-000000"
+mkdir -p \
+    "$single_restore_home/Applications" \
+    "$single_restore_app/Contents/MacOS" \
+    "$single_restore_app/Contents/Frameworks" \
+    "$single_restore_app/Contents/PlugIns" \
+    "$single_unmanifested_backup/Frameworks" \
+    "$single_unmanifested_backup/PlugIns"
+printf '#!/bin/bash\nexit 0\n' > "$single_restore_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$single_restore_app/Contents/MacOS/Worms W.M.D"
+: > "$single_restore_app/Contents/Frameworks/libsteam_api.dylib"
+printf 'single original\n' > "$single_restore_app/Contents/Frameworks/store-marker.txt"
+printf 'unmanifested replacement\n' > "$single_unmanifested_backup/Frameworks/store-marker.txt"
+single_restore_real=$(cd "$single_restore_app" && pwd -P)
+printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tsteam\ncode_signature_present\tfalse\n' \
+    "$single_restore_real" > "$single_unmanifested_backup/BACKUP_METADATA.tsv"
+set +e
+single_unmanifested_output=$(
+    HOME="$single_restore_home" \
+        GAME_APP="$single_restore_app" \
+        WORMSWMD_TEST_APPLICATIONS_ROOT="$single_restore_home/Applications" \
+        "$ROOT_DIR/fix_worms_wmd.sh" --restore --force 2>&1
+)
+single_unmanifested_status=$?
+set -e
+if [[ "$single_unmanifested_status" -eq 0 ]]; then
+    fail "single-install restore treated unmanifested metadata as a legacy backup: $single_unmanifested_output"
+fi
+grep -Fxq 'single original' "$single_restore_app/Contents/Frameworks/store-marker.txt" \
+    || fail "unmanifested metadata modified a single detected installation"
 
 same_path_gog_backup="$restore_home/Documents/WormsWMD-Backup-20987500-000000"
 mkdir -p "$same_path_gog_backup/Frameworks" "$same_path_gog_backup/PlugIns"
@@ -582,10 +740,13 @@ mkdir -p \
 printf 'steam restored\n' > "$steam_backup/Frameworks/store-marker.txt"
 printf '#!/bin/bash\nexit 7\n' > "$steam_backup/MacOS/Worms W.M.D"
 chmod +x "$steam_backup/MacOS/Worms W.M.D"
+steam_backup_exec_hash=$(shasum -a 256 "$steam_backup/MacOS/Worms W.M.D" | awk '{print $1}')
+steam_backup_exec_size=$(stat -f%z "$steam_backup/MacOS/Worms W.M.D")
 printf 'original signature\n' > "$steam_backup/_CodeSignature/CodeResources"
 printf '<plist version="1.0"><dict></dict></plist>\n' > "$steam_backup/Info.plist"
-printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tsteam\ncode_signature_present\ttrue\n' \
-    "$restore_steam_real" > "$steam_backup/BACKUP_METADATA.tsv"
+printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tsteam\ngame_executable_sha256\t%s\ngame_executable_size\t%s\ncode_signature_present\ttrue\n' \
+    "$restore_steam_real" "$steam_backup_exec_hash" "$steam_backup_exec_size" \
+    > "$steam_backup/BACKUP_METADATA.tsv"
 (
     # shellcheck source=/dev/null
     source "$ROOT_DIR/scripts/common.sh"
@@ -649,20 +810,25 @@ mkdir -p \
     "$gog_guidance_app/Contents/Frameworks" \
     "$gog_guidance_app/Contents/PlugIns" \
     "$gog_guidance_backup/Frameworks" \
-    "$gog_guidance_backup/PlugIns"
+    "$gog_guidance_backup/PlugIns" \
+    "$gog_guidance_backup/MacOS"
 printf '#!/bin/bash\nexit 0\n' > "$gog_guidance_app/Contents/MacOS/Worms W.M.D"
 : > "$gog_guidance_app/Contents/MacOS/libGalaxy.dylib"
 chmod +x "$gog_guidance_app/Contents/MacOS/Worms W.M.D"
+cp "$gog_guidance_app/Contents/MacOS/Worms W.M.D" "$gog_guidance_backup/MacOS/Worms W.M.D"
 printf 'current gog files\n' > "$gog_guidance_app/Contents/Frameworks/store-marker.txt"
 printf 'restored gog files\n' > "$gog_guidance_backup/Frameworks/store-marker.txt"
 gog_guidance_real=$(cd "$gog_guidance_app" && pwd -P)
-printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tgog\ncode_signature_present\tfalse\n' \
-    "$gog_guidance_real" > "$gog_guidance_backup/BACKUP_METADATA.tsv"
+gog_guidance_exec_hash=$(shasum -a 256 "$gog_guidance_backup/MacOS/Worms W.M.D" | awk '{print $1}')
+gog_guidance_exec_size=$(stat -f%z "$gog_guidance_backup/MacOS/Worms W.M.D")
+printf '# WormsWMD backup metadata v1\ngame_app_path\t%s\ngame_source\tgog\ngame_executable_sha256\t%s\ngame_executable_size\t%s\ncode_signature_present\tfalse\n' \
+    "$gog_guidance_real" "$gog_guidance_exec_hash" "$gog_guidance_exec_size" \
+    > "$gog_guidance_backup/BACKUP_METADATA.tsv"
 (
     # shellcheck source=/dev/null
     source "$ROOT_DIR/scripts/common.sh"
     worms_write_manifest "$gog_guidance_backup" "$gog_guidance_backup/BACKUP_MANIFEST.tsv" \
-        Frameworks PlugIns BACKUP_METADATA.tsv
+        Frameworks PlugIns MacOS BACKUP_METADATA.tsv
 )
 gog_guidance_output=$(HOME="$gog_guidance_home" \
     GAME_APP="$gog_guidance_app" \

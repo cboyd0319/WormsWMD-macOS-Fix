@@ -35,11 +35,11 @@ Back up and restore your save games, settings, and replays:
 ./tools/backup_saves.sh --restore ~/Documents/WormsWMD-SaveBackups/saves-20251225-120000.tar.gz
 ```
 
-New save backups include a `MANIFEST.tsv` file. Restore validates archive
-layout before extraction, verifies the manifest when present, copies backup
-contents into a temporary tree, replaces the backed-up save roots, and verifies
-that stale files absent from the backup did not survive. Older legacy backups
-that predate manifests restore with an explicit warning.
+New save backups include a `MANIFEST.tsv` file. Restore rejects exact/canonical
+duplicate members, control-character paths, links, and special entries before
+use; it verifies the manifest, stages each save tree, replaces the backed-up
+roots, and checks that stale files did not survive. Older legacy backups that
+predate manifests restore with an explicit warning.
 
 ## Steam update watcher
 

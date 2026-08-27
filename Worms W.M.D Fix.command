@@ -216,6 +216,12 @@ launch_game() {
         return 0
     fi
 
+    if [[ -n "${GAME_APP:-}" ]]; then
+        worms_print_warning "Could not launch the selected game installation automatically."
+        print_line "Open this installation directly: $GAME_APP"
+        return 1
+    fi
+
     if open "steam://run/327030" >/dev/null 2>&1; then
         worms_print_success "Steam was asked to launch Worms W.M.D."
         return 0

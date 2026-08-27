@@ -62,9 +62,10 @@ The fix bundles dylibs required by Qt frameworks and plugins (detected with `oto
 
 The exact list varies by Qt version and plugin set.
 
-The committed Qt 5.15.19 archive contains 15 top-level runtime dependency
-dylibs. Qt plugins live only under `PlugIns/`; their Mach-O self install IDs are
-not copied again into `Frameworks/`, and archive members are unique.
+The committed Qt 5.15.19 archive contains 16 top-level runtime dependency
+dylibs, including `libsharpyuv.0.dylib`. Qt plugins live only under `PlugIns/`;
+their Mach-O self install IDs are not copied again into `Frameworks/`, archive
+members are canonical and unique, and build-only `.prl` files are omitted.
 
 ## Mach-O run-path verification
 
@@ -72,12 +73,16 @@ The verifier parses `LC_RPATH` and dependency load commands with `otool`.
 `@executable_path` is expanded from the game executable, `@loader_path` from the
 binary being inspected, and resolved `@rpath` targets must remain inside the
 selected app bundle. An unresolved `LC_LOAD_WEAK_DYLIB` is optional; an
-unresolved strong load remains an installation error.
+unresolved strong load remains an installation error. Relative install names
+and direct token paths that escape `Contents` are also installation errors.
 
 ## Plugins updated
 
 - `platforms/libqcocoa.dylib` - Cocoa platform integration
 - `imageformats/*.dylib` - Image format support (including libqsvg.dylib)
+
+Legacy Qt 5.3 `accessible/` and `printsupport/` plugin directories are removed
+because Qt 5.15 no longer ships those plugin categories.
 
 ## How the AGL stub works
 

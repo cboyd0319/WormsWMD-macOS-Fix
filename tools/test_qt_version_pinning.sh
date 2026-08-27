@@ -87,9 +87,46 @@ archive_dependency_count=$(tar -tzf "$committed_package" \
     | awk -F/ '$1 == "Frameworks" && NF == 2 && $2 ~ /[.]dylib$/ {seen[$2]=1} END {for (name in seen) count++; print count+0}')
 [[ "$metadata_dependency_count" == "$archive_dependency_count" ]] \
     || fail "Qt package metadata dependency count does not match the archive"
+[[ "$archive_dependency_count" == "16" ]] \
+    || fail "Qt package does not contain the complete 16-dylib runtime closure"
+tar -tzf "$committed_package" | grep -Fxq 'Frameworks/libsharpyuv.0.dylib' \
+    || fail "Qt package omits libwebp's bundled libsharpyuv dependency"
+if tar -tzf "$committed_package" | grep -Eq '[.]prl$'; then
+    fail "Qt runtime package still contains build-only .prl metadata"
+fi
 duplicate_archive_entry=$(tar -tzf "$committed_package" | LC_ALL=C sort | uniq -d | head -1)
 [[ -z "$duplicate_archive_entry" ]] \
     || fail "Qt package contains duplicate archive entry: $duplicate_archive_entry"
+
+package_root="$tmp_dir/package-root"
+mkdir -p "$package_root"
+tar -xzf "$committed_package" -C "$package_root"
+while IFS= read -r -d '' binary; do
+    install_id=$(otool -D "$binary" 2>/dev/null | sed -n '2p' || true)
+    while IFS= read -r dependency; do
+        [[ -n "$dependency" ]] || continue
+        [[ "$dependency" == "$install_id" ]] && continue
+        case "$dependency" in
+            /usr/lib/*|/System/Library/*)
+                ;;
+            *".framework/"*)
+                framework_name=$(basename "${dependency%%.framework/*}")
+                [[ -d "$package_root/Frameworks/$framework_name.framework" ]] \
+                    || fail "Qt package dependency closure is missing $framework_name.framework for $(basename "$binary")"
+                ;;
+            *.dylib)
+                dependency_name=$(basename "$dependency")
+                [[ -f "$package_root/Frameworks/$dependency_name" ]] \
+                    || fail "Qt package dependency closure is missing $dependency_name for $(basename "$binary")"
+                ;;
+            *)
+                fail "Qt package contains an unportable dependency in $(basename "$binary"): $dependency"
+                ;;
+        esac
+    done < <(worms_otool_dependencies "$binary")
+done < <(find "$package_root/Frameworks" "$package_root/PlugIns" -type f -print0 | while IFS= read -r -d '' candidate; do
+    file "$candidate" 2>/dev/null | grep -Fq 'Mach-O' && printf '%s\0' "$candidate"
+done)
 
 if "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" \
     --output "$tmp_dir/provenance-prefix" \

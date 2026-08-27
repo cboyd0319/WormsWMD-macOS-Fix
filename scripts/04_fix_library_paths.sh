@@ -176,6 +176,7 @@ fix_binary() {
     local dep_id
     local fw_name
     local dep_base
+    local resolved
     local tool_output
 
     if [ ! -f "$bin" ]; then
@@ -193,6 +194,20 @@ fix_binary() {
     while IFS= read -r dep; do
         dep_id=""
         if [[ "$dep" == @executable_path/* ]] || [[ "$dep" == @loader_path/* ]]; then
+            resolved=$(worms_expand_macho_path "$dep" "$bin" "$GAME_EXEC" || true)
+            if [[ -z "$resolved" ]] \
+                || ! worms_path_inside_root "$GAME_APP/Contents" "$resolved"; then
+                echo "ERROR: Dependency resolves outside the app bundle in $label: $dep"
+                return 1
+            fi
+            if [[ ! -f "$resolved" ]]; then
+                if worms_macho_dependency_is_weak "$bin" "$dep"; then
+                    echo "WARNING: Keeping optional missing dependency for $label: $dep"
+                else
+                    echo "ERROR: Missing dependency in $label: $dep"
+                    return 1
+                fi
+            fi
             continue
         fi
 
