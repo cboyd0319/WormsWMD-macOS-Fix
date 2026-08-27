@@ -103,11 +103,11 @@ inside the backup copy before manifest validation. This self-heals repeated
 installs from older fixer versions without mutating save data or trusting
 symlinks that escape the backup root.
 
-Save-game restore requires Python 3.9+, inspects a bounded owner-only copy, and
-extracts only it. Expansion is at most 8 GiB and half of usable space, with a
-512 MiB reserve and staging/final-copy room; an override requires
-`--max-expanded-size K|M|G --yes`. Unsafe archives fail, manifests are verified,
-and help/list/location remain usable without Python.
+Save restore inspects one bounded copy, requires numeric Steam IDs, rejects
+intermediate user links, and defaults inside canonical userdata. An external
+`327030` target requires its exact canonical path plus `--yes`. Steam must be
+stopped. Every root stages on its target filesystem; old trees remain until all
+copies verify and roll back together. Expansion keeps the 8 GiB, half-free-space, and 512 MiB-reserve bounds.
 
 ## Qt Distribution Contract
 

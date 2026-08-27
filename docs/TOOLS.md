@@ -33,13 +33,20 @@ Back up and restore your save games, settings, and replays:
 ./tools/backup_saves.sh --location
 ./tools/backup_saves.sh --restore
 ./tools/backup_saves.sh --restore ~/Documents/WormsWMD-SaveBackups/saves-20251225-120000.tar.gz
+./tools/backup_saves.sh --restore --yes \
+  --allow-external-steam-root "$EXACT_EXTERNAL_327030_PATH"
 ```
 
 New save backups include a `MANIFEST.tsv` file. Restore rejects exact/canonical
 duplicate members, control-character paths, links, and special entries before
 use; it verifies the manifest, stages each save tree, replaces the backed-up
-roots, and checks that stale files did not survive. Older legacy backups that
-predate manifests restore with an explicit warning.
+roots on their target filesystems, and rolls every changed root back if copying
+or verification fails. Steam user IDs must be numeric and intermediate user
+links are refused. A deliberately relocated `327030` link requires the exact
+canonical target through `--allow-external-steam-root` together with explicit
+`--yes`; the decision is never saved. A detected running Steam process blocks
+unattended restore and must be closed and rechecked interactively. Older legacy
+backups that predate manifests restore with an explicit warning.
 
 ## Steam update watcher
 
