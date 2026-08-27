@@ -31,7 +31,8 @@ QT_PACKAGE_VERSION="${QT_PACKAGE_VERSION:-}"
 QT_DEP_PREFIX="${QT_DEP_PREFIX:-}"
 QT_DEP_PREFIX_REAL=""
 QT_PACKAGE_SOURCE_LABEL="${QT_PACKAGE_SOURCE_LABEL:-}"
-QT_SOURCE_PROVENANCE_FILE="${QT_SOURCE_PROVENANCE_FILE:-}"
+REVIEWED_QT_LOCK="$REPO_DIR/packaging/qt-homebrew-lock.tsv"
+QT_SOURCE_PROVENANCE_FILE="${QT_SOURCE_PROVENANCE_FILE:-$REVIEWED_QT_LOCK}"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1704067200}"
 PACKAGE_NAME="qt-frameworks-x86_64"
 
@@ -41,7 +42,7 @@ source "$REPO_DIR/scripts/common.sh"
 source "$REPO_DIR/scripts/ui.sh"
 worms_color_init
 
-for cmd in date find gzip lipo mktemp otool realpath shasum tar; do
+for cmd in date find gzip lipo mktemp otool realpath ruby shasum tar; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         worms_print_error "Missing required command: $cmd"
         exit 1
@@ -67,7 +68,7 @@ Environment:
   QT_PACKAGE_SOURCE_LABEL
                       Override source label written to metadata
   QT_SOURCE_PROVENANCE_FILE
-                      TSV lock/provenance file to include in the archive
+                      Must resolve to the reviewed packaging lock
   SOURCE_DATE_EPOCH   Reproducible timestamp seed (default: $SOURCE_DATE_EPOCH)
 
 Examples:
@@ -130,17 +131,12 @@ format_epoch_touch() {
 }
 
 determine_qt_version() {
-    local qmake="$QT_PREFIX/bin/qmake"
     local header="$QT_PREFIX/lib/QtCore.framework/Headers/qglobal.h"
     local qt_version_path
 
     if [[ -n "$QT_PACKAGE_VERSION" ]]; then
         echo "$QT_PACKAGE_VERSION"
         return 0
-    fi
-
-    if [[ -x "$qmake" ]]; then
-        "$qmake" -query QT_VERSION 2>/dev/null && return 0
     fi
 
     if [[ -f "$header" ]]; then
@@ -322,6 +318,17 @@ worms_reject_control_chars "$QT_PREFIX" "QT_PREFIX"
 worms_reject_control_chars "$QT_DEP_PREFIX" "QT_DEP_PREFIX"
 worms_reject_control_chars "$QT_PACKAGE_SOURCE_LABEL" "QT_PACKAGE_SOURCE_LABEL"
 worms_reject_control_chars "$QT_SOURCE_PROVENANCE_FILE" "QT_SOURCE_PROVENANCE_FILE"
+if [[ ! -f "$REVIEWED_QT_LOCK" ]] \
+    || [[ "$(cd "$(dirname "$QT_SOURCE_PROVENANCE_FILE")" 2>/dev/null && pwd -P)/$(basename "$QT_SOURCE_PROVENANCE_FILE")" \
+        != "$REVIEWED_QT_LOCK" ]]; then
+    worms_print_error "Packaging requires the reviewed lock: packaging/qt-homebrew-lock.tsv"
+    exit 1
+fi
+if ! ruby -e 'require ARGV.fetch(0); WormsBottleFetcher.read_lock(ARGV.fetch(1))' \
+    "$REPO_DIR/tools/fetch_qt_homebrew_bottles.rb" "$REVIEWED_QT_LOCK"; then
+    worms_print_error "Reviewed Homebrew bottle lock validation failed"
+    exit 1
+fi
 QT_PREFIX_REAL=$(cd "$QT_PREFIX" && pwd -P)
 if [[ -n "$QT_DEP_PREFIX" ]]; then
     if [[ ! -d "$QT_DEP_PREFIX" ]]; then
@@ -537,13 +544,7 @@ plugin_count=$(find "$PLUGINS_DIR" -name "*.dylib" -type f | wc -l | tr -d ' ')
 echo ""
 echo "Packaged: $fw_count frameworks, $dylib_count dylibs, $plugin_count plugins"
 
-if [[ -n "$QT_SOURCE_PROVENANCE_FILE" ]]; then
-    if [[ ! -f "$QT_SOURCE_PROVENANCE_FILE" ]]; then
-        worms_print_error "Source provenance file not found: $QT_SOURCE_PROVENANCE_FILE"
-        exit 1
-    fi
-    cp "$QT_SOURCE_PROVENANCE_FILE" "$WORK_DIR/SOURCE_PROVENANCE.tsv"
-fi
+cp "$REVIEWED_QT_LOCK" "$WORK_DIR/SOURCE_PROVENANCE.tsv"
 
 # Create metadata file
 worms_print_step "Creating metadata..."
@@ -589,6 +590,8 @@ create_reproducible_archive "$ARCHIVE_PATH"
 # Calculate checksum
 CHECKSUM=$(shasum -a 256 "$ARCHIVE_PATH" | cut -d' ' -f1)
 echo "$CHECKSUM  $ARCHIVE_NAME" > "$OUTPUT_DIR/${ARCHIVE_NAME}.sha256"
+cp "$REVIEWED_QT_LOCK" \
+    "$OUTPUT_DIR/${PACKAGE_NAME}-${QT_VERSION}.source-provenance.tsv"
 
 # Get size
 SIZE=$(du -h "$ARCHIVE_PATH" | cut -f1)
@@ -603,3 +606,4 @@ echo ""
 echo "Commit these files to the repo dist/ folder:"
 echo "  $ARCHIVE_PATH"
 echo "  ${ARCHIVE_PATH}.sha256"
+echo "  $OUTPUT_DIR/${PACKAGE_NAME}-${QT_VERSION}.source-provenance.tsv"
