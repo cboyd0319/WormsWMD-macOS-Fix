@@ -34,6 +34,8 @@ CACHED_PACKAGE=""
 EXTRACT_DIR=""
 TEMP_EXTRACT=""
 CHECKSUM_TMP=""
+TEMP_ARCHIVE_DIR=""
+INSPECTED_ARCHIVE=""
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/common.sh"
@@ -44,7 +46,7 @@ worms_color_init
 FORCE=false
 CHECK_ONLY=false
 
-CURL_BASE=(--proto '=https' --tlsv1.2 --retry 3 --retry-delay 1 --retry-connrefused)
+CURL_BASE=(--proto '=https' --tlsv1.2 --retry 3 --retry-delay 1 --retry-connrefused --max-filesize $((64 * 1024 * 1024)))
 
 cleanup() {
     if [[ -n "$TEMP_EXTRACT" ]] && [[ -d "$TEMP_EXTRACT" ]]; then
@@ -52,6 +54,9 @@ cleanup() {
     fi
     if [[ -n "$CHECKSUM_TMP" ]] && [[ -f "$CHECKSUM_TMP" ]]; then
         rm -f "$CHECKSUM_TMP"
+    fi
+    if [[ -n "$TEMP_ARCHIVE_DIR" ]] && [[ -d "$TEMP_ARCHIVE_DIR" ]]; then
+        rm -rf "$TEMP_ARCHIVE_DIR"
     fi
 }
 
@@ -272,22 +277,33 @@ ensure_extracted_manifest() {
 
 verify_local_package() {
     local package="$1"
-    local version verify_dir status=0
+    local version verify_dir archive_dir archive_copy expected_sha256 status=0
 
     version=$(worms_qt_package_version "$package") || return 1
     [[ -f "${package}.sha256" ]] || return 1
-    read_checksum "${package}.sha256" >/dev/null || return 1
+    expected_sha256=$(read_checksum "${package}.sha256") || return 1
     verify_checksum "$package" "${package}.sha256" || return 1
-    validate_tar_layout "$package" || return 1
-    validate_archive_metadata "$package" "$version" || return 1
 
-    verify_dir=$(mktemp -d)
-    if ! tar -xzf "$package" -C "$verify_dir" 2>/dev/null; then
-        rm -rf "$verify_dir"
+    archive_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-qt-archive.XXXXXX")
+    archive_copy="$archive_dir/package.tar.gz"
+    if ! worms_copy_and_inspect_archive \
+        "$package" "$archive_copy" qt "$expected_sha256" --quiet; then
+        rm -rf "$archive_dir"
+        return 1
+    fi
+    if ! validate_tar_layout "$archive_copy" \
+        || ! validate_archive_metadata "$archive_copy" "$version"; then
+        rm -rf "$archive_dir"
+        return 1
+    fi
+
+    verify_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-qt-extract.XXXXXX")
+    if ! tar -xzf "$archive_copy" -C "$verify_dir" 2>/dev/null; then
+        rm -rf "$verify_dir" "$archive_dir"
         return 1
     fi
     validate_extracted_package "$verify_dir" "$version" || status=1
-    rm -rf "$verify_dir"
+    rm -rf "$verify_dir" "$archive_dir"
     return "$status"
 }
 
@@ -493,14 +509,29 @@ if ! verify_checksum "$CACHED_PACKAGE" "$CACHED_PACKAGE.sha256"; then
 fi
 echo -e "${GREEN}Checksum verified${NC}"
 
+expected_package_sha256=$(read_checksum "$CACHED_PACKAGE.sha256") || {
+    echo -e "${RED}ERROR:${NC} Invalid package checksum file."
+    echo "FALLBACK_TO_HOMEBREW"
+    exit 1
+}
+TEMP_ARCHIVE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-qt-archive.XXXXXX")
+INSPECTED_ARCHIVE="$TEMP_ARCHIVE_DIR/$PACKAGE_NAME"
+if ! worms_copy_and_inspect_archive \
+    "$CACHED_PACKAGE" "$INSPECTED_ARCHIVE" qt "$expected_package_sha256" --quiet; then
+    echo -e "${RED}ERROR:${NC} Archive safety inspection failed."
+    $USE_LOCAL || rm -f "$CACHED_PACKAGE"
+    echo "FALLBACK_TO_HOMEBREW"
+    exit 1
+fi
+
 # Verify archive layout before extraction
-if ! validate_tar_layout "$CACHED_PACKAGE"; then
+if ! validate_tar_layout "$INSPECTED_ARCHIVE"; then
     echo -e "${RED}ERROR:${NC} Archive validation failed."
     $USE_LOCAL || rm -f "$CACHED_PACKAGE"
     echo "FALLBACK_TO_HOMEBREW"
     exit 1
 fi
-if ! validate_archive_metadata "$CACHED_PACKAGE" "$QT_VERSION"; then
+if ! validate_archive_metadata "$INSPECTED_ARCHIVE" "$QT_VERSION"; then
     echo -e "${RED}ERROR:${NC} Archive metadata validation failed."
     $USE_LOCAL || rm -f "$CACHED_PACKAGE"
     echo "FALLBACK_TO_HOMEBREW"
@@ -510,7 +541,7 @@ fi
 # Extract
 echo "Extracting..."
 TEMP_EXTRACT=$(mktemp -d)
-tar -xzf "$CACHED_PACKAGE" -C "$TEMP_EXTRACT"
+tar -xzf "$INSPECTED_ARCHIVE" -C "$TEMP_EXTRACT"
 
 rm -rf "$EXTRACT_DIR"
 mkdir -p "$(dirname "$EXTRACT_DIR")"

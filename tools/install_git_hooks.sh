@@ -5,6 +5,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/common.sh"
 HOOKS_DIR="$ROOT_DIR/.githooks"
 KINGFISHER_VERSION="2.0.0"
 KINGFISHER_TEMP_DIR=""
@@ -210,6 +212,7 @@ install_kingfisher() {
     local expected_binary_sha256
     local download_url
     local temporary_directory
+    local downloaded_archive
     local archive
     local candidate
     local binary
@@ -224,13 +227,17 @@ install_kingfisher() {
     temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-kingfisher.XXXXXX")
     KINGFISHER_TEMP_DIR="$temporary_directory"
     trap cleanup_kingfisher_temp EXIT
+    downloaded_archive="$temporary_directory/.download-$asset"
     archive="$temporary_directory/$asset"
 
     curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
         --retry 3 --retry-delay 1 --retry-connrefused --max-time 120 \
-        --output "$archive" "$download_url"
+        --max-filesize $((64 * 1024 * 1024)) \
+        --output "$downloaded_archive" "$download_url"
     shasum_bin=$(shasum_command)
-    printf '%s  %s\n' "$expected_sha256" "$archive" | "$shasum_bin" -a 256 -c -
+    printf '%s  %s\n' "$expected_sha256" "$downloaded_archive" | "$shasum_bin" -a 256 -c -
+    worms_copy_and_inspect_archive \
+        "$downloaded_archive" "$archive" kingfisher "$expected_sha256" --quiet
     tar -xzf "$archive" -C "$temporary_directory" kingfisher
 
     candidate="$temporary_directory/kingfisher"

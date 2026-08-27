@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlparse
 
+from inspect_archive import ArchiveInspectionError, PROFILES, copy_and_inspect_archive
+
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PROVENANCE = (
     ROOT / "dist" / "qt-frameworks-x86_64-5.15.19.source-provenance.tsv"
@@ -50,6 +52,16 @@ class SbomError(ValueError):
     """Raised when provenance or CLI input cannot produce a trustworthy SBOM."""
 
 
+def read_bounded_file(path: Path, max_bytes: int, label: str) -> bytes:
+    if not path.is_file() or path.is_symlink():
+        raise SbomError(f"{label} must be a regular file: {path}")
+    with path.open("rb") as source:
+        data = source.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise SbomError(f"{label} exceeds the size limit")
+    return data
+
+
 def normalize_timestamp(value: str) -> str:
     candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
     try:
@@ -72,11 +84,9 @@ def require_sha256(value: str, field: str) -> str:
 
 
 def read_checksum(path: Path, expected_suffix: str, label: str) -> str:
-    if not path.is_file() or path.is_symlink():
-        raise SbomError(f"{label} checksum must be a regular file: {path}")
-    checksum_bytes = path.read_bytes()
-    if len(checksum_bytes) > MAX_CHECKSUM_BYTES:
-        raise SbomError(f"{label} checksum file exceeds the size limit")
+    checksum_bytes = read_bounded_file(
+        path, MAX_CHECKSUM_BYTES, f"{label} checksum file"
+    )
     lines = [
         line for line in checksum_bytes.decode("utf-8").splitlines() if line.strip()
     ]
@@ -109,27 +119,42 @@ def verify_archive_provenance(
     if archive_path.stat().st_size > MAX_ARCHIVE_BYTES:
         raise SbomError("Qt archive exceeds the size limit")
 
-    verify_file_sha256(archive_path, expected_sha256, "Qt archive")
+    embedded: bytes | None = None
+    with tempfile.TemporaryDirectory(prefix="wormswmd-sbom-archive-") as directory:
+        inspected_archive = Path(directory) / "qt-package.tar.gz"
+        profile = PROFILES["qt"]
+        try:
+            copy_and_inspect_archive(
+                archive_path,
+                inspected_archive,
+                profile.limits,
+                allow_symlinks=profile.allow_symlinks,
+                expected_sha256=expected_sha256,
+            )
+            with tarfile.open(inspected_archive, "r|gz") as archive:
+                for member in archive:
+                    if member.name != "SOURCE_PROVENANCE.tsv":
+                        continue
+                    if embedded is not None or not member.isfile():
+                        raise SbomError(
+                            "Qt archive must contain exactly one regular "
+                            "SOURCE_PROVENANCE.tsv"
+                        )
+                    if member.size > MAX_PROVENANCE_BYTES:
+                        raise SbomError("Embedded provenance lock exceeds the size limit")
+                    embedded_file = archive.extractfile(member)
+                    if embedded_file is None:
+                        raise SbomError("Could not read embedded provenance lock")
+                    embedded = embedded_file.read(MAX_PROVENANCE_BYTES + 1)
+        except ArchiveInspectionError as error:
+            raise SbomError(f"Qt archive safety inspection failed: {error}") from error
+        except tarfile.TarError as error:
+            raise SbomError(f"Could not read Qt archive: {error}") from error
 
-    try:
-        with tarfile.open(archive_path, "r:gz") as archive:
-            members = [
-                member
-                for member in archive.getmembers()
-                if member.name == "SOURCE_PROVENANCE.tsv"
-            ]
-            if len(members) != 1 or not members[0].isfile():
-                raise SbomError(
-                    "Qt archive must contain exactly one regular SOURCE_PROVENANCE.tsv"
-                )
-            if members[0].size > MAX_PROVENANCE_BYTES:
-                raise SbomError("Embedded provenance lock exceeds the size limit")
-            embedded_file = archive.extractfile(members[0])
-            if embedded_file is None:
-                raise SbomError("Could not read embedded provenance lock")
-            embedded = embedded_file.read(MAX_PROVENANCE_BYTES + 1)
-    except tarfile.TarError as error:
-        raise SbomError(f"Could not read Qt archive: {error}") from error
+    if embedded is None:
+        raise SbomError(
+            "Qt archive must contain exactly one regular SOURCE_PROVENANCE.tsv"
+        )
 
     if embedded != provenance:
         raise SbomError(
@@ -138,11 +163,7 @@ def verify_archive_provenance(
 
 
 def read_provenance(path: Path) -> tuple[list[dict[str, str]], bytes]:
-    if not path.is_file() or path.is_symlink():
-        raise SbomError(f"Provenance lock must be a regular file: {path}")
-    provenance = path.read_bytes()
-    if len(provenance) > MAX_PROVENANCE_BYTES:
-        raise SbomError("Provenance lock exceeds the size limit")
+    provenance = read_bounded_file(path, MAX_PROVENANCE_BYTES, "Provenance lock")
 
     data_lines = [
         line

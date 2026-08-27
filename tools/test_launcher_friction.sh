@@ -202,7 +202,11 @@ printf '5\n%s\n\nq\nq\n' "$multi_gog_choice" | HOME="$multi_home" bash "$launche
 multi_bundle=$(find "$multi_home/Desktop" -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
 [[ -n "$multi_bundle" ]] || fail "multi-install launcher did not create a support bundle"
 mkdir -p "$tmp_dir/multi-extracted"
-tar -xzf "$multi_bundle" -C "$tmp_dir/multi-extracted"
+inspected_multi_bundle="$tmp_dir/inspected-multi-bundle.tar.gz"
+worms_copy_and_inspect_archive \
+    "$multi_bundle" "$inspected_multi_bundle" save "" \
+    --max-expanded-bytes $((128 * 1024 * 1024)) --quiet
+tar -xzf "$inspected_multi_bundle" -C "$tmp_dir/multi-extracted"
 grep -Fq 'Found: ~/GOG Games/Worms W.M.D/Worms W.M.D.app' "$tmp_dir/multi-extracted/diagnostics.txt" \
     || fail "support bundle inspected Steam instead of the selected GOG installation"
 

@@ -103,24 +103,19 @@ inside the backup copy before manifest validation. This self-heals repeated
 installs from older fixer versions without mutating save data or trusting
 symlinks that escape the backup root.
 
-Save-game backup behavior belongs to `tools/backup_saves.sh` and must remain
-separate from game-bundle restore behavior. Save-game archives must validate
-their tar layout and entry metadata before extraction, reject symlinks,
-hardlinks, special files, canonical duplicate aliases, and control-character
-paths, verify `MANIFEST.tsv` when present, restore
-backed-up save roots from a temporary copy before replacing the target, detect
-stale files that were absent from the backup, and warn when restoring older
-archives that do not include a manifest.
+Save-game restore requires Python 3.9+, inspects a bounded owner-only copy, and
+extracts only it. Expansion is at most 8 GiB and half of usable space, with a
+512 MiB reserve and staging/final-copy room; an override requires
+`--max-expanded-size K|M|G --yes`. Unsafe archives fail, manifests are verified,
+and help/list/location remain usable without Python.
 
 ## Qt Distribution Contract
 
-The preferred Qt source is the prebuilt archive in `dist/` plus its `.sha256`
-file. Archive extraction must reject unsafe layouts, traversal paths, unsafe
-symlink targets, hardlinks, special files, control-character paths, and exact or
-canonical duplicate archive members.
+The preferred Qt source is `dist/` plus its `.sha256`. Consumers inspect and use
+one bounded owner-only copy. Profiles cap resources and reject unsafe archive
+structure. Mutation requires Python 3.9+; diagnostics degrade without parsing.
 Remote fallback must use a pinned commit for `dist/` contents. If a legacy
-archive lacks `MANIFEST.txt`, the
-downloader must generate and verify a cache-local manifest before installer use.
+archive lacks `MANIFEST.txt`, the downloader generates and verifies a cache-local manifest.
 Homebrew is a fallback, not the primary happy path.
 
 When replacing the Qt archive:
@@ -164,6 +159,11 @@ Maintainer packages should be reproducible where possible: deterministic file
 ordering, normalized timestamps from `SOURCE_DATE_EPOCH`, stable ownership in
 the tar stream, `gzip -n`, and a generated `MANIFEST.txt`.
 
+The reviewed bottle closure is `packaging/qt-homebrew-lock.tsv`; `dist/` keeps
+generated evidence. Fetching bounds exact GHCR digest downloads, drops
+cross-origin authorization, validates without `qmake`, and stages beside the
+output. Replacement/cleanup requires its path-bound marker and explicit flag.
+
 ## Network Contract
 
 Network access is limited to documented endpoints for repository downloads,
@@ -182,7 +182,7 @@ The project does not collect telemetry.
 
 `tools/build_release_bundle.sh` builds the player-facing release folder and zip
 under `build/release/` by default. The bundle may include repository source,
-scripts, tools, docs, original project assets, and verified `dist/` packages.
+scripts, tools, docs, the reviewed packaging lock, original assets, and verified `dist/` packages.
 It must not include `.git`, local build output, downloaded sample projects,
 game binaries, save files, support bundles, logs, secrets, or user data.
 

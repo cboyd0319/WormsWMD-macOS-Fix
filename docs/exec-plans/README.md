@@ -31,6 +31,9 @@ the plan before continuing.
 
 ## Current Plans
 
+- [Security remediation PR 2: archive and bottle safety](2026-08-27-security-remediation-pr2-archive-bottle-safety.md) - active
+  bounded archive inspection, strict Homebrew bottle inputs, nonexecuting
+  version checks, and staged marker-owned output.
 - [Security remediation PR 1: harness and hook trust](2026-08-27-security-remediation-pr1-harness-hooks.md) - completed
   trusted-base contributor review, safe harness inputs, sensitive-change
   reporting, plan status ownership, and Kingfisher hook integrity.

@@ -481,6 +481,8 @@ check_ci_and_ownership_gates() {
         "./tools/test_ci_changed_paths.sh" \
         "./tools/test_ci_change_classification.sh" \
         "python3 tools/test_generate_sbom.py" \
+        "/usr/bin/python3 tools/test_archive_inspector.py" \
+        "ruby tools/test_fetch_qt_homebrew_bottles.rb" \
         "./tools/test_git_hooks.sh" \
         "./tools/test_bootstrap_installer_safety.sh" \
         "./tools/test_issue_10_regression.sh" \
@@ -508,6 +510,7 @@ check_ci_and_ownership_gates() {
         "/.agents/** @cboyd0319" \
         "/.githooks/** @cboyd0319" \
         "/.github/** @cboyd0319" \
+        "/packaging/** @cboyd0319" \
         "/AGENTS.md @cboyd0319" \
         "/docs/exec-plans/** @cboyd0319" \
         "/docs/style/agent-harness.md @cboyd0319" \
@@ -588,15 +591,19 @@ require_file "docs/runbooks/agent-session.md"
 require_file "docs/style/agent-harness.md"
 require_file "docs/exec-plans/README.md"
 require_file "docs/exec-plans/TEMPLATE.md"
+require_file "packaging/qt-homebrew-lock.tsv"
 require_file "tools/extract_release_notes.sh"
 require_file "tools/ci_changed_paths.sh"
 require_file "tools/ci_requires_macos.sh"
 require_file "tools/generate_sbom.py"
+require_file "tools/inspect_archive.py"
 require_file "tools/install_git_hooks.sh"
 require_file "tools/report_sensitive_changes.sh"
 require_file "tools/test_ci_changed_paths.sh"
 require_file "tools/test_ci_change_classification.sh"
 require_file "tools/test_generate_sbom.py"
+require_file "tools/test_archive_inspector.py"
+require_file "tools/test_fetch_qt_homebrew_bottles.rb"
 require_file "tools/test_git_hooks.sh"
 require_file "tools/test_harness_security.sh"
 require_file "tools/test_sensitive_change_report.sh"

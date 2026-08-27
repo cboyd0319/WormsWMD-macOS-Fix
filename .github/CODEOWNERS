@@ -15,6 +15,7 @@
 /tools/** @cboyd0319
 /src/** @cboyd0319
 /dist/** @cboyd0319
+/packaging/** @cboyd0319
 /SECURITY.md @cboyd0319
 /docs/design/runtime-contracts.md @cboyd0319
 /docs/runbooks/agent-session.md @cboyd0319

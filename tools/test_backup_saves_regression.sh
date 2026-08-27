@@ -35,8 +35,44 @@ HOME="$team17_only_home" BACKUP_DIR="$team17_only_backup_dir" "$ROOT_DIR/tools/b
 
 HOME="$test_home" BACKUP_DIR="$backup_dir" "$ROOT_DIR/tools/backup_saves.sh" --backup >/dev/null
 
+no_python_repo="$tmp_dir/no-python-repo"
+mkdir -p "$no_python_repo/tools" "$no_python_repo/scripts"
+cp "$ROOT_DIR/tools/backup_saves.sh" "$no_python_repo/tools/backup_saves.sh"
+cp "$ROOT_DIR/scripts/common.sh" "$no_python_repo/scripts/common.sh"
+cp "$ROOT_DIR/scripts/ui.sh" "$no_python_repo/scripts/ui.sh"
+printf '\nworms_python3() { return 1; }\n' >> "$no_python_repo/scripts/common.sh"
+chmod +x "$no_python_repo/tools/backup_saves.sh"
+no_python_backup="$no_python_repo/tools/backup_saves.sh"
+
+if ! "$ROOT_DIR/tools/backup_saves.sh" --help | grep -Fq -- '--max-expanded-size SIZE'; then
+    fail "save restore help does not document the bounded expanded-size override"
+fi
+if ! HOME="$test_home" BACKUP_DIR="$backup_dir" \
+    "$no_python_backup" --list >/dev/null; then
+    fail "listing save backups unnecessarily requires Python"
+fi
+
 archive=$(find "$backup_dir" -mindepth 1 -maxdepth 1 -type f -name 'saves-*.tar.gz' -print -quit)
 [[ -n "$archive" ]] || fail "save backup archive was not created"
+
+no_python_home="$tmp_dir/no-python-home"
+mkdir -p "$no_python_home/Library/Application Support/Team17"
+printf 'must remain unchanged\n' > "$no_python_home/Library/Application Support/Team17/save.dat"
+if HOME="$no_python_home" WORMSWMD_RESTORE_ASSUME_YES=1 \
+    "$no_python_backup" --restore "$archive" >/dev/null 2>&1; then
+    fail "save restore proceeded without a compatible Python interpreter"
+fi
+grep -Fxq 'must remain unchanged' "$no_python_home/Library/Application Support/Team17/save.dat" \
+    || fail "save restore without Python modified existing saves"
+
+if HOME="$no_python_home" "$ROOT_DIR/tools/backup_saves.sh" \
+    --restore "$archive" --max-expanded-size 1G >/dev/null 2>&1; then
+    fail "save restore accepted a size override without explicit --yes"
+fi
+if HOME="$no_python_home" "$ROOT_DIR/tools/backup_saves.sh" \
+    --restore "$archive" --yes --max-expanded-size 9G >/dev/null 2>&1; then
+    fail "save restore accepted a size override above the 8 GiB limit"
+fi
 
 listing="$tmp_dir/listing.txt"
 tar -tzf "$archive" | sort > "$listing"

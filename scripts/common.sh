@@ -243,6 +243,73 @@ worms_file_sha256() {
     shasum -a 256 "$path" | awk '{print $1}'
 }
 
+worms_select_python3() {
+    local candidate
+    local seen=""
+
+    for candidate in "$@"; do
+        [[ -n "$candidate" && -x "$candidate" ]] || continue
+        case "|$seen|" in
+            *"|$candidate|"*)
+                continue
+                ;;
+        esac
+        seen="${seen:+$seen|}$candidate"
+        if "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' \
+            >/dev/null 2>&1; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+worms_python3() {
+    local resolved
+    local candidates=()
+
+    [[ -x /usr/bin/python3 ]] && candidates+=(/usr/bin/python3)
+    if command -v xcrun >/dev/null 2>&1; then
+        resolved=$(xcrun --find python3 2>/dev/null || true)
+        [[ -n "$resolved" ]] && candidates+=("$resolved")
+    fi
+    resolved=$(command -v python3 2>/dev/null || true)
+    [[ -n "$resolved" ]] && candidates+=("$resolved")
+    worms_select_python3 "${candidates[@]}"
+}
+
+worms_inspect_archive() {
+    local archive="$1"
+    local profile="$2"
+    shift 2
+    local python_bin
+    local common_dir
+
+    python_bin=$(worms_python3) || {
+        printf '%s\n' \
+            "ERROR: Python 3.9 or newer is required for safe archive inspection." \
+            "Install or update Apple Command Line Tools, then run this command again." >&2
+        return 1
+    }
+    common_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+    "$python_bin" "$common_dir/../tools/inspect_archive.py" \
+        --profile "$profile" "$@" "$archive"
+}
+
+worms_copy_and_inspect_archive() {
+    local source_archive="$1"
+    local copied_archive="$2"
+    local profile="$3"
+    local expected_sha256="${4:-}"
+    shift 4
+    local copy_args=(--copy-to "$copied_archive")
+
+    if [[ -n "$expected_sha256" ]]; then
+        copy_args+=(--expected-sha256 "$expected_sha256")
+    fi
+    worms_inspect_archive "$source_archive" "$profile" "${copy_args[@]}" "$@"
+}
+
 worms_text_sha256() {
     local value="$1"
 

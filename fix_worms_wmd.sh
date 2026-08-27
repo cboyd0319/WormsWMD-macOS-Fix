@@ -301,14 +301,13 @@ ensure_rosetta() {
 
 # Check and install Xcode Command Line Tools if needed
 ensure_xcode_clt() {
-    # Check if clang is available
-    if command -v clang &>/dev/null; then
-        return 0  # Already installed
-    fi
-
-    # Check if xcode-select path exists
-    if xcode-select -p &>/dev/null; then
-        return 0  # CLT installed but maybe not in PATH
+    if command -v clang &>/dev/null || xcode-select -p &>/dev/null; then
+        if worms_python3 >/dev/null 2>&1; then
+            return 0
+        fi
+        print_error "Python 3.9 or newer is required for safe archive inspection."
+        echo "Install or update Apple Command Line Tools, then run this fix again."
+        exit 1
     fi
 
     echo ""
@@ -358,6 +357,11 @@ ensure_xcode_clt() {
             echo "Please complete the installation dialog, then run this fix again."
             exit 1
         fi
+    fi
+    if ! worms_python3 >/dev/null 2>&1; then
+        print_error "Command Line Tools did not provide Python 3.9 or newer."
+        echo "Update Apple Command Line Tools, then run this fix again."
+        exit 1
     fi
 
     print_success "Xcode Command Line Tools installed!"

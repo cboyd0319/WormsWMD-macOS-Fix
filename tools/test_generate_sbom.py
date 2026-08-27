@@ -60,6 +60,11 @@ class GenerateSbomTests(unittest.TestCase):
             timeout=10,
         )
 
+    def test_archive_provenance_verification_is_streaming(self) -> None:
+        source = GENERATOR.read_text(encoding="utf-8")
+        self.assertNotIn(".getmembers(", source)
+        self.assertIn("inspect_archive(", source)
+
     def test_real_lock_produces_deterministic_complete_inventory(self) -> None:
         self.assertTrue(GENERATOR.is_file(), "tools/generate_sbom.py is required")
         with tempfile.TemporaryDirectory() as temporary_directory:

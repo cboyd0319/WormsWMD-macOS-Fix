@@ -6,6 +6,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/common.sh"
 
 fail() {
     printf 'support bundle sanitization check failed: %s\n' "$*" >&2
@@ -49,6 +51,17 @@ fixture_repo="$tmp_dir/fixture-repo"
 fixture_home="$tmp_dir/fixture-home"
 fixture_bundle_dir="$tmp_dir/fixture-bundles"
 fixture_extract_dir="$tmp_dir/fixture-extracted"
+inspection_counter=0
+
+inspect_support_bundle() {
+    local source_archive="$1"
+
+    inspection_counter=$((inspection_counter + 1))
+    INSPECTED_SUPPORT_BUNDLE="$tmp_dir/inspected-support-$inspection_counter.tar.gz"
+    worms_copy_and_inspect_archive \
+        "$source_archive" "$INSPECTED_SUPPORT_BUNDLE" save "" \
+        --max-expanded-bytes $((128 * 1024 * 1024)) --quiet
+}
 
 GAME_APP="$fake_game" "$diagnostics_script" > "$plain_report"
 assert_sanitized "$plain_report"
@@ -125,7 +138,8 @@ bundle_path=$(find "$bundle_dir" -mindepth 1 -maxdepth 1 -type f -name 'wormswmd
 [[ -n "$bundle_path" ]] || fail "support bundle was not created"
 
 mkdir -p "$extract_dir"
-tar -xzf "$bundle_path" -C "$extract_dir"
+inspect_support_bundle "$bundle_path"
+tar -xzf "$INSPECTED_SUPPORT_BUNDLE" -C "$extract_dir"
 assert_sanitized "$extract_dir/diagnostics.txt"
 
 for bundled_file in install-summary.txt runtime-invariants.txt backup-summary.txt qt-package.txt; do
@@ -179,6 +193,7 @@ fi
 
 mkdir -p "$fixture_repo/tools" "$fixture_repo/scripts" "$fixture_repo/dist" "$fixture_repo/pkg" "$fixture_home"
 cp "$diagnostics_script" "$fixture_repo/tools/collect_diagnostics.sh"
+cp "$ROOT_DIR/tools/inspect_archive.py" "$fixture_repo/tools/inspect_archive.py"
 cp "$ROOT_DIR/scripts/common.sh" "$fixture_repo/scripts/common.sh"
 cp "$ROOT_DIR/scripts/ui.sh" "$fixture_repo/scripts/ui.sh"
 cat > "$fixture_repo/fix_worms_wmd.sh" <<'SH'
@@ -215,12 +230,30 @@ fixture_bundle_path=$(find "$fixture_bundle_dir" -mindepth 1 -maxdepth 1 -type f
 [[ -n "$fixture_bundle_path" ]] || fail "fixture support bundle was not created"
 
 mkdir -p "$fixture_extract_dir"
-tar -xzf "$fixture_bundle_path" -C "$fixture_extract_dir"
+inspect_support_bundle "$fixture_bundle_path"
+tar -xzf "$INSPECTED_SUPPORT_BUNDLE" -C "$fixture_extract_dir"
 assert_sanitized "$fixture_extract_dir/qt-package.txt"
 grep -Fq "Source: Qt prefix (" "$fixture_extract_dir/qt-package.txt" \
     || fail "fixture Qt package metadata was not included"
 grep -Fq "[redacted-secret]" "$fixture_extract_dir/qt-package.txt" \
     || fail "fixture Qt package metadata did not redact secret-like values"
+
+rm -rf "$fixture_bundle_dir" "$fixture_extract_dir"
+printf '\nworms_python3() { return 1; }\n' >> "$fixture_repo/scripts/common.sh"
+HOME="$fixture_home" GAME_APP="$fake_game" \
+    "$fixture_repo/tools/collect_diagnostics.sh" --bundle --bundle-output "$fixture_bundle_dir" >/dev/null
+fixture_bundle_path=$(find "$fixture_bundle_dir" -mindepth 1 -maxdepth 1 -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
+[[ -n "$fixture_bundle_path" ]] || fail "fixture no-Python support bundle was not created"
+mkdir -p "$fixture_extract_dir"
+inspect_support_bundle "$fixture_bundle_path"
+tar -xzf "$INSPECTED_SUPPORT_BUNDLE" -C "$fixture_extract_dir"
+grep -Fq "Archive inspection: unavailable (compatible Python/CLT missing)" \
+    "$fixture_extract_dir/qt-package.txt" \
+    || fail "diagnostics did not report unavailable archive inspection without Python"
+if grep -Fq "Source: Qt prefix" "$fixture_extract_dir/qt-package.txt"; then
+    fail "diagnostics read Qt archive metadata without safe inspection"
+fi
+cp "$ROOT_DIR/scripts/common.sh" "$fixture_repo/scripts/common.sh"
 
 rm -rf "$fixture_bundle_dir" "$fixture_extract_dir"
 rm -f "$fixture_repo/dist/qt-frameworks-x86_64-5.15.42.tar.gz" "$fixture_repo/dist/qt-frameworks-x86_64-5.15.42.tar.gz.sha256"
@@ -232,7 +265,8 @@ HOME="$fixture_home" GAME_APP="$fake_game" "$fixture_repo/tools/collect_diagnost
 fixture_bundle_path=$(find "$fixture_bundle_dir" -mindepth 1 -maxdepth 1 -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
 [[ -n "$fixture_bundle_path" ]] || fail "fixture missing-checksum support bundle was not created"
 mkdir -p "$fixture_extract_dir"
-tar -xzf "$fixture_bundle_path" -C "$fixture_extract_dir"
+inspect_support_bundle "$fixture_bundle_path"
+tar -xzf "$INSPECTED_SUPPORT_BUNDLE" -C "$fixture_extract_dir"
 grep -Fq "Local package: qt-frameworks-x86_64-5.15.43.tar.gz" "$fixture_extract_dir/qt-package.txt" \
     || fail "Qt package summary hid a local package with missing checksum"
 grep -Fq "Checksum: missing" "$fixture_extract_dir/qt-package.txt" \
@@ -249,10 +283,11 @@ HOME="$fixture_home" GAME_APP="$fake_game" "$fixture_repo/tools/collect_diagnost
 fixture_bundle_path=$(find "$fixture_bundle_dir" -mindepth 1 -maxdepth 1 -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
 [[ -n "$fixture_bundle_path" ]] || fail "fixture corrupt-archive support bundle was not created"
 mkdir -p "$fixture_extract_dir"
-tar -xzf "$fixture_bundle_path" -C "$fixture_extract_dir"
+inspect_support_bundle "$fixture_bundle_path"
+tar -xzf "$INSPECTED_SUPPORT_BUNDLE" -C "$fixture_extract_dir"
 grep -Fq "Local package: qt-frameworks-x86_64-5.15.44.tar.gz" "$fixture_extract_dir/qt-package.txt" \
     || fail "Qt package summary hid a corrupt local package"
-grep -Fq "FAIL unable to list archive contents" "$fixture_extract_dir/qt-package.txt" \
-    || fail "Qt package summary did not report corrupt archive contents"
+grep -Fq "Archive inspection: failed" "$fixture_extract_dir/qt-package.txt" \
+    || fail "Qt package summary did not report corrupt archive inspection"
 
 printf 'Support bundle sanitization check passed.\n'

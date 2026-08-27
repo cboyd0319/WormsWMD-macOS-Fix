@@ -52,6 +52,25 @@ assert_rejected "5.15.19_1"
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-qt-pin.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
 
+old_python="$tmp_dir/python-old"
+valid_python="$tmp_dir/python-valid"
+cat > "$old_python" <<'STUB'
+#!/bin/bash
+exit 1
+STUB
+cat > "$valid_python" <<'STUB'
+#!/bin/bash
+exit 0
+STUB
+chmod +x "$old_python" "$valid_python"
+
+resolved_python=$(worms_select_python3 "$old_python" "$valid_python")
+[[ "$resolved_python" == "$valid_python" ]] \
+    || fail "Python resolver did not skip an incompatible interpreter"
+if worms_select_python3 "$old_python" >/dev/null 2>&1; then
+    fail "Python resolver accepted an incompatible-only candidate set"
+fi
+
 touch "$tmp_dir/qt-frameworks-x86_64-5.14.2.tar.gz"
 touch "$tmp_dir/qt-frameworks-x86_64-5.15.18.tar.gz"
 touch "$tmp_dir/qt-frameworks-x86_64-5.15.19.tar.gz"
@@ -93,10 +112,23 @@ grep -Fq 'worms_supported_qt5_version "$homebrew_version"' "$ROOT_DIR/fix_worms_
     || fail "installer fallback does not enforce supported Homebrew Qt 5.15.x versions"
 grep -Fq 'SOURCE_PROVENANCE.tsv' "$ROOT_DIR/scripts/download_qt_frameworks.sh" \
     || fail "Qt archive validator does not allow source provenance"
+if grep -Eq 'qmake.*-query|capture!.*qmake|system.*qmake' \
+    "$ROOT_DIR/tools/package_qt_frameworks.sh" "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb"; then
+    fail "Qt maintainer tooling executes untrusted extracted qmake"
+fi
 [[ -x "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" ]] \
     || fail "Homebrew bottle provenance fetcher is missing or not executable"
+cmp -s "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" \
+    "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv" \
+    || fail "generated dist provenance does not match the reviewed packaging lock"
 
 committed_package="$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.tar.gz"
+committed_checksum=$(awk 'NR == 1 {print $1; exit}' "${committed_package}.sha256")
+package_archive_dir=$(mktemp -d "$tmp_dir/inspected-package.XXXXXX")
+inspected_package="$package_archive_dir/package.tar.gz"
+worms_copy_and_inspect_archive \
+    "$committed_package" "$inspected_package" qt "$committed_checksum" --quiet
+committed_package="$inspected_package"
 archive_manifest=$(tar -xOzf "$committed_package" MANIFEST.txt)
 grep -Fq '# WormsWMD manifest v2' <<< "$archive_manifest" \
     || fail "committed Qt package manifest does not cover symlink entries"
@@ -159,9 +191,9 @@ done)
 if "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" \
     --output "$tmp_dir/provenance-prefix" \
     --write-lock "$tmp_dir/provenance.tsv" >"$tmp_dir/provenance.out" 2>&1; then
-    fail "Homebrew bottle provenance fetcher accepted an unpinned root formula version"
+    fail "Homebrew bottle provenance fetcher accepted an unscoped lock write"
 fi
-grep -Fq 'Pinned --version is required' "$tmp_dir/provenance.out" \
-    || fail "Homebrew bottle provenance fetcher did not explain the missing version pin"
+grep -Fq -- '--write-lock is available only with --refresh-formula' "$tmp_dir/provenance.out" \
+    || fail "Homebrew bottle provenance fetcher did not explain candidate-only lock writes"
 
 printf 'Qt version pinning check passed.\n'

@@ -129,14 +129,13 @@ Maintainers can build a replacement package with:
 
 ```bash
 ./tools/fetch_qt_homebrew_bottles.rb \
-  --lock dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv \
+  --lock packaging/qt-homebrew-lock.tsv \
   --output /tmp/wormswmd-qt51519-prefix
 
 SOURCE_DATE_EPOCH=1781740800 \
 QT_PREFIX=/tmp/wormswmd-qt51519-prefix/opt/qt@5 \
 QT_DEP_PREFIX=/tmp/wormswmd-qt51519-prefix \
 QT_PACKAGE_VERSION=5.15.19 \
-QT_SOURCE_PROVENANCE_FILE=dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv \
 ./tools/package_qt_frameworks.sh --output dist --version 5.15.19
 ```
 

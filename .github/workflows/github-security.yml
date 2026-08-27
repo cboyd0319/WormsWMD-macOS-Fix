@@ -51,12 +51,21 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/kingfisher-linux-x64.tgz"
+          download="$archive.download"
           install_dir="$RUNNER_TEMP/kingfisher-bin"
           curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
             --retry 3 --retry-delay 1 --retry-connrefused --max-time 120 \
-            --output "$archive" \
+            --max-filesize 67108864 \
+            --output "$download" \
             "https://github.com/mongodb/kingfisher/releases/download/v${KINGFISHER_VERSION}/kingfisher-linux-x64.tgz"
-          printf '%s  %s\n' "$KINGFISHER_SHA256" "$archive" | shasum -a 256 -c -
+          chmod 0600 "$download"
+          printf '%s  %s\n' "$KINGFISHER_SHA256" "$download" | shasum -a 256 -c -
+          /usr/bin/python3 tools/inspect_archive.py \
+            --profile kingfisher \
+            --copy-to "$archive" \
+            --expected-sha256 "$KINGFISHER_SHA256" \
+            --quiet \
+            "$download"
           mkdir -p "$install_dir"
           tar -xzf "$archive" -C "$install_dir" kingfisher
           "$install_dir/kingfisher" --version
