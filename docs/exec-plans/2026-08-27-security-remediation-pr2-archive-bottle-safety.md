@@ -1,6 +1,6 @@
 # Security Remediation PR 2: Archive And Bottle Safety
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -36,8 +36,8 @@ publication.
 - [x] Integrate all archive consumers, CI, contracts, docs, and compatibility.
 - [x] Add red bottle tests and harden lock/download/extraction/output/refresh.
 - [x] Run one real-lock smoke and local/adversarial full verification.
-- [ ] Commit, open one PR, request one Copilot review, verify CI, and merge.
-- [ ] Complete plans and record exact PR 3 base.
+- [x] Commit, open one PR, request one Copilot review, verify CI, and merge.
+- [x] Complete plans and record exact PR 3 base.
 
 ## Verification
 
@@ -71,6 +71,12 @@ git status --short
   to their formula metadata, 1,822 Mach-O references were relocated, QtCore was
   `x86_64`, and the marker-owned staged prefix published successfully. The 415
   MiB smoke workspace was moved to Trash.
+- 2026-08-27: [PR #26](https://github.com/cboyd0319/WormsWMD-macOS-Fix/pull/26)
+  received one automatic Copilot review. Both findings were fixed in `6683040`,
+  replied to, and resolved. GitHub Security run 14 and CI run 113 passed at the
+  exact reviewed head, including the full macOS job.
+- 2026-08-27: PR #26 merged to protected `main` as
+  `671f1285b69fd4a1597044521525b61f39d5ee13`. This is the exact PR 3 base.
 
 ## Surprises & Discoveries
 
@@ -99,5 +105,12 @@ git status --short
 
 ## Outcomes & Retrospective
 
-Implementation is in progress. Complete with commits, PR URL, local/hosted
-verification, real-lock evidence, residual risks, and exact PR 3 base.
+Completed in PR #26. The implementation adds bounded same-copy archive
+inspection, safe Python degradation, a reviewed bottle lock, nonexecuting
+formula validation, restricted redirects, and marker-owned staged output. All
+local and hosted gates passed; `dist` bytes and user saves were unchanged.
+
+Residual player/runtime findings are handed to PR 3: the fixed Steam app's
+plugin self-install IDs are false positives in dependency verification, and a
+separate `/Applications` installation remains unfixed. PR 3 starts from
+`671f1285b69fd4a1597044521525b61f39d5ee13`.
