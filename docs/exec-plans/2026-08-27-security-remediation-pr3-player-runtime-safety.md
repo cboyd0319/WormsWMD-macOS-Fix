@@ -109,7 +109,8 @@ git status --short
 - 2026-08-27: [PR #27](https://github.com/cboyd0319/WormsWMD-macOS-Fix/pull/27)
   merged after GitHub Security run 17 and CI run 116 passed on corrected head
   `33968c6e737f7d974d12962165fb5d52871a1c47`. Merge commit
-  `7b10f3eb9e487fe8a7ec88499735ae093870e189` is the exact PR 4 base.
+  `7b10f3eb9e487fe8a7ec88499735ae093870e189` is followed by this closeout;
+  PR 4 must start from the latest protected `main` including the closeout.
 
 ## Surprises & Discoveries
 
@@ -146,4 +147,4 @@ one Copilot finding was fixed and resolved, and no real save was restored or
 mutated. Save and LaunchAgent failure fixtures prove retained-state rollback;
 cache and dependency fixtures prove authority and containment. Residual risk is
 limited to ordinary same-user races and final player compatibility checks. PR 4
-starts from `7b10f3eb9e487fe8a7ec88499735ae093870e189`.
+starts from the latest protected `main`, including this closeout record.
