@@ -28,16 +28,25 @@ if [[ "${1:-}" == "--version" ]]; then
     exit 0
 fi
 printf '%s\n' "$@" > "$WORMSWMD_HOOK_ARGUMENT_LOG"
+pwd > "$WORMSWMD_HOOK_CWD_LOG"
 EOF
 chmod +x "$fake_kingfisher"
 
 WORMSWMD_KINGFISHER_BIN="$fake_kingfisher" \
 WORMSWMD_HOOK_ARGUMENT_LOG="$argument_log" \
+WORMSWMD_HOOK_CWD_LOG="$test_dir/cwd" \
     "$HOOK"
 
-for expected in scan . --staged --git-history none --exclude '**/.git/**' --redact --no-validate --confidence medium --quiet --no-update-check; do
+for expected in scan . --staged --git-history none --exclude '**/.git/**' --exclude 'dist/*.tar.gz' --no-extract-archives --redact --no-validate --confidence medium --quiet --no-update-check; do
     grep -Fxq -- "$expected" "$argument_log" || fail "pre-commit hook omitted Kingfisher argument: $expected"
 done
+[[ "$(cat "$test_dir/cwd")" == "$ROOT_DIR" ]] || fail "pre-commit hook did not anchor at repository root"
+
+grep -Fq "trap 'rm -rf \"\$temporary_directory\"' EXIT" "$INSTALLER" \
+    || fail "hook installer must clean temporary files on process exit"
+if grep -Fq "trap 'rm -rf \"\$temporary_directory\"' RETURN" "$INSTALLER"; then
+    fail "hook installer still uses function-return-only cleanup"
+fi
 
 if WORMSWMD_KINGFISHER_BIN="$test_dir/missing" "$HOOK" >/dev/null 2>&1; then
     fail "pre-commit hook succeeded without its pinned scanner"

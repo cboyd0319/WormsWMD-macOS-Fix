@@ -34,10 +34,13 @@ if [[ "$("$KINGFISHER_BIN" --version 2>/dev/null)" != "kingfisher 2.0.0" ]]; the
     exit 1
 fi
 
+cd "$ROOT_DIR"
 exec "$KINGFISHER_BIN" scan . \
     --staged \
     --git-history none \
     --exclude '**/.git/**' \
+    --exclude 'dist/*.tar.gz' \
+    --no-extract-archives \
     --redact \
     --no-validate \
     --confidence medium \

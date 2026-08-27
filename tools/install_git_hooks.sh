@@ -105,7 +105,7 @@ install_kingfisher() {
     expected_sha256=${record#*$'\t'}
     download_url="https://github.com/mongodb/kingfisher/releases/download/v${KINGFISHER_VERSION}/${asset}"
     temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-kingfisher.XXXXXX")
-    trap 'rm -rf "$temporary_directory"' RETURN
+    trap 'rm -rf "$temporary_directory"' EXIT
     archive="$temporary_directory/$asset"
 
     curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
@@ -121,6 +121,8 @@ install_kingfisher() {
         printf '%s\n' "ERROR: Downloaded Kingfisher failed its version check." >&2
         return 1
     }
+    rm -rf "$temporary_directory"
+    trap - EXIT
 }
 
 case "${1:-}" in

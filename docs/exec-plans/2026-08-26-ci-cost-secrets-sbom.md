@@ -139,6 +139,16 @@ single macOS job whenever the fail-safe classifier reports a runtime change.
 - 2026-08-26: Replaced the obsolete standalone `Validate C Code` branch context
   with the unchanged required `Validate Scripts` context that now owns the same
   compilation. ShellCheck and Zizmor remain required with strict current checks.
+- 2026-08-26: Rewrote `SECURITY.md` as a shorter security contract organized by
+  posture, threat model, runtime/network/GitHub boundaries, staged/CI scanning,
+  release/SBOM flow, verification, and a compact limitations table. Corrected
+  pre-existing overstatements about outside-bundle files and TLS ownership, and
+  separated existing release guarantees from next-release SBOM readiness.
+- 2026-08-26: Copilot identified three valid hook issues. Cleanup now uses an
+  `EXIT` trap for errexit paths; the hook changes to the repository root; and
+  staged/CI scans share Git/history/archive exclusions. Hook tests cover root
+  anchoring, cleanup-trap policy, exact flags, missing binaries, and wrong
+  versions.
 
 ## Surprises & Discoveries
 
