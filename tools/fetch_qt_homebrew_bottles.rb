@@ -184,7 +184,7 @@ module WormsBottleFetcher
 
   def allowed_download_host?(host)
     host == 'ghcr.io' || host == 'pkg-containers.githubusercontent.com' ||
-      host.end_with?('.pkg-containers.githubusercontent.com') || host.end_with?('.githubusercontent.com')
+      host.end_with?('.pkg-containers.githubusercontent.com')
   end
 
   def validate_https_uri!(uri, allowed_host)

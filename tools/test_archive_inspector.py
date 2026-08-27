@@ -377,6 +377,36 @@ class ArchiveInspectorTests(unittest.TestCase):
         self.assertNotEqual(rejected.returncode, 0)
         self.assertFalse(mismatch.exists())
 
+    def test_cli_rejects_symlinked_copy_parent(self) -> None:
+        path = self.write_archive("copy-parent-source.tar.gz", [(regular("file"), b"data\n")])
+        real_parent = self.temp / "real-parent"
+        real_parent.mkdir()
+        linked_parent = self.temp / "linked-parent"
+        linked_parent.symlink_to(real_parent, target_is_directory=True)
+        copied = linked_parent / "copied.tar.gz"
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(INSPECTOR_PATH),
+                "--profile",
+                "qt",
+                "--copy-to",
+                str(copied),
+                "--quiet",
+                str(path),
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("parent", result.stderr)
+        self.assertFalse((real_parent / copied.name).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

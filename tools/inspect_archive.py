@@ -244,11 +244,17 @@ def inspect_archive(
     path: Path, limits: Limits, *, allow_symlinks: bool = False
 ) -> Summary:
     archive_path = Path(path)
-    if archive_path.is_symlink() or not archive_path.is_file():
+    try:
+        archive_stat = os.lstat(archive_path)
+    except OSError as error:
+        raise ArchiveInspectionError(
+            f"could not inspect archive file: {error}"
+        ) from error
+    if not stat.S_ISREG(archive_stat.st_mode):
         raise ArchiveInspectionError(f"archive must be a regular nonlinked file: {path}")
-    if archive_path.stat().st_nlink != 1:
+    if archive_stat.st_nlink != 1:
         raise ArchiveInspectionError("archive must have link count one")
-    compressed_bytes = archive_path.stat().st_size
+    compressed_bytes = archive_stat.st_size
     if compressed_bytes <= 0:
         raise ArchiveInspectionError("archive is empty")
     if compressed_bytes > limits.max_compressed_bytes:
@@ -361,28 +367,46 @@ def copy_archive_for_inspection(
     expected_sha256: Optional[str] = None,
 ) -> Path:
     source_path = Path(source)
-    destination_path = Path(destination)
+    destination_path = Path(os.path.abspath(os.fspath(destination)))
     if expected_sha256 is not None and not re.fullmatch(
         r"[0-9a-fA-F]{64}", expected_sha256
     ):
         raise ArchiveInspectionError("expected SHA-256 is invalid")
-    if destination_path.exists() or destination_path.is_symlink():
+    destination_parent = destination_path.parent
+    try:
+        parent_stat = os.lstat(destination_parent)
+    except OSError as error:
         raise ArchiveInspectionError(
-            f"refusing to overwrite archive copy: {destination_path}"
+            f"archive copy parent is unavailable: {destination_parent}: {error}"
+        ) from error
+    if not stat.S_ISDIR(parent_stat.st_mode):
+        raise ArchiveInspectionError(
+            f"archive copy parent must be a real directory: {destination_parent}"
         )
+    parent_real = Path(os.path.realpath(destination_parent))
 
     source_flags = os.O_RDONLY
     destination_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    parent_flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         source_flags |= os.O_NOFOLLOW
         destination_flags |= os.O_NOFOLLOW
+        parent_flags |= os.O_NOFOLLOW
+    if hasattr(os, "O_DIRECTORY"):
+        parent_flags |= os.O_DIRECTORY
     source_fd = -1
     destination_fd = -1
+    parent_fd = -1
     destination_created = False
     completed = False
     digest = hashlib.sha256()
     copied_bytes = 0
     try:
+        parent_fd = os.open(str(parent_real), parent_flags)
+        if not stat.S_ISDIR(os.fstat(parent_fd).st_mode):
+            raise ArchiveInspectionError(
+                f"archive copy parent must be a directory: {destination_parent}"
+            )
         source_fd = os.open(str(source_path), source_flags)
         source_stat = os.fstat(source_fd)
         if not stat.S_ISREG(source_stat.st_mode):
@@ -398,7 +422,10 @@ def copy_archive_for_inspection(
             )
 
         destination_fd = os.open(
-            str(destination_path), destination_flags, 0o600
+            destination_path.name,
+            destination_flags,
+            0o600,
+            dir_fd=parent_fd,
         )
         destination_created = True
         with os.fdopen(source_fd, "rb", closefd=True) as source_file:
@@ -428,6 +455,10 @@ def copy_archive_for_inspection(
             )
         completed = True
         return destination_path
+    except FileExistsError as error:
+        raise ArchiveInspectionError(
+            f"refusing to overwrite archive copy: {destination_path}"
+        ) from error
     except OSError as error:
         raise ArchiveInspectionError(f"could not create bounded archive copy: {error}") from error
     finally:
@@ -435,11 +466,13 @@ def copy_archive_for_inspection(
             os.close(source_fd)
         if destination_fd >= 0:
             os.close(destination_fd)
-        if destination_created and not completed:
+        if parent_fd >= 0 and destination_created and not completed:
             try:
-                destination_path.unlink()
+                os.unlink(destination_path.name, dir_fd=parent_fd)
             except FileNotFoundError:
                 pass
+        if parent_fd >= 0:
+            os.close(parent_fd)
 
 
 def copy_and_inspect_archive(

@@ -175,6 +175,9 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     assert_raises(Fetcher::Error) do
       Fetcher.redirect_target(origin, 'https://attacker.invalid/object', origin)
     end
+    assert_raises(Fetcher::Error) do
+      Fetcher.redirect_target(origin, 'https://user-content.githubusercontent.com/object', origin)
+    end
   end
 
   def test_streaming_redirect_does_not_forward_bearer_to_storage_origin
