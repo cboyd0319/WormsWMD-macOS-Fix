@@ -249,6 +249,30 @@ Last audit: 2026-08-26
 | Backup restore | Pass | Verified staged v2 backups exactly replace `MacOS`, bind to app/storefront identity, use atomic collision-resistant publication, reject invalid metadata/unrecorded entries, and preserve v1 merge behavior |
 | Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations; publication stages a resumable draft and refuses to overwrite a published release |
 
+## GitHub repository controls
+
+- GitHub Actions is restricted to GitHub-owned actions plus the pinned
+  `ludeeus/action-shellcheck` and `zizmorcore/zizmor-action` repositories. The
+  hosted policy requires every action to use a full commit SHA.
+- Default workflow tokens are read-only and cannot approve pull requests.
+  Workflows then deny permissions by default and grant each job only what it
+  needs.
+- Every external contributor requires maintainer approval before forked pull
+  request workflows run.
+- `main` requires strict current CI, Zizmor, one CODEOWNER approval, stale
+  review dismissal, and conversation resolution. Force pushes and deletion are
+  disabled. Administrator enforcement remains deliberately disabled for the
+  single-maintainer constraint documented below.
+- CodeQL default setup scans GitHub Actions, C/C++, and Ruby for supported pull
+  requests and weekly. GitHub excludes fork pull requests from default setup.
+  The initial Actions/C++/Ruby analysis completed without alerts.
+- GitHub secret scanning, push protection, and Dependabot security updates are
+  enabled. Partner validity checks and non-provider patterns are unavailable
+  for this user-owned public repository without GitHub Secret Protection.
+- Repository-level immutable releases are enabled for future publications.
+  The workflow builds a draft first, uploads assets and release notes, then
+  publishes. GitHub does not retroactively make v1.7.6 immutable.
+
 ## Verifying the fix
 
 ### Review the code
@@ -406,6 +430,11 @@ Qt package supply-chain process:
    but administrator enforcement remains disabled. Enabling it before a second
    trusted reviewer exists would prevent the sole maintainer from satisfying
    the review requirement.
+
+9. **Existing release mutability**: Repository-level immutable releases protect
+   future releases. GitHub reports v1.7.6 as mutable because it was published
+   before the control was enabled. Its hosted checksum and attestation remain
+   independently verifiable.
 
 ## Reporting security issues
 

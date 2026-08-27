@@ -1,6 +1,6 @@
 # GitHub Security Deep Dive
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -66,9 +66,9 @@ Out of scope:
   release recovery, security scanning, and contributor/security templates.
 - [x] Milestone 5: Run focused and full local repository verification plus one
   adversarial pass.
-- [ ] Milestone 6: With exact approval, apply and verify the selected hosted
+- [x] Milestone 6: Apply and verify the selected hosted
   Actions, scanning, contributor-approval, and release-immutability controls.
-- [ ] Milestone 7: Commit/push only if requested, then verify the consolidated
+- [x] Milestone 7: Commit/push only if requested, then verify the consolidated
   hosted checks without triggering redundant review or release workflows.
 
 ## Verification
@@ -126,6 +126,21 @@ changes must not silently drop existing behavior coverage.
   published releases are refused. Residuals are hosted enforcement, historical
   credential-owner confirmation, standard SBOM publication, and the deliberate
   solo-maintainer branch bypass.
+- 2026-08-26: Pushed `09d1552` on `security/github-hardening`, opened PR #23,
+  and required only its four meaningful checks. ShellCheck, C validation, the
+  full regression job, and the new Zizmor job all passed. Squash-merged as
+  `604fceace11076e0408446080d7b3faec3f5b91d` and canceled the redundant
+  post-merge comprehensive CI run; the path-scoped Zizmor push check passed.
+- 2026-08-26: Restricted hosted Actions to GitHub-owned actions plus ShellCheck
+  and Zizmor, with mandatory full-SHA references. Required approval for all
+  external contributors and added Zizmor to the strict `main` status checks.
+- 2026-08-26: Enabled CodeQL default setup for Actions, C/C++, and Ruby. Initial
+  run `33038436081` passed all three analyses with zero open code-scanning
+  alerts. Enabled repository-level immutable releases for future publications.
+- 2026-08-26: GitHub accepted but did not enable secret-scanning partner
+  validity checks or non-provider patterns. Current GitHub documentation limits
+  those controls to eligible Team/Enterprise Secret Protection repositories;
+  core scanning and push protection remain enabled.
 
 ## Surprises & Discoveries
 
@@ -158,4 +173,10 @@ changes must not silently drop existing behavior coverage.
 
 ## Outcomes & Retrospective
 
-Pending implementation and verification.
+The repository now enforces immutable Action SHAs, a minimal action allowlist,
+all-external workflow approval, strict CI plus Zizmor checks, CodeQL default
+setup, secret scanning/push protection, and immutable future releases. Local and
+hosted verification passed. Remaining risks are documented: six historical
+generic-key patterns needing credential-owner confirmation, no standard SBOM,
+the necessary solo-maintainer admin bypass, unavailable paid secret-scanning
+enhancements, and the non-retroactive mutability of v1.7.6.

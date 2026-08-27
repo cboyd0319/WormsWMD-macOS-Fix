@@ -17,6 +17,10 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   published release or its assets to be overwritten.
 - Made future GitHub release notes come from the matching changelog section and
   limited workflow artifact retention to 14 days.
+- Restricted hosted Actions to verified full-SHA GitHub-owned, ShellCheck, and
+  Zizmor actions; required Zizmor alongside the existing `main` checks.
+- Required approval for all external contributors, enabled CodeQL default setup
+  for Actions/C++/Ruby, and enabled immutable future GitHub releases.
 
 ## Mainline maintenance after 1.7.6 (2026-08-26)
 

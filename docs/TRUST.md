@@ -55,9 +55,13 @@ it.
   update cooldown.
 - A path-scoped Zizmor job and the local GitHub policy regression validate
   workflow changes before they reach release automation.
+- GitHub also enforces full-SHA Actions, an allowlist limited to GitHub-owned
+  actions plus ShellCheck and Zizmor, approval for every external contributor,
+  and CodeQL scanning for Actions, C/C++, and Ruby.
 - Release publication uploads assets and notes to a draft first, refuses to
   replace a published release, and publishes only after checksum assets and
-  attestations exist.
+  attestations exist. Repository-level immutability protects future published
+  releases; v1.7.6 predates that GitHub setting.
 
 ## What it can still do
 

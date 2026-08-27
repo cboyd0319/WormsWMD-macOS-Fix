@@ -31,7 +31,7 @@ the plan before continuing.
 
 ## Current Plans
 
-- [GitHub security deep dive](2026-08-26-github-security-deep-dive.md) - active
+- [GitHub security deep dive](2026-08-26-github-security-deep-dive.md) - completed
   audit and hardening of Actions, releases, hosted controls, secrets, and
   supply-chain evidence using the local OWASP cheat sheets as reference.
 - [Open pull request resolution](2026-08-26-open-pr-resolution.md) - completed
