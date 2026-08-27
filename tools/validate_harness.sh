@@ -7,6 +7,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 DOC_INDEX="$ROOT_DIR/docs/README.md"
+SAFE_REPO_FILES=""
 
 failures=0
 
@@ -17,8 +18,8 @@ fail() {
 
 require_file() {
     local rel="$1"
-    if [[ ! -f "$ROOT_DIR/$rel" ]]; then
-        fail "Missing required file: $rel"
+    if [[ -z "$SAFE_REPO_FILES" ]] || ! grep -Fxq "$rel" "$SAFE_REPO_FILES"; then
+        fail "Missing or unsafe required file: $rel"
     fi
 }
 
@@ -59,11 +60,144 @@ normalize_existing_path() {
     printf '%s/%s\n' "$dir" "$base"
 }
 
+repo_path_has_control_chars() {
+    [[ "$1" =~ [[:cntrl:]] ]]
+}
+
+repo_file_link_count() {
+    local path="$1"
+    local count
+
+    count=$(stat -f "%l" "$path" 2>/dev/null || true)
+    if [[ ! "$count" =~ ^[0-9]+$ ]]; then
+        count=$(stat -c "%h" "$path" 2>/dev/null || echo 0)
+    fi
+    printf '%s\n' "$count"
+}
+
+repo_file_size() {
+    local path="$1"
+    local size
+
+    size=$(stat -f "%z" "$path" 2>/dev/null || true)
+    if [[ ! "$size" =~ ^[0-9]+$ ]]; then
+        size=$(stat -c "%s" "$path" 2>/dev/null || echo 0)
+    fi
+    printf '%s\n' "$size"
+}
+
+validate_repo_source() {
+    local rel="$1"
+    local tracked_mode="${2:-}"
+    local source_abs="$ROOT_DIR/$rel"
+    local link_count
+
+    if repo_path_has_control_chars "$rel"; then
+        fail "Unsafe repository source: path contains a control character"
+        return 1
+    fi
+    if (( ${#rel} > 4096 )); then
+        fail "Unsafe repository source: path exceeds 4096 bytes"
+        return 1
+    fi
+    case "$rel" in
+        /*|../*|*/../*|*/..)
+            fail "Unsafe repository source: $rel (noncanonical path)"
+            return 1
+            ;;
+    esac
+    case "$tracked_mode" in
+        ""|100644|100755)
+            ;;
+        120000)
+            fail "Unsafe repository source: $rel (symlink)"
+            return 1
+            ;;
+        *)
+            fail "Unsafe repository source: $rel (unsupported Git mode $tracked_mode)"
+            return 1
+            ;;
+    esac
+    if [[ -L "$source_abs" ]]; then
+        fail "Unsafe repository source: $rel (symlink)"
+        return 1
+    fi
+    if [[ ! -f "$source_abs" ]]; then
+        fail "Unsafe repository source: $rel (not a regular file)"
+        return 1
+    fi
+    if ! path_is_inside_repo "$source_abs"; then
+        fail "Unsafe repository source: $rel (outside repository)"
+        return 1
+    fi
+    link_count=$(repo_file_link_count "$source_abs")
+    if [[ ! "$link_count" =~ ^[0-9]+$ ]] || (( link_count != 1 )); then
+        fail "Unsafe repository source: $rel (link count $link_count)"
+        return 1
+    fi
+
+    printf '%s\n' "$rel"
+}
+
+collect_safe_repo_files() {
+    local record
+    local metadata
+    local mode
+    local rel
+    local untracked_count=0
+
+    if command -v git >/dev/null 2>&1 \
+        && git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        while IFS= read -r -d '' record; do
+            metadata=${record%%$'\t'*}
+            rel=${record#*$'\t'}
+            mode=${metadata%% *}
+            validate_repo_source "$rel" "$mode" || true
+        done < <(git -C "$ROOT_DIR" ls-files -s -z)
+
+        while IFS= read -r -d '' rel; do
+            untracked_count=$((untracked_count + 1))
+            if (( untracked_count > 1000 )); then
+                fail "Unsafe repository source inventory: more than 1000 untracked files"
+                break
+            fi
+            validate_repo_source "$rel" || true
+        done < <(git -C "$ROOT_DIR" ls-files --others --exclude-standard -z)
+
+        while IFS= read -r -d '' rel; do
+            rel=${rel#"$ROOT_DIR"/}
+            if git -C "$ROOT_DIR" check-ignore -q -- "$rel" 2>/dev/null; then
+                continue
+            fi
+            untracked_count=$((untracked_count + 1))
+            if (( untracked_count > 1000 )); then
+                fail "Unsafe repository source inventory: more than 1000 untracked files"
+                break
+            fi
+            validate_repo_source "$rel" || true
+        done < <(
+            find "$ROOT_DIR" \
+                \( -path "$ROOT_DIR/.git" -o -path "$ROOT_DIR/build" \) -prune -o \
+                ! -type d ! -type f ! -type l -print0
+        )
+    else
+        while IFS= read -r -d '' rel; do
+            rel=${rel#./}
+            validate_repo_source "$rel" || true
+        done < <(
+            cd "$ROOT_DIR"
+            find . \
+                \( -path ./.git -o -path ./build \) -prune -o \
+                ! -type d -print0
+        )
+    fi
+}
+
 path_is_inside_repo() {
     local path="$1"
     local abs_path
 
-    abs_path=$(normalize_existing_path "$path")
+    abs_path=$(realpath "$path" 2>/dev/null || normalize_existing_path "$path")
     case "$abs_path" in
         "$ROOT_DIR"|"$ROOT_DIR"/*)
             return 0
@@ -111,6 +245,10 @@ check_local_links() {
         if [[ -z "$target" ]] || [[ "$target" == \#* ]] || is_external_link "$target"; then
             continue
         fi
+        if repo_path_has_control_chars "$target"; then
+            fail "$source has a Markdown link target containing a control character"
+            continue
+        fi
 
         if [[ "$target" == /* ]]; then
             fail "$source uses an absolute local link: $target"
@@ -139,6 +277,10 @@ collect_index_targets() {
         target=$(strip_link_target "$token")
 
         if [[ -z "$target" ]] || [[ "$target" == \#* ]] || is_external_link "$target"; then
+            continue
+        fi
+        if repo_path_has_control_chars "$target"; then
+            fail "docs/README.md has a link target containing a control character"
             continue
         fi
 
@@ -214,27 +356,39 @@ check_exec_plan_index_statuses() {
 }
 
 collect_repo_text_files() {
-    (
-        cd "$ROOT_DIR"
-        if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-            git ls-files --cached --others --exclude-standard
-        else
-            find . \
-                \( -path ./.git -o -path ./build \) -prune -o \
-                -type f -print \
-                | sed 's#^\./##'
-        fi
-    ) | while IFS= read -r source; do
+    local source
+    local size
+
+    while IFS= read -r source; do
         case "$source" in
             build/*|dist/*.tar|dist/*.tar.gz|dist/*.tgz|dist/*.zip|*.bmp|*.dmg|*.gif|*.icns|*.ico|*.jpg|*.jpeg|*.pdf|*.png|*.tiff|*.webp)
                 continue
                 ;;
         esac
 
-        if [[ -f "$ROOT_DIR/$source" ]] && LC_ALL=C grep -Iq . "$ROOT_DIR/$source"; then
+        size=$(repo_file_size "$ROOT_DIR/$source")
+        if [[ "$size" =~ ^[0-9]+$ ]] && (( size > 5242880 )); then
+            fail "Unsafe repository source: $source (text read exceeds 5 MiB)"
+            continue
+        fi
+        if LC_ALL=C grep -Iq . "$ROOT_DIR/$source"; then
             printf '%s\n' "$source"
         fi
-    done | sort -u
+    done < "$SAFE_REPO_FILES"
+}
+
+check_general_doc_plan_statuses() {
+    local duplicated
+
+    duplicated=$(awk '
+        /^## / { plan = 0 }
+        /^- \[/ { plan = ($0 ~ /\(exec-plans\//) }
+        plan { print }
+    ' "$DOC_INDEX" | LC_ALL=C grep -Ei '(^|[^[:alpha:]])(active|completed|superseded|shipped)([^[:alpha:]]|$)' || true)
+
+    if [[ -n "$duplicated" ]]; then
+        fail "docs/README.md execution-plan entries must not duplicate execution plan status"
+    fi
 }
 
 check_no_local_machine_paths() {
@@ -267,6 +421,7 @@ check_no_local_machine_paths() {
 check_harness_markers() {
     require_marker "AGENTS.md" "## Project Shape"
     require_marker "AGENTS.md" "## Non-Negotiables"
+    require_marker "AGENTS.md" "## Untrusted Content Boundary"
     require_marker "AGENTS.md" "## Startup Path"
     require_marker "AGENTS.md" "## Common Commands"
     require_marker "AGENTS.md" "## Documentation Entrypoints"
@@ -276,11 +431,14 @@ check_harness_markers() {
     require_marker ".agents/CLAUDE.md" "AGENTS.md"
     require_marker ".agents/rules/wormswmd-maintenance.md" "security-critical"
     require_marker ".agents/rules/wormswmd-maintenance.md" "local-path"
+    require_marker ".agents/rules/wormswmd-maintenance.md" "Untrusted Content Boundary"
+    require_marker ".github/copilot-instructions.md" "Untrusted Content Boundary"
 
     require_marker "docs/style/agent-harness.md" "## Five Subsystems"
     require_marker "docs/style/agent-harness.md" "## Harness Change Rules"
     require_marker "docs/style/agent-harness.md" "## Clean-State Checklist"
     require_marker "docs/runbooks/agent-session.md" "## Start A Session"
+    require_marker "docs/runbooks/agent-session.md" "### External contributor review"
     require_marker "docs/runbooks/agent-session.md" "## Choose Validation"
     require_marker "docs/runbooks/agent-session.md" "## Clean-State Checklist"
     require_marker "docs/design/runtime-contracts.md" "## Validation Contract"
@@ -297,7 +455,7 @@ check_harness_line_caps() {
     check_line_cap "docs/design/runtime-contracts.md" 260
     check_line_cap "docs/exec-plans/TEMPLATE.md" 120
     check_line_cap "docs/exec-plans/README.md" 160
-    check_line_cap "tools/validate_harness.sh" 520
+    check_line_cap "tools/validate_harness.sh" 680
     check_line_cap ".github/workflows/ci.yml" 180
     check_line_cap ".github/workflows/github-security.yml" 120
     check_line_cap ".github/workflows/release.yml" 140
@@ -317,6 +475,8 @@ check_ci_and_ownership_gates() {
 
     for required_ci_check in \
         "./tools/validate_harness.sh" \
+        "./tools/test_harness_security.sh" \
+        "./tools/test_sensitive_change_report.sh" \
         "./tools/test_github_security.sh" \
         "./tools/test_ci_changed_paths.sh" \
         "./tools/test_ci_change_classification.sh" \
@@ -405,6 +565,13 @@ check_ci_and_ownership_gates() {
     fi
 }
 
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-harness.XXXXXX")
+trap 'rm -rf "$tmp_dir"' EXIT
+
+SAFE_REPO_FILES="$tmp_dir/safe-repo-files.txt"
+collect_safe_repo_files > "$SAFE_REPO_FILES"
+sort -u -o "$SAFE_REPO_FILES" "$SAFE_REPO_FILES"
+
 require_file "AGENTS.md"
 require_file ".agents/README.md"
 require_file ".agents/CLAUDE.md"
@@ -426,10 +593,13 @@ require_file "tools/ci_changed_paths.sh"
 require_file "tools/ci_requires_macos.sh"
 require_file "tools/generate_sbom.py"
 require_file "tools/install_git_hooks.sh"
+require_file "tools/report_sensitive_changes.sh"
 require_file "tools/test_ci_changed_paths.sh"
 require_file "tools/test_ci_change_classification.sh"
 require_file "tools/test_generate_sbom.py"
 require_file "tools/test_git_hooks.sh"
+require_file "tools/test_harness_security.sh"
+require_file "tools/test_sensitive_change_report.sh"
 require_file "tools/test_github_security.sh"
 
 check_harness_markers
@@ -451,25 +621,24 @@ for section in \
     fi
 done
 
-tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-harness.XXXXXX")
-trap 'rm -rf "$tmp_dir"' EXIT
-
 markdown_files="$tmp_dir/markdown-files.txt"
 index_targets="$tmp_dir/index-targets.txt"
 repo_text_files="$tmp_dir/repo-text-files.txt"
 
-(
-    cd "$ROOT_DIR"
-    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        git ls-files --cached --others --exclude-standard '*.md' | sort
-    else
-        find . \
-            \( -path ./.git -o -path ./build \) -prune -o \
-            -name '*.md' -type f -print \
-            | sed 's#^\./##' \
-            | sort
-    fi
-) > "$markdown_files"
+: > "$markdown_files"
+while IFS= read -r source; do
+    case "$source" in
+        *.md)
+            source_size=$(repo_file_size "$ROOT_DIR/$source")
+            if [[ "$source_size" =~ ^[0-9]+$ ]] && (( source_size > 1048576 )); then
+                fail "Unsafe repository source: $source (Markdown read exceeds 1 MiB)"
+            else
+                printf '%s\n' "$source" >> "$markdown_files"
+            fi
+            ;;
+    esac
+done < "$SAFE_REPO_FILES"
+sort -u -o "$markdown_files" "$markdown_files"
 
 collect_repo_text_files > "$repo_text_files"
 
@@ -494,6 +663,7 @@ while IFS= read -r doc; do
 done < "$markdown_files"
 
 check_exec_plan_index_statuses
+check_general_doc_plan_statuses
 
 if (( failures > 0 )); then
     printf 'Harness validation failed with %d issue(s).\n' "$failures" >&2

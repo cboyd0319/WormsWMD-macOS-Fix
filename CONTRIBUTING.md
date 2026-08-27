@@ -153,5 +153,11 @@ review and passing CI before changes are merged to `main`.
 
 The repository-local pre-commit hook runs pinned Kingfisher against staged
 changes. Git hooks cannot install themselves in a fresh clone, so run
-`./tools/install_git_hooks.sh` once per clone. The hook fails closed when its
-checksum-pinned Kingfisher 2.0.0 binary is missing or has the wrong version.
+`./tools/install_git_hooks.sh` once per clone from the reviewed official
+`origin/main`. For a
+different reviewed commit, pass its exact HEAD with
+`--allow-reviewed-commit SHA`. The installer refuses tracked changes and
+unacknowledged branches. The hook fails closed when its checksum-pinned
+Kingfisher 2.0.0 binary is missing or differs from the pinned per-platform
+executable digest. `--no-verify` is emergency local recovery only; required CI
+and GitHub push protection remain authoritative for shared history.

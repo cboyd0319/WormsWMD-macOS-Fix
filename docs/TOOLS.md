@@ -171,13 +171,22 @@ Install the repository-local Kingfisher pre-commit hook once per clone:
 ```bash
 ./tools/install_git_hooks.sh
 ./tools/install_git_hooks.sh --check
+./tools/install_git_hooks.sh --allow-reviewed-commit "$(git rev-parse HEAD)"
+./tools/install_git_hooks.sh --uninstall
+./tools/install_git_hooks.sh --purge
 ```
 
-The hook uses a checksum-pinned Kingfisher 2.0.0 binary stored under the local
-Git directory and scans staged changes with redaction, no live provider
-validation, and no Git-history traversal. CI scans the current checkout with
-the same privacy boundaries. GitHub push protection and required CI remain the
-backstop for clones whose hooks were not installed or were bypassed.
+The default install accepts a clean checkout at the reviewed official
+`origin/main`. Another
+reviewed commit requires its exact HEAD through `--allow-reviewed-commit`; the
+installer does not fetch or infer trust. The hook uses a checksum-pinned
+Kingfisher 2.0.0 binary beneath the local Git directory and verifies its
+per-platform executable digest before every commit. It scans staged changes
+with redaction, no live provider validation, and no Git-history traversal.
+`--uninstall` disables the hook and retains the scanner; `--purge` previews and
+removes only that exact cached scanner. CI scans the current checkout with the
+same privacy boundaries. `--no-verify` is an emergency recovery path, while
+GitHub push protection and required CI remain the shared-history backstop.
 
 Check or refresh the pre-built Qt package used by the installer:
 
