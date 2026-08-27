@@ -268,6 +268,43 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     assert_equal(['freetype'], changes.map(&:first))
   end
 
+  def test_refresh_cli_writes_a_separate_candidate_and_reports_only_changed_rows
+    original = Fetcher.read_lock(LOCK)
+    current = original.find { |item| item.fetch('name') == 'freetype' }
+    digest = 'e' * 64
+    refreshed = current.merge(
+      'version' => '2.15.0',
+      'bottle_sha256' => digest,
+      'bottle_url' => "https://ghcr.io/v2/homebrew/core/freetype/blobs/sha256:#{digest}"
+    )
+    candidate_path = File.join(@tmp, 'candidate.tsv')
+    result = nil
+
+    stdout, stderr = capture_io do
+      Fetcher.stub(:resolve_lock, [refreshed]) do
+        result = Fetcher.main(
+          [
+            '--lock', LOCK,
+            '--refresh-formula', 'freetype',
+            '--version', '2.15.0',
+            '--write-lock', candidate_path
+          ]
+        )
+      end
+    end
+
+    assert_equal(0, result, stderr)
+    candidate = Fetcher.read_lock(candidate_path)
+    assert_equal('2.15.0', candidate.find { |item| item['name'] == 'freetype' }['version'])
+    assert_equal(
+      original.find { |item| item['name'] == 'glib' },
+      candidate.find { |item| item['name'] == 'glib' }
+    )
+    assert_includes(stdout, 'Changed freetype: version, bottle_sha256, bottle_url')
+    assert_includes(stdout, "Candidate lock: #{candidate_path}")
+    refute_includes(stdout, 'Changed glib:')
+  end
+
   def test_source_never_executes_extracted_qmake
     source = File.read(File.join(ROOT, 'tools', 'fetch_qt_homebrew_bottles.rb'))
 
