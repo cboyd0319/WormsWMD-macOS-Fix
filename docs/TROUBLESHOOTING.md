@@ -117,6 +117,24 @@ Run the verification script to identify missing dependencies:
 ./scripts/05_verify_installation.sh
 ```
 
+The verifier resolves `@rpath` through the executable's Mach-O `LC_RPATH`
+commands. A bundled resolved dependency is valid, and a missing weak-load
+dependency is reported as an optional warning. A required unresolved dependency
+still fails. Direct token paths that escape `Contents`, relative install names,
+and unreadable required Mach-O architectures also fail. Run `--verbose` to show
+the resolved bundle-relative target:
+
+```bash
+./scripts/05_verify_installation.sh --verbose
+```
+
+When Steam and GOG are both installed, use the friendly launcher so option 5
+can retain the selected installation. For direct diagnostics, set the target:
+
+```bash
+GAME_APP="/Applications/Games/Worms W.M.D.app" ./tools/collect_diagnostics.sh --bundle
+```
+
 ## Logging and debugging
 
 The fix writes logs to `~/Library/Logs/WormsWMD-Fix/` by default.

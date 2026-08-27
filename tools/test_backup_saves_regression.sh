@@ -70,4 +70,36 @@ grep -Fxq 'steam visible' "$steam_dir/visible-steam" \
 [[ ! -e "$steam_dir/stale-steam" ]] \
     || fail "Steam restore left a file that was absent from the backup"
 
+alias_home="$tmp_dir/alias-home"
+alias_root="$tmp_dir/alias-archive-root"
+alias_archive="$tmp_dir/alias-save.tar.gz"
+mkdir -p "$alias_home/Library/Application Support/Team17" "$alias_root/Team17"
+printf 'original alias target\n' > "$alias_home/Library/Application Support/Team17/save.dat"
+printf 'malicious duplicate\n' > "$alias_root/Team17/save.dat"
+(
+    cd "$alias_root"
+    tar -czf "$alias_archive" Team17/save.dat Team17//save.dat
+)
+if HOME="$alias_home" WORMSWMD_RESTORE_ASSUME_YES=1 \
+    "$ROOT_DIR/tools/backup_saves.sh" --restore "$alias_archive" >/dev/null 2>&1; then
+    fail "save restore accepted canonically duplicate archive members"
+fi
+grep -Fxq 'original alias target' "$alias_home/Library/Application Support/Team17/save.dat" \
+    || fail "duplicate-member save archive modified existing saves"
+
+newline_home="$tmp_dir/newline-home"
+newline_root="$tmp_dir/newline-archive-root"
+newline_archive="$tmp_dir/newline-save.tar.gz"
+newline_source="$newline_root/Team17/visible"$'\nTeam17'
+mkdir -p "$newline_home/Library/Application Support/Team17" "$newline_source"
+printf 'hidden newline save\n' > "$newline_source/injected.dat"
+(
+    cd "$newline_root"
+    tar -czf "$newline_archive" Team17
+)
+if HOME="$newline_home" WORMSWMD_RESTORE_ASSUME_YES=1 \
+    "$ROOT_DIR/tools/backup_saves.sh" --restore "$newline_archive" >/dev/null 2>&1; then
+    fail "save restore accepted an archive path containing a newline"
+fi
+
 printf 'Save backup regression check passed.\n'

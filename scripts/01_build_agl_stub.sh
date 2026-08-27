@@ -39,34 +39,40 @@ echo "=== Building AGL Stub Library (Universal Binary) ==="
 # Create build directory
 mkdir -p "$BUILD_DIR"
 
-# Compile for x86_64 (required for Rosetta 2 compatibility)
-echo "Compiling agl_stub.c for x86_64..."
-clang -arch x86_64 \
-    -dynamiclib \
-    -o "$BUILD_DIR/AGL_x86_64" \
-    -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \
-    -framework OpenGL \
-    -compatibility_version 1.0.0 \
-    -current_version 1.0.0 \
-    "$SRC_DIR/agl_stub.c"
+compile_arch() {
+    local arch="$1"
+    local output="$2"
+    local compiler_output
 
-# Compile for arm64 (future-proofing for native Apple Silicon if Rosetta is deprecated)
-echo "Compiling agl_stub.c for arm64..."
-clang -arch arm64 \
-    -dynamiclib \
-    -o "$BUILD_DIR/AGL_arm64" \
-    -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \
-    -framework OpenGL \
-    -compatibility_version 1.0.0 \
-    -current_version 1.0.0 \
-    "$SRC_DIR/agl_stub.c"
+    echo "Compiling agl_stub.c for $arch..."
+    if ! compiler_output=$(clang -arch "$arch" \
+        -dynamiclib \
+        -o "$output" \
+        -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \
+        -framework OpenGL \
+        -compatibility_version 1.0.0 \
+        -current_version 1.0.0 \
+        "$SRC_DIR/agl_stub.c" 2>&1); then
+        echo "ERROR: Failed to compile AGL stub for $arch"
+        [[ -n "$compiler_output" ]] && echo "$compiler_output"
+        return 1
+    fi
+}
+
+# x86_64 is required for Rosetta 2; arm64 keeps the stub universal.
+compile_arch "x86_64" "$BUILD_DIR/AGL_x86_64"
+compile_arch "arm64" "$BUILD_DIR/AGL_arm64"
 
 # Create universal binary
 echo "Creating universal binary..."
-lipo -create \
+if ! lipo_output=$(lipo -create \
     "$BUILD_DIR/AGL_x86_64" \
     "$BUILD_DIR/AGL_arm64" \
-    -output "$BUILD_DIR/AGL"
+    -output "$BUILD_DIR/AGL" 2>&1); then
+    echo "ERROR: Failed to create universal AGL stub"
+    [[ -n "$lipo_output" ]] && echo "$lipo_output"
+    exit 1
+fi
 
 # Clean up architecture-specific files
 rm -f "$BUILD_DIR/AGL_x86_64" "$BUILD_DIR/AGL_arm64"

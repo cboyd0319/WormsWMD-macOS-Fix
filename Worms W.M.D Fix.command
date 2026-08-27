@@ -25,7 +25,7 @@ source "$LAUNCHER_DIR/scripts/common.sh"
 worms_color_init auto
 
 print_line() {
-    printf '%b\n' "$*"
+    printf '%s\n' "$*"
 }
 
 read_answer() {
@@ -33,10 +33,10 @@ read_answer() {
     local answer=""
 
     if [[ -n "$TTY_DEVICE" ]]; then
-        printf '%b' "$prompt" > "$TTY_DEVICE"
+        printf '%s' "$prompt" > "$TTY_DEVICE"
         IFS= read -r answer < "$TTY_DEVICE" || answer=""
     else
-        printf '%b' "$prompt" >&2
+        printf '%s' "$prompt" >&2
         IFS= read -r answer || answer=""
     fi
 
@@ -101,11 +101,60 @@ ensure_ready() {
     chmod +x "$LAUNCHER_DIR/fix_worms_wmd.sh" "$LAUNCHER_DIR/tools/collect_diagnostics.sh" 2>/dev/null || true
 }
 
+select_game_app_if_needed() {
+    local game choice i
+    local games=()
+
+    if [[ -n "${GAME_APP:-}" ]]; then
+        worms_reject_control_chars "$GAME_APP" "GAME_APP" || return 1
+        export GAME_APP
+        return 0
+    fi
+
+    while IFS= read -r -d '' game; do
+        games+=("$game")
+    done < <(worms_find_game_apps)
+
+    if [[ ${#games[@]} -eq 0 ]]; then
+        return 0
+    fi
+    if [[ ${#games[@]} -eq 1 ]]; then
+        GAME_APP="${games[0]}"
+        export GAME_APP
+        return 0
+    fi
+
+    print_line ""
+    worms_print_step "Choose the Worms W.M.D installation to use"
+    i=1
+    for game in "${games[@]}"; do
+        printf '  %s) %s\n' "$i" "$game"
+        i=$((i + 1))
+    done
+
+    while true; do
+        choice=$(read_answer "Choose an installation [1-${#games[@]}]: ")
+        if [[ "$choice" =~ ^[0-9]+$ ]] \
+            && [[ "$choice" -ge 1 ]] \
+            && [[ "$choice" -le ${#games[@]} ]]; then
+            GAME_APP="${games[$((choice - 1))]}"
+            export GAME_APP
+            return 0
+        fi
+        if [[ -z "$choice" ]]; then
+            worms_print_error "No installation was selected."
+            return 1
+        fi
+        worms_print_warning "Choose a number between 1 and ${#games[@]}."
+    done
+}
+
 create_support_bundle() {
     local output_dir="$HOME/Desktop"
 
     print_line ""
     worms_print_step "Creating a support bundle on your Desktop"
+    select_game_app_if_needed || return 1
     if BUNDLE_OUTPUT_DIR="$output_dir" "$LAUNCHER_DIR/tools/collect_diagnostics.sh" --bundle --bundle-output "$output_dir"; then
         worms_print_success "Support bundle created."
         if command -v open >/dev/null 2>&1; then
@@ -134,10 +183,12 @@ offer_support_bundle() {
 
 launch_game() {
     local default_game_path detected_game
-    local game_app="${GAME_APP:-}"
+    local game_app
 
     print_line ""
     worms_print_step "Launching Worms W.M.D"
+    select_game_app_if_needed || return 1
+    game_app="${GAME_APP:-}"
 
     if ! command -v open >/dev/null 2>&1; then
         worms_print_warning "Automatic launch is unavailable here."
@@ -164,6 +215,12 @@ launch_game() {
     if [[ -d "$game_app" ]] && open "$game_app" >/dev/null 2>&1; then
         worms_print_success "Worms W.M.D was opened."
         return 0
+    fi
+
+    if [[ -n "${GAME_APP:-}" ]]; then
+        worms_print_warning "Could not launch the selected game installation automatically."
+        printf 'Open this installation directly: %s\n' "$GAME_APP"
+        return 1
     fi
 
     if open "steam://run/327030" >/dev/null 2>&1; then
@@ -200,6 +257,8 @@ run_fix_engine() {
     worms_print_step "$title"
     print_line ""
 
+    select_game_app_if_needed || return 1
+
     if "$LAUNCHER_DIR/fix_worms_wmd.sh" "$@"; then
         print_line ""
         worms_print_success "Finished."
@@ -220,6 +279,7 @@ run_launch_readiness_check() {
     print_banner
     worms_print_step "Checking launch readiness"
     print_line ""
+    select_game_app_if_needed || return 1
 
     if "$LAUNCHER_DIR/tools/preflight_check.sh" --quick; then
         print_line ""

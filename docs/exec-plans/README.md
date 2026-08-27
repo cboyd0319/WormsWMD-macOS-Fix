@@ -31,6 +31,9 @@ the plan before continuing.
 
 ## Current Plans
 
+- [Issue 20 GOG rpath and rollback hardening](2026-08-26-issue-20-gog-rpath-rollback.md) - active
+  deep audit of GOG dependency verification, rollback, archive integrity,
+  backup identity, and multi-install diagnostics before release.
 - [v1.7.5 release](2026-08-11-v1.7.5-release.md) - completed release prep,
   validation, publication, asset verification, and post-release bootstrap
   pinning.

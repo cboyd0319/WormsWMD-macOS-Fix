@@ -41,8 +41,8 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 | Area | What changed |
 | --- | --- |
 | Qt installation | Copied framework binaries are made writable before `install_name_tool` updates them, addressing issue #19 on macOS 26.6. |
-| Rollback | Failed installs continue to verify the backup manifest and restore the original game bundle. |
-| Runtime package | The existing checksum-verified Qt 5.15.19 archive remains unchanged. |
+| Rollback | Failed installs verify staged, target-bound backups and restore every covered executable, including GOG Galaxy. |
+| Runtime package | The Qt 5.15.19 archive has a complete 16-dylib closure with canonical, unique members and an updated checksum. |
 | Bootstrap safety | Terminal and double-click bootstraps are pinned to `v1.7.5` and reject install directories that resolve into system paths. |
 | Regression coverage | The installer suite reproduces read-only Qt framework inputs and verifies the corrected mutation path. |
 
@@ -107,9 +107,9 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.5.zip --repo cboyd0319/WormsWMD-ma
 | Dependencies | Bundles required dylibs and fixes install names. |
 | App metadata | Updates Info.plist bundle identity, HiDPI, and minimum macOS values. |
 | Config URLs | Converts known HTTP URLs to HTTPS and comments out internal/staging URLs. |
-| Signing | Clears quarantine flags and applies ad-hoc signing. |
+| Signing | Applies and verifies ad-hoc signing transactionally, then clears quarantine. |
 | Window state | Resets incompatible Qt window geometry that can cause small windows. |
-| Backups | Creates restorable game-bundle backups with manifests for integrity checks. |
+| Backups | Publishes source-app/storefront-bound backups only after complete manifest verification. |
 
 ## Safety Model
 

@@ -117,6 +117,11 @@ validate_backup_archive_layout() {
         return 1
     fi
 
+    if ! worms_validate_tar_no_duplicate_entries "$archive"; then
+        echo -e "${RED}ERROR:${NC} Backup archive contains duplicate members."
+        return 1
+    fi
+
     while IFS= read -r raw_entry; do
         [[ -n "$raw_entry" ]] || continue
         entry="${raw_entry#./}"
@@ -373,6 +378,7 @@ do_restore() {
 
     # Extract backup
     tar -xzf "$backup_file" -C "$TEMP_DIR"
+    worms_validate_tree_paths "$TEMP_DIR"
     worms_validate_no_special_entries "$TEMP_DIR"
 
     if [[ -f "$TEMP_DIR/$SAVE_MANIFEST_NAME" ]]; then

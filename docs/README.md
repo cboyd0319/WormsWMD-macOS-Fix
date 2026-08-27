@@ -64,6 +64,9 @@ current when adding, moving, renaming, or deleting Markdown files.
   - completed fix for missing AGL and required Qt runtime partial installs.
 - [Issue 19 QtCore bad file descriptor plan](exec-plans/2026-08-11-issue-19-qtcore-bad-fd.md)
   - completed fix for read-only copied Qt framework binaries on macOS 26.6.
+- [Issue 20 GOG rpath and rollback hardening plan](exec-plans/2026-08-26-issue-20-gog-rpath-rollback.md)
+  - completed fix for GOG `@rpath` verification, rollback completeness, backup
+    identity, and multi-install diagnostics.
 - [v1.7.5 release plan](exec-plans/2026-08-11-v1.7.5-release.md)
   - completed release prep, validation, publication, asset verification, and
     post-release bootstrap pinning.

@@ -130,14 +130,23 @@ The fix creates a timestamped backup before making changes.
 ```
 
 Automatic restore verifies the backup manifest when `BACKUP_MANIFEST.tsv` is
-present and cancels instead of restoring from a mismatched backup. Older backups
-without a manifest are treated as legacy backups and restored with a warning.
+present and cancels instead of restoring from a mismatched backup. New backups
+are published only after verification and record their source app/storefront in
+`BACKUP_METADATA.tsv`, so a Steam backup cannot be applied to GOG or vice versa.
+Metadata that is missing from its manifest or malformed is rejected. Older
+backups without source metadata are restored with a warning only when the
+selected installation is unambiguous.
+
+Current metadata v2 backups replace `Contents/MacOS` through a staged swap so
+extra files cannot survive restore. Older metadata v1 backups retain the prior
+merge behavior for compatibility.
 
 ### Restore manually
 
 Prefer automatic restore when possible because it performs manifest validation.
 Manual restore is useful for inspection or recovery, but it bypasses the
-automated manifest checks.
+automated file-integrity checks. The example below reproduces the path and
+storefront identity checks, but you must inspect the manifest before copying.
 
 ```bash
 # Find your backup
@@ -152,10 +161,54 @@ if [[ -f "$BACKUP_DIR/BACKUP_MANIFEST.tsv" ]]; then
   sed -n '1,20p' "$BACKUP_DIR/BACKUP_MANIFEST.tsv"
 fi
 
+# New backups must match the selected app.
+if [[ -f "$BACKUP_DIR/BACKUP_METADATA.tsv" ]]; then
+  BACKUP_GAME_APP=$(awk -F '\t' '$1 == "game_app_path" {sub(/^[^\t]*\t/, ""); print; exit}' "$BACKUP_DIR/BACKUP_METADATA.tsv")
+  BACKUP_GAME_SOURCE=$(awk -F '\t' '$1 == "game_source" {print $2; exit}' "$BACKUP_DIR/BACKUP_METADATA.tsv")
+  SELECTED_GAME_APP=$(cd "$GAME_APP" && pwd -P)
+  [[ "$BACKUP_GAME_APP" == "$SELECTED_GAME_APP" ]] || {
+    echo "Backup belongs to a different game installation." >&2
+    exit 1
+  }
+
+  GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
+  GAME_DEPENDENCIES=$(otool -arch x86_64 -L "$GAME_EXEC" 2>/dev/null || true)
+  HAS_GALAXY=false
+  HAS_STEAM=false
+  grep -Fqi 'libGalaxy.dylib' <<< "$GAME_DEPENDENCIES" && HAS_GALAXY=true
+  grep -Fqi 'libsteam_api.dylib' <<< "$GAME_DEPENDENCIES" && HAS_STEAM=true
+  if $HAS_GALAXY && ! $HAS_STEAM; then
+    SELECTED_GAME_SOURCE=gog
+  elif $HAS_STEAM && ! $HAS_GALAXY; then
+    SELECTED_GAME_SOURCE=steam
+  else
+    echo "Could not identify the selected Steam or GOG installation." >&2
+    exit 1
+  fi
+  [[ "$BACKUP_GAME_SOURCE" == "$SELECTED_GAME_SOURCE" ]] || {
+    echo "Backup belongs to a different storefront." >&2
+    exit 1
+  }
+fi
+
 rm -rf "$GAME_APP/Contents/Frameworks"
 rm -rf "$GAME_APP/Contents/PlugIns"
 cp -R "$BACKUP_DIR/Frameworks" "$GAME_APP/Contents/"
 cp -R "$BACKUP_DIR/PlugIns" "$GAME_APP/Contents/"
+
+# Restore original launch files, executable, and storefront libraries.
+if [[ -d "$BACKUP_DIR/MacOS" ]]; then
+  cp -R "$BACKUP_DIR/MacOS/." "$GAME_APP/Contents/MacOS/"
+fi
+
+# Restore or remove fixer-created signature resources according to metadata.
+if [[ -f "$BACKUP_DIR/BACKUP_METADATA.tsv" ]]; then
+  SIGNATURE_PRESENT=$(awk -F '\t' '$1 == "code_signature_present" {print $2; exit}' "$BACKUP_DIR/BACKUP_METADATA.tsv")
+  rm -rf "$GAME_APP/Contents/_CodeSignature"
+  if [[ "$SIGNATURE_PRESENT" == "true" && -d "$BACKUP_DIR/_CodeSignature" ]]; then
+    cp -R "$BACKUP_DIR/_CodeSignature" "$GAME_APP/Contents/"
+  fi
+fi
 
 # Restore Info.plist (if backed up)
 if [[ -f "$BACKUP_DIR/Info.plist" ]]; then

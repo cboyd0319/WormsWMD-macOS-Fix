@@ -15,6 +15,8 @@ fail() {
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-issue11.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
+export WORMSWMD_TEST_APPLICATIONS_ROOT="$tmp_dir/system-applications"
+mkdir -p "$WORMSWMD_TEST_APPLICATIONS_ROOT"
 
 function_file="$tmp_dir/auto_detect_game.sh"
 awk '
@@ -121,6 +123,25 @@ if [[ "$multi_status" -eq 0 ]] && [[ -n "$multi_output" ]]; then
 fi
 if grep -Fq "Multiple game installations found" <<< "$multi_output"; then
     fail "noninteractive multiple-install discovery polluted stdout with menu text: $multi_output"
+fi
+
+multi_dry_run_output=$(HOME="$multi_home" "$installer" --dry-run </dev/null 2>&1 || true)
+if grep -Fq "[dry-run] Game found: $multi_steam_app" <<< "$multi_dry_run_output"; then
+    fail "noninteractive dry-run silently targeted Steam when multiple installations exist: $multi_dry_run_output"
+fi
+grep -Fq 'Set GAME_APP to preview against a custom location.' <<< "$multi_dry_run_output" \
+    || fail "noninteractive dry-run did not require an explicit multi-install target: $multi_dry_run_output"
+if grep -Fq '/dev/tty: Device not configured' <<< "$multi_dry_run_output"; then
+    fail "noninteractive dry-run emitted raw /dev/tty errors: $multi_dry_run_output"
+fi
+if grep -Fq 'Target: /Contents/' <<< "$multi_dry_run_output"; then
+    fail "noninteractive dry-run printed an empty-root mutation target: $multi_dry_run_output"
+fi
+dry_sign_line=$(grep -nF 'Apply ad-hoc code signature' <<< "$multi_dry_run_output" | cut -d: -f1)
+dry_verify_sign_line=$(grep -nF 'Strictly verify the ad-hoc signature' <<< "$multi_dry_run_output" | cut -d: -f1)
+if [[ -z "$dry_sign_line" ]] || [[ -z "$dry_verify_sign_line" ]] \
+    || [[ "$dry_sign_line" -ge "$dry_verify_sign_line" ]]; then
+    fail "dry-run does not show signature application before verification: $multi_dry_run_output"
 fi
 
 verify_link_home="$tmp_dir/verify-link-home"

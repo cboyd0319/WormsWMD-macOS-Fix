@@ -9,10 +9,11 @@ worms_default_game_app() {
 
 worms_game_search_paths() {
     local steam_config line lib_path root found_path
+    local system_applications_root="${WORMSWMD_TEST_APPLICATIONS_ROOT:-/Applications}"
 
     printf '%s\0' "$(worms_default_game_app)"
-    printf '%s\0' "/Applications/Worms W.M.D.app"
-    printf '%s\0' "/Applications/Worms WMD.app"
+    printf '%s\0' "$system_applications_root/Worms W.M.D.app"
+    printf '%s\0' "$system_applications_root/Worms WMD.app"
     printf '%s\0' "$HOME/Applications/Worms W.M.D.app"
     printf '%s\0' "$HOME/Applications/Worms WMD.app"
     printf '%s\0' "$HOME/Games/Worms W.M.D.app"
@@ -22,7 +23,7 @@ worms_game_search_paths() {
     printf '%s\0' "$HOME/Library/Application Support/GOG.com/Games/Worms W.M.D/Worms W.M.D.app"
 
     for root in \
-        "/Applications" \
+        "$system_applications_root" \
         "$HOME/Applications" \
         "$HOME/Games" \
         "$HOME/GOG Games" \
@@ -53,6 +54,9 @@ worms_find_game_apps() {
     local unique_games=()
 
     while IFS= read -r -d '' path; do
+        if worms_has_control_chars "$path"; then
+            continue
+        fi
         if [[ -d "$path" ]] && [[ -f "$path/Contents/MacOS/Worms W.M.D" ]]; then
             found_games+=("$path")
         fi
@@ -219,7 +223,7 @@ worms_unique_path() {
     local counter=1
 
     candidate="${base}${suffix}"
-    while [[ -e "$candidate" ]]; do
+    while [[ -e "$candidate" ]] || [[ -L "$candidate" ]]; do
         candidate="${base}-${counter}${suffix}"
         counter=$((counter + 1))
     done
@@ -237,6 +241,18 @@ worms_file_sha256() {
     local path="$1"
 
     shasum -a 256 "$path" | awk '{print $1}'
+}
+
+worms_text_sha256() {
+    local value="$1"
+
+    printf '%s' "$value" | shasum -a 256 | awk '{print $1}'
+}
+
+worms_text_size() {
+    local value="$1"
+
+    printf '%s' "$value" | LC_ALL=C wc -c | tr -d ' '
 }
 
 worms_manifest_hashes() {
@@ -267,8 +283,135 @@ worms_otool_dependencies_from_stdin() {
 
 worms_otool_dependencies() {
     local bin="$1"
+    local output
 
-    otool -L "$bin" 2>/dev/null | worms_otool_dependencies_from_stdin || true
+    if output=$(otool -arch x86_64 -L "$bin" 2>/dev/null); then
+        printf '%s\n' "$output" | worms_otool_dependencies_from_stdin
+    else
+        otool -L "$bin" 2>/dev/null | worms_otool_dependencies_from_stdin || true
+    fi
+}
+
+worms_macho_rpaths() {
+    local bin="$1"
+    local output
+
+    if ! output=$(otool -arch x86_64 -l "$bin" 2>/dev/null); then
+        output=$(otool -l "$bin" 2>/dev/null || true)
+    fi
+    printf '%s\n' "$output" | awk '
+        $1 == "cmd" {
+            in_rpath = ($2 == "LC_RPATH")
+            next
+        }
+        in_rpath && $1 == "path" {
+            line = $0
+            sub(/^[[:space:]]*path[[:space:]]+/, "", line)
+            sub(/[[:space:]]+\(offset[[:space:]]+[0-9]+\)$/, "", line)
+            print line
+            in_rpath = 0
+        }
+    '
+}
+
+worms_macho_dependency_is_weak() {
+    local bin="$1"
+    local dependency="$2"
+    local output
+
+    if ! output=$(otool -arch x86_64 -l "$bin" 2>/dev/null); then
+        output=$(otool -l "$bin" 2>/dev/null || true)
+    fi
+    printf '%s\n' "$output" | awk -v dependency="$dependency" '
+        $1 == "cmd" {
+            load_command = $2
+            next
+        }
+        $1 == "name" {
+            line = $0
+            sub(/^[[:space:]]*name[[:space:]]+/, "", line)
+            sub(/[[:space:]]+\(offset[[:space:]]+[0-9]+\)$/, "", line)
+            if (line == dependency && load_command == "LC_LOAD_WEAK_DYLIB") {
+                found = 1
+            }
+            load_command = ""
+        }
+        END { exit(found ? 0 : 1) }
+    '
+}
+
+worms_macho_install_id() {
+    local bin="$1"
+    local output
+
+    if ! output=$(otool -arch x86_64 -D "$bin" 2>/dev/null); then
+        output=$(otool -D "$bin" 2>/dev/null || true)
+    fi
+    printf '%s\n' "$output" | sed -n '2p'
+}
+
+worms_expand_macho_path() {
+    local path="$1"
+    local loader_bin="$2"
+    local game_exec="$3"
+
+    case "$path" in
+        @executable_path)
+            printf '%s\n' "$(dirname "$game_exec")"
+            ;;
+        @executable_path/*)
+            printf '%s%s\n' "$(dirname "$game_exec")" "${path#@executable_path}"
+            ;;
+        @loader_path)
+            printf '%s\n' "$(dirname "$loader_bin")"
+            ;;
+        @loader_path/*)
+            printf '%s%s\n' "$(dirname "$loader_bin")" "${path#@loader_path}"
+            ;;
+        /*)
+            printf '%s\n' "$path"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+worms_resolve_macho_rpath_dependency() {
+    local bin="$1"
+    local dependency="$2"
+    local game_exec="$3"
+    local game_app="$4"
+    local dependency_suffix
+    local rpath expanded candidate candidate_real rpath_bin
+
+    [[ "$dependency" == @rpath/* ]] || return 1
+    dependency_suffix=${dependency#@rpath/}
+
+    for rpath_bin in "$bin" "$game_exec"; do
+        [[ -f "$rpath_bin" ]] || continue
+        while IFS= read -r rpath; do
+            [[ -n "$rpath" ]] || continue
+            expanded=$(worms_expand_macho_path "$rpath" "$rpath_bin" "$game_exec" || true)
+            [[ -n "$expanded" ]] || continue
+            candidate="${expanded%/}/$dependency_suffix"
+            [[ -f "$candidate" ]] || continue
+            if [[ -L "$candidate" ]]; then
+                command -v realpath >/dev/null 2>&1 || continue
+                candidate_real=$(realpath "$candidate" 2>/dev/null || true)
+                [[ -n "$candidate_real" ]] || continue
+            else
+                candidate_real="$candidate"
+            fi
+            if worms_path_inside_root "$game_app/Contents" "$candidate_real"; then
+                printf '%s\n' "$candidate"
+                return 0
+            fi
+        done < <(worms_macho_rpaths "$rpath_bin")
+        [[ "$rpath_bin" == "$game_exec" ]] && break
+    done
+
+    return 1
 }
 
 worms_file_link_count() {
@@ -279,14 +422,9 @@ worms_file_link_count() {
 
 worms_has_control_chars() {
     local value="$1"
+    local LC_ALL=C
 
-    case "$value" in
-        *$'\n'*|*$'\r'*)
-            return 0
-            ;;
-    esac
-
-    return 1
+    [[ "$value" =~ [[:cntrl:]] ]]
 }
 
 worms_reject_control_chars() {
@@ -324,7 +462,10 @@ worms_path_inside_root() {
     local path_real
 
     root_real=$(worms_real_dir "$root") || return 1
-    if [[ -d "$path" ]]; then
+    if [[ -L "$path" ]]; then
+        command -v realpath >/dev/null 2>&1 || return 1
+        path_real=$(realpath "$path" 2>/dev/null) || return 1
+    elif [[ -d "$path" ]]; then
         path_real=$(worms_real_dir "$path") || return 1
     else
         path_real=$(worms_real_dir "$(dirname "$path")") || return 1
@@ -388,14 +529,31 @@ worms_path_creatable_inside_root() {
 
 worms_validate_tree_symlinks() {
     local root_dir="$1"
+    local policy="${2:-strict}"
     local root_real
-    local link_path link_dir target target_dir target_base target_real status=0
+    local link_path link_rel link_dir target target_dir target_base target_real status=0
+    local links_file
 
     root_real=$(worms_real_dir "$root_dir") || return 1
+    links_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-tree-links.XXXXXX")
+    if ! find "$root_dir" -type l -print0 > "$links_file" 2>/dev/null; then
+        echo "Unable to inspect symlinks under: $root_dir" >&2
+        rm -f "$links_file"
+        return 1
+    fi
 
     while IFS= read -r -d '' link_path; do
+        link_rel=${link_path#"$root_dir"/}
+        if [[ "$policy" == "allow-stale-agl" ]]; then
+            case "$link_rel" in
+                Frameworks/AGL.framework/Versions/A/A|Frameworks/AGL.framework/Versions/A/Resources/Resources)
+                    continue
+                    ;;
+            esac
+        fi
         target=$(readlink "$link_path" 2>/dev/null || true)
-        if [[ -z "$target" ]] || worms_path_has_parent_escape "$target"; then
+        if [[ -z "$target" ]] || worms_has_control_chars "$target" \
+            || worms_path_has_parent_escape "$target"; then
             echo "Unsafe symlink target: $link_path -> ${target:-}" >&2
             status=1
             continue
@@ -413,9 +571,74 @@ worms_validate_tree_symlinks() {
                 status=1
                 ;;
         esac
-    done < <(find "$root_dir" -type l -print0 2>/dev/null)
+    done < "$links_file"
+
+    rm -f "$links_file"
 
     return "$status"
+}
+
+worms_validate_tree_paths() {
+    local root_dir="$1"
+    local path paths_file status=0
+
+    paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-tree-paths.XXXXXX")
+    if ! find "$root_dir" -print0 > "$paths_file" 2>/dev/null; then
+        echo "Unable to inspect paths under: $root_dir" >&2
+        rm -f "$paths_file"
+        return 1
+    fi
+
+    while IFS= read -r -d '' path; do
+        if worms_has_control_chars "$path"; then
+            echo "Refusing a tree path containing a control character under: $root_dir" >&2
+            status=1
+            break
+        fi
+    done < "$paths_file"
+
+    rm -f "$paths_file"
+    return "$status"
+}
+
+worms_validate_tree_entry_types() {
+    local root_dir="$1"
+    local bad_entry bad_entries_file
+
+    bad_entries_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-tree-entry-types.XXXXXX")
+    if ! find "$root_dir" ! -type f ! -type d ! -type l -print0 > "$bad_entries_file" 2>/dev/null; then
+        echo "Unable to inspect entry types under: $root_dir" >&2
+        rm -f "$bad_entries_file"
+        return 1
+    fi
+
+    if IFS= read -r -d '' bad_entry < "$bad_entries_file"; then
+        echo "Refusing unsupported tree entry type: $bad_entry" >&2
+        rm -f "$bad_entries_file"
+        return 1
+    fi
+
+    rm -f "$bad_entries_file"
+}
+
+worms_validate_tree_hardlinks() {
+    local root_dir="$1"
+    local hardlink hardlinks_file
+
+    hardlinks_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-tree-hardlinks.XXXXXX")
+    if ! find "$root_dir" -type f -links +1 -print0 > "$hardlinks_file" 2>/dev/null; then
+        echo "Unable to inspect hardlinks under: $root_dir" >&2
+        rm -f "$hardlinks_file"
+        return 1
+    fi
+
+    if IFS= read -r -d '' hardlink < "$hardlinks_file"; then
+        echo "Refusing hardlinked tree file: $hardlink" >&2
+        rm -f "$hardlinks_file"
+        return 1
+    fi
+
+    rm -f "$hardlinks_file"
 }
 
 worms_repair_agl_framework_symlinks() {
@@ -445,8 +668,8 @@ worms_repair_agl_framework_symlinks() {
 
 worms_validate_game_app_for_mutation() {
     local game_app="$1"
-    local root_real contents contents_real path path_real
-    local critical_paths
+    local root_real contents contents_real path path_real config_file
+    local critical_paths critical_files
 
     if [[ -z "$game_app" ]] || [[ ! -d "$game_app" ]] || [[ ! -d "$game_app/Contents" ]]; then
         echo "Invalid game app path: $game_app" >&2
@@ -466,8 +689,10 @@ worms_validate_game_app_for_mutation() {
     fi
 
     critical_paths=(
+        "$contents/MacOS"
         "$contents/Frameworks"
         "$contents/PlugIns"
+        "$contents/_CodeSignature"
         "$contents/PlugIns/platforms"
         "$contents/PlugIns/imageformats"
         "$contents/Resources"
@@ -495,6 +720,27 @@ worms_validate_game_app_for_mutation() {
                 ;;
         esac
     done
+
+    critical_files=(
+        "$contents/MacOS/Worms W.M.D"
+        "$contents/Info.plist"
+    )
+    while IFS= read -r config_file; do
+        critical_files+=("$contents/Resources/DataOSX/$config_file")
+    done < <(worms_dataosx_config_files)
+    while IFS= read -r config_file; do
+        critical_files+=("$contents/Resources/CommonData/$config_file")
+    done < <(worms_commondata_config_files)
+
+    for path in "${critical_files[@]}"; do
+        [[ -e "$path" ]] || [[ -L "$path" ]] || continue
+        worms_refuse_linked_file_for_mutation "$path" "game bundle mutation file" || return 1
+    done
+
+    worms_validate_tree_paths "$contents" || return 1
+    worms_validate_tree_entry_types "$contents" || return 1
+    worms_validate_tree_symlinks "$contents" allow-stale-agl || return 1
+    worms_validate_tree_hardlinks "$contents" || return 1
 
     return 0
 }
@@ -571,58 +817,184 @@ worms_validate_tar_entry_metadata() {
     done <<< "$listing"
 }
 
+worms_validate_tar_no_duplicate_entries() {
+    local archive="$1"
+    local duplicate listing
+
+    if ! listing=$(tar -tzf "$archive" 2>/dev/null); then
+        echo "Unable to read archive entries: $archive" >&2
+        return 1
+    fi
+
+    duplicate=$(printf '%s\n' "$listing" | awk '
+        {
+            entry = $0
+            sub(/^\.\//, "", entry)
+            while (sub(/\/$/, "", entry)) { }
+            original = entry
+            count = split(entry, parts, "/")
+            entry = ""
+            for (i = 1; i <= count; i++) {
+                if (parts[i] == "" || parts[i] == ".") continue
+                entry = (entry == "" ? parts[i] : entry "/" parts[i])
+            }
+            if (entry == "") next
+            if (entry != original) {
+                print "non-canonical " original
+                exit
+            }
+            if (seen[entry]++) {
+                print entry
+                exit
+            }
+        }
+    ')
+    if [[ -n "$duplicate" ]]; then
+        echo "Archive contains duplicate or non-canonical entry: $duplicate" >&2
+        return 1
+    fi
+}
+
 worms_write_manifest() {
     local root_dir="$1"
     local manifest_file="$2"
-    local paths_file hash rel_path
+    local raw_entries_file entries_file files_file data_file hash hash_line rel_path entry_type extra status=0
+    local target target_hash target_size
     shift 2
 
-    paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-paths.XXXXXX")
+    worms_validate_tree_paths "$root_dir" || return 1
+    worms_validate_tree_entry_types "$root_dir" || return 1
+    worms_validate_tree_symlinks "$root_dir" || return 1
+    worms_validate_tree_hardlinks "$root_dir" || return 1
 
-    (
+    raw_entries_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-raw-entries.XXXXXX")
+    entries_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-entries.XXXXXX")
+    files_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-files.XXXXXX")
+    data_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-data.XXXXXX")
+
+    if ! (
         cd "$root_dir" || exit 1
         for rel in "$@"; do
-            [[ -e "$rel" ]] || continue
-            if [[ -d "$rel" ]]; then
-                find "$rel" -type f -print
+            if worms_has_control_chars "$rel" || worms_path_has_parent_escape "$rel"; then
+                echo "Unsafe manifest input path" >&2
+                exit 1
+            fi
+            [[ -e "$rel" ]] || [[ -L "$rel" ]] || continue
+            if [[ -L "$rel" ]]; then
+                printf '%s\0' "$rel"
+            elif [[ -d "$rel" ]]; then
+                find "$rel" ! -type d -print0
             elif [[ -f "$rel" ]]; then
-                printf '%s\n' "$rel"
+                printf '%s\0' "$rel"
+            else
+                echo "Unsupported manifest input type: $rel" >&2
+                exit 1
             fi
-        done | LC_ALL=C sort | while IFS= read -r rel_path; do
-            [[ -n "$rel_path" ]] || continue
-            if [[ "$rel_path" == *$'\t'* ]]; then
-                echo "Skipping manifest path with tab: $rel_path" >&2
-                continue
-            fi
-            printf '%s\n' "$rel_path"
         done
-    ) > "$paths_file"
+    ) > "$raw_entries_file"; then
+        rm -f "$raw_entries_file" "$entries_file" "$files_file" "$data_file"
+        return 1
+    fi
+
+    while IFS= read -r -d '' rel_path; do
+        [[ -n "$rel_path" ]] || continue
+        if worms_has_control_chars "$rel_path"; then
+            echo "Unsafe control character in manifest path" >&2
+            status=1
+            break
+        fi
+        if [[ -L "$root_dir/$rel_path" ]]; then
+            printf 'symlink\t%s\n' "$rel_path" >> "$entries_file"
+        elif [[ -f "$root_dir/$rel_path" ]]; then
+            printf 'file\t%s\n' "$rel_path" >> "$entries_file"
+        else
+            echo "Unsupported manifest entry type: $rel_path" >&2
+            status=1
+            break
+        fi
+    done < "$raw_entries_file"
+
+    if [[ "$status" -ne 0 ]]; then
+        rm -f "$raw_entries_file" "$entries_file" "$files_file" "$data_file"
+        return 1
+    fi
+
+    LC_ALL=C sort -u "$entries_file" -o "$entries_file"
+
+    awk -F '\t' '$1 == "file" {sub(/^[^\t]*\t/, ""); print}' "$entries_file" > "$files_file"
+
+    worms_manifest_hashes "$root_dir" "$files_file" | while IFS= read -r hash_line; do
+        [[ -n "$hash_line" ]] || continue
+        hash=${hash_line%% *}
+        rel_path=${hash_line#*  }
+        printf '%s\t%s\t%s\n' "$hash" "$(worms_file_size "$root_dir/$rel_path")" "$rel_path"
+    done > "$data_file"
+
+    while IFS=$'\t' read -r entry_type rel_path extra; do
+        [[ "$entry_type" == "symlink" ]] || continue
+        if [[ -n "${extra:-}" ]] || [[ -z "$rel_path" ]]; then
+            echo "Invalid symlink manifest path: $rel_path" >&2
+            status=1
+            break
+        fi
+        target=$(readlink "$root_dir/$rel_path" 2>/dev/null || true)
+        if [[ -z "$target" ]] || worms_has_control_chars "$target"; then
+            echo "Unsafe symlink target in manifest input: $rel_path" >&2
+            status=1
+            break
+        fi
+        target_hash=$(worms_text_sha256 "$target")
+        target_size=$(worms_text_size "$target")
+        printf 'symlink:%s\t%s\t%s\n' "$target_hash" "$target_size" "$rel_path" >> "$data_file"
+    done < "$entries_file"
+
+    if [[ "$status" -ne 0 ]]; then
+        rm -f "$raw_entries_file" "$entries_file" "$files_file" "$data_file"
+        return 1
+    fi
 
     {
-        echo "# WormsWMD manifest v1"
-        echo "# sha256	size	path"
-        worms_manifest_hashes "$root_dir" "$paths_file" | while IFS= read -r hash_line; do
-            [[ -n "$hash_line" ]] || continue
-            hash=${hash_line%% *}
-            rel_path=${hash_line#*  }
-            printf '%s\t%s\t%s\n' "$hash" "$(worms_file_size "$root_dir/$rel_path")" "$rel_path"
-        done
+        echo "# WormsWMD manifest v2"
+        echo "# sha256-or-symlink-digest	size	path"
+        LC_ALL=C sort -t $'\t' -k3,3 "$data_file"
     } > "$manifest_file"
 
-    rm -f "$paths_file"
+    rm -f "$raw_entries_file" "$entries_file" "$files_file" "$data_file"
 }
 
 worms_verify_manifest() {
     local root_dir="$1"
     local manifest_file="$2"
     local expected_hash expected_size rel_path actual_size status=0
-    local paths_file expected_file actual_file hash_line actual_hash actual_path actual_extra
+    local paths_file expected_file actual_file tree_file tree_expected_file
+    local hash_line actual_hash actual_path actual_extra
+    local root_real manifest_dir_real manifest_rel="" extra_path manifest_version duplicate_path
+    local symlink_hash symlink_target
 
     [[ -f "$manifest_file" ]] || return 1
+    if [[ -L "$manifest_file" ]] || [[ "$(worms_file_link_count "$manifest_file")" -gt 1 ]]; then
+        echo "Manifest must be a regular non-linked file: $manifest_file" >&2
+        return 1
+    fi
 
     paths_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-paths.XXXXXX")
     expected_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-expected.XXXXXX")
     actual_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-actual.XXXXXX")
+    tree_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-tree.XXXXXX")
+    tree_expected_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-manifest-tree-expected.XXXXXX")
+
+    manifest_version=$(sed -n 's/^# WormsWMD manifest v\([0-9][0-9]*\)$/\1/p' "$manifest_file" | head -1)
+    manifest_version=${manifest_version:-1}
+    if [[ "$manifest_version" != "1" ]] && [[ "$manifest_version" != "2" ]]; then
+        echo "Unsupported manifest version: $manifest_version" >&2
+        rm -f "$paths_file" "$expected_file" "$actual_file" "$tree_file" "$tree_expected_file"
+        return 1
+    fi
+
+    worms_validate_tree_paths "$root_dir" || status=1
+    worms_validate_tree_entry_types "$root_dir" || status=1
+    worms_validate_tree_symlinks "$root_dir" || status=1
+    worms_validate_tree_hardlinks "$root_dir" || status=1
 
     while IFS=$'\t' read -r expected_hash expected_size rel_path extra; do
         [[ -n "${expected_hash:-}" ]] || continue
@@ -633,17 +1005,43 @@ worms_verify_manifest() {
             status=1
             continue
         fi
-        if [[ ! "$expected_hash" =~ ^[a-fA-F0-9]{64}$ ]] || [[ ! "$expected_size" =~ ^[0-9]+$ ]]; then
-            echo "Invalid manifest checksum or size for $rel_path" >&2
-            status=1
-            continue
-        fi
         if worms_path_has_parent_escape "$rel_path"; then
             echo "Unsafe manifest path: $rel_path" >&2
             status=1
             continue
         fi
-        if [[ ! -f "$root_dir/$rel_path" ]]; then
+        printf '%s\n' "$rel_path" >> "$tree_expected_file"
+
+        if [[ "$expected_hash" == symlink:* ]]; then
+            symlink_hash=${expected_hash#symlink:}
+            if [[ "$manifest_version" != "2" ]] \
+                || [[ ! "$symlink_hash" =~ ^[a-fA-F0-9]{64}$ ]] \
+                || [[ ! "$expected_size" =~ ^[0-9]+$ ]]; then
+                echo "Invalid manifest symlink checksum or size for $rel_path" >&2
+                status=1
+                continue
+            fi
+            if [[ ! -L "$root_dir/$rel_path" ]]; then
+                echo "Manifest symlink missing: $rel_path" >&2
+                status=1
+                continue
+            fi
+            symlink_target=$(readlink "$root_dir/$rel_path" 2>/dev/null || true)
+            actual_size=$(worms_text_size "$symlink_target")
+            actual_hash=$(worms_text_sha256 "$symlink_target")
+            if [[ "$actual_size" != "$expected_size" ]] || [[ "$actual_hash" != "$symlink_hash" ]]; then
+                echo "Manifest symlink mismatch: $rel_path" >&2
+                status=1
+            fi
+            continue
+        fi
+
+        if [[ ! "$expected_hash" =~ ^[a-fA-F0-9]{64}$ ]] || [[ ! "$expected_size" =~ ^[0-9]+$ ]]; then
+            echo "Invalid manifest checksum or size for $rel_path" >&2
+            status=1
+            continue
+        fi
+        if [[ ! -f "$root_dir/$rel_path" ]] || [[ -L "$root_dir/$rel_path" ]]; then
             echo "Manifest file missing: $rel_path" >&2
             status=1
             continue
@@ -659,6 +1057,40 @@ worms_verify_manifest() {
         printf '%s\n' "$rel_path" >> "$paths_file"
         printf '%s\t%s\n' "$expected_hash" "$rel_path" >> "$expected_file"
     done < "$manifest_file"
+
+    duplicate_path=$(LC_ALL=C sort "$tree_expected_file" | uniq -d | head -1 || true)
+    if [[ -n "$duplicate_path" ]]; then
+        echo "Manifest contains duplicate path: $duplicate_path" >&2
+        status=1
+    fi
+
+    root_real=$(worms_real_dir "$root_dir") || status=1
+    manifest_dir_real=$(worms_real_dir "$(dirname "$manifest_file")" || true)
+    if [[ -n "$root_real" ]] && [[ "$manifest_dir_real" == "$root_real" ]]; then
+        manifest_rel=$(basename "$manifest_file")
+    elif [[ -n "$root_real" ]] && [[ "$manifest_dir_real" == "$root_real"/* ]]; then
+        manifest_rel="${manifest_dir_real#"$root_real"/}/$(basename "$manifest_file")"
+    fi
+
+    : > "$tree_file"
+    while IFS= read -r -d '' actual_path; do
+        actual_path=${actual_path#./}
+        [[ -n "$actual_path" ]] || continue
+        [[ "$actual_path" == "$manifest_rel" ]] && continue
+        printf '%s\n' "$actual_path" >> "$tree_file"
+    done < <(
+        cd "$root_dir" || exit 1
+        if [[ "$manifest_version" == "2" ]]; then
+            find . ! -type d -print0
+        else
+            find . -type f -print0
+        fi
+    )
+    extra_path=$(awk 'NR == FNR {expected[$0]=1; next} !($0 in expected) {print; exit}' "$tree_expected_file" "$tree_file")
+    if [[ -n "$extra_path" ]]; then
+        echo "Manifest contains unrecorded entry: $extra_path" >&2
+        status=1
+    fi
 
     worms_manifest_hashes "$root_dir" "$paths_file" | while IFS= read -r hash_line; do
         [[ -n "$hash_line" ]] || continue
@@ -686,7 +1118,7 @@ worms_verify_manifest() {
     fi
     exec 3<&-
 
-    rm -f "$paths_file" "$expected_file" "$actual_file"
+    rm -f "$paths_file" "$expected_file" "$actual_file" "$tree_file" "$tree_expected_file"
 
     return "$status"
 }

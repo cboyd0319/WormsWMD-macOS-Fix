@@ -171,21 +171,43 @@ dylib_id_for() {
 fix_binary() {
     local bin="$1"
     local id="$2"
+    local label="${3:-$(basename "$bin")}"
     local dep
     local dep_id
     local fw_name
     local dep_base
+    local resolved
+    local tool_output
 
     if [ ! -f "$bin" ]; then
         return
     fi
 
     if [ -n "$id" ]; then
-        install_name_tool -id "$id" "$bin" 2>/dev/null || true
+        if ! tool_output=$(install_name_tool -id "$id" "$bin" 2>&1); then
+            echo "ERROR: Failed to update install ID for $label"
+            [[ -n "$tool_output" ]] && echo "$tool_output"
+            return 1
+        fi
     fi
 
     while IFS= read -r dep; do
+        dep_id=""
         if [[ "$dep" == @executable_path/* ]] || [[ "$dep" == @loader_path/* ]]; then
+            resolved=$(worms_expand_macho_path "$dep" "$bin" "$GAME_EXEC" || true)
+            if [[ -z "$resolved" ]] \
+                || ! worms_path_inside_root "$GAME_APP/Contents" "$resolved"; then
+                echo "ERROR: Dependency resolves outside the app bundle in $label: $dep"
+                return 1
+            fi
+            if [[ ! -f "$resolved" ]]; then
+                if worms_macho_dependency_is_weak "$bin" "$dep"; then
+                    echo "WARNING: Keeping optional missing dependency for $label: $dep"
+                else
+                    echo "ERROR: Missing dependency in $label: $dep"
+                    return 1
+                fi
+            fi
             continue
         fi
 
@@ -193,16 +215,44 @@ fix_binary() {
             fw_name=$(basename "${dep%%.framework/*}")
             dep_id=$(fw_id_for "$fw_name" || true)
             if [ -n "$dep_id" ]; then
-                install_name_tool -change "$dep" "$dep_id" "$bin" 2>/dev/null || true
+                if ! tool_output=$(install_name_tool -change "$dep" "$dep_id" "$bin" 2>&1); then
+                    echo "ERROR: Failed to update dependency in $label: $dep"
+                    [[ -n "$tool_output" ]] && echo "$tool_output"
+                    return 1
+                fi
             fi
-            continue
+        else
+            dep_base=$(basename "$dep")
+            dep_id=$(dylib_id_for "$dep_base" || true)
+            if [ -n "$dep_id" ]; then
+                if ! tool_output=$(install_name_tool -change "$dep" "$dep_id" "$bin" 2>&1); then
+                    echo "ERROR: Failed to update dependency in $label: $dep"
+                    [[ -n "$tool_output" ]] && echo "$tool_output"
+                    return 1
+                fi
+            fi
         fi
 
-        dep_base=$(basename "$dep")
-        dep_id=$(dylib_id_for "$dep_base" || true)
-        if [ -n "$dep_id" ]; then
-            install_name_tool -change "$dep" "$dep_id" "$bin" 2>/dev/null || true
-        fi
+        [[ -n "$dep_id" ]] && continue
+
+        case "$dep" in
+            /usr/lib/*|/System/Library/*)
+                ;;
+            @rpath/*)
+                if worms_resolve_macho_rpath_dependency "$bin" "$dep" "$GAME_EXEC" "$GAME_APP" >/dev/null; then
+                    echo "Keeping bundled rpath dependency for $label: $dep"
+                elif worms_macho_dependency_is_weak "$bin" "$dep"; then
+                    echo "WARNING: Keeping optional unresolved dependency for $label: $dep"
+                else
+                    echo "ERROR: Unresolved dependency in $label: $dep"
+                    return 1
+                fi
+                ;;
+            *)
+                echo "ERROR: Unportable dependency in $label: $dep"
+                return 1
+                ;;
+        esac
     done < <(worms_otool_dependencies "$bin")
 }
 
@@ -210,28 +260,28 @@ echo ""
 echo "--- Updating install names ---"
 
 echo "Fixing Worms W.M.D..."
-fix_binary "$GAME_EXEC" ""
+fix_binary "$GAME_EXEC" "" "Worms W.M.D"
 
 for i in "${!fw_bins[@]}"; do
     echo "Fixing ${fw_names[$i]}.framework..."
-    fix_binary "${fw_bins[$i]}" "${fw_ids[$i]}"
+    fix_binary "${fw_bins[$i]}" "${fw_ids[$i]}" "${fw_names[$i]}.framework"
 done
 
 for i in "${!dylib_paths[@]}"; do
     echo "Fixing ${dylib_names[$i]}..."
-    fix_binary "${dylib_paths[$i]}" "${dylib_ids[$i]}"
+    fix_binary "${dylib_paths[$i]}" "${dylib_ids[$i]}" "${dylib_names[$i]}"
 done
 
 if [ -f "$GAME_PLUGINS/platforms/libqcocoa.dylib" ]; then
     echo "Fixing libqcocoa.dylib..."
-    fix_binary "$GAME_PLUGINS/platforms/libqcocoa.dylib" "@executable_path/../PlugIns/platforms/libqcocoa.dylib"
+    fix_binary "$GAME_PLUGINS/platforms/libqcocoa.dylib" "@executable_path/../PlugIns/platforms/libqcocoa.dylib" "libqcocoa.dylib"
 fi
 
 for plugin in "$GAME_PLUGINS/imageformats/"*.dylib; do
     if [ -f "$plugin" ]; then
         name=$(basename "$plugin")
         echo "Fixing $name..."
-        fix_binary "$plugin" "@executable_path/../PlugIns/imageformats/$name"
+        fix_binary "$plugin" "@executable_path/../PlugIns/imageformats/$name" "$name"
     fi
 done
 

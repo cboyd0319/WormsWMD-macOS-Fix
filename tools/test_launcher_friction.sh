@@ -7,6 +7,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/common.sh"
+
 fail() {
     printf 'launcher friction check failed: %s\n' "$*" >&2
     exit 1
@@ -23,6 +26,20 @@ grep -Fq 'Launch Worms W.M.D now? [Y/n]' "$launcher" \
     || fail "launcher does not offer to launch after applying the fix"
 grep -Fq 'run_launch_readiness_check' "$launcher" \
     || fail "launcher does not have a launch-readiness check"
+readiness_block=$(awk '/^run_launch_readiness_check\(\)/ {inside=1} inside {print} /^}/ && inside {exit}' "$launcher")
+grep -Fq 'select_game_app_if_needed' <<< "$readiness_block" \
+    || fail "launcher readiness check does not preserve the selected installation"
+launch_block=$(awk '/^launch_game\(\)/ {inside=1} inside {print} /^}/ && inside {exit}' "$launcher")
+grep -Fq 'select_game_app_if_needed' <<< "$launch_block" \
+    || fail "launcher launch action does not preserve the selected installation"
+# shellcheck disable=SC2016
+if grep -Fq 'print_line "  $i) $game"' "$launcher" \
+    || grep -Fq 'print_line "Open this installation directly: $GAME_APP"' "$launcher"; then
+    fail "launcher still sends an untrusted game path through printf %b"
+fi
+if grep -Fq "printf '%b" "$launcher"; then
+    fail "launcher still interprets backslash escapes in rendered text"
+fi
 grep -Fq 'tools/preflight_check.sh" --quick' "$launcher" \
     || fail "launcher readiness check does not run quick preflight"
 grep -Fq 'fix_worms_wmd.sh" --verify' "$launcher" \
@@ -46,6 +63,9 @@ grep -Fq "| \`7\` | Launch Worms W.M.D. |" "$readme" \
     || fail "README.md launcher options table is missing option 7"
 grep -Fq 'option 7 to launch Worms W.M.D' "$install_doc" \
     || fail "docs/INSTALL.md launcher option list is missing option 7"
+# shellcheck disable=SC2016
+grep -Fq 'if $HAS_GALAXY && ! $HAS_STEAM' "$install_doc" \
+    || fail "manual restore docs do not reject ambiguous storefront identity"
 grep -Fq "GAME_APP=\"\$GAME_APP\" ./fix_worms_wmd.sh --force" "$ROOT_DIR/tools/watch_for_updates.sh" \
     || fail "watcher daemon reapply does not forward GAME_APP"
 if ! grep -F "GAME_APP=\"\$GAME_APP\" ./fix_worms_wmd.sh" "$ROOT_DIR/tools/watch_for_updates.sh" | grep -Fvq -- "--force"; then
@@ -153,6 +173,75 @@ HOME="$crash_home" \
 [[ ! -e "$crash_home/Library/OutsideCrash" ]] \
     || fail "enhanced launcher created a crash directory while crash reporting was disabled"
 
+multi_home="$tmp_dir/multi-home"
+multi_steam_app="$multi_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"
+multi_gog_app="$multi_home/GOG Games/Worms W.M.D/Worms W.M.D.app"
+mkdir -p \
+    "$multi_home/Desktop" \
+    "$multi_steam_app/Contents/MacOS" \
+    "$multi_gog_app/Contents/MacOS"
+printf '#!/bin/bash\nexit 0\n' > "$multi_steam_app/Contents/MacOS/Worms W.M.D"
+printf '#!/bin/bash\nexit 0\n' > "$multi_gog_app/Contents/MacOS/Worms W.M.D"
+chmod +x \
+    "$multi_steam_app/Contents/MacOS/Worms W.M.D" \
+    "$multi_gog_app/Contents/MacOS/Worms W.M.D"
+
+multi_gog_choice=0
+candidate_number=1
+while IFS= read -r -d '' candidate_game; do
+    if [[ "$candidate_game" == "$multi_gog_app" ]]; then
+        multi_gog_choice=$candidate_number
+        break
+    fi
+    candidate_number=$((candidate_number + 1))
+done < <(HOME="$multi_home" worms_find_game_apps)
+[[ "$multi_gog_choice" -gt 0 ]] || fail "test could not identify the synthetic GOG installation"
+
+printf '5\n%s\n\nq\nq\n' "$multi_gog_choice" | HOME="$multi_home" bash "$launcher" > "$tmp_dir/multi-menu.out" 2>&1 \
+    || fail "launcher did not create support for a selected GOG installation"
+multi_bundle=$(find "$multi_home/Desktop" -type f -name 'wormswmd-support-*.tar.gz' -print -quit)
+[[ -n "$multi_bundle" ]] || fail "multi-install launcher did not create a support bundle"
+mkdir -p "$tmp_dir/multi-extracted"
+tar -xzf "$multi_bundle" -C "$tmp_dir/multi-extracted"
+grep -Fq 'Found: ~/GOG Games/Worms W.M.D/Worms W.M.D.app' "$tmp_dir/multi-extracted/diagnostics.txt" \
+    || fail "support bundle inspected Steam instead of the selected GOG installation"
+
+multi_bin="$tmp_dir/multi-bin"
+multi_open_log="$tmp_dir/multi-open.log"
+mkdir -p "$multi_bin"
+cat > "$multi_bin/open" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$WORMS_TEST_OPEN_LOG"
+if [[ -n "${WORMS_TEST_OPEN_FAIL_PATH:-}" ]] && [[ "${1:-}" == "$WORMS_TEST_OPEN_FAIL_PATH" ]]; then
+    exit 1
+fi
+exit 0
+STUB
+chmod +x "$multi_bin/open"
+printf '7\n%s\n\nq\n' "$multi_gog_choice" | \
+    HOME="$multi_home" \
+    PATH="$multi_bin:$PATH" \
+    WORMS_TEST_OPEN_LOG="$multi_open_log" \
+    bash "$launcher" > "$tmp_dir/multi-launch.out" 2>&1 \
+    || fail "launcher did not launch the selected GOG installation"
+grep -Fxq "$multi_gog_app" "$multi_open_log" \
+    || fail "launcher did not pass the selected GOG app to open: $(cat "$multi_open_log")"
+if grep -Fq 'steam://run/327030' "$multi_open_log"; then
+    fail "launcher ignored the selected GOG app and launched Steam"
+fi
+
+failed_gog_open_log="$tmp_dir/failed-gog-open.log"
+printf '7\n%s\n\nq\n' "$multi_gog_choice" | \
+    HOME="$multi_home" \
+    PATH="$multi_bin:$PATH" \
+    WORMS_TEST_OPEN_LOG="$failed_gog_open_log" \
+    WORMS_TEST_OPEN_FAIL_PATH="$multi_gog_app" \
+    bash "$launcher" > "$tmp_dir/failed-gog-launch.out" 2>&1 \
+    || fail "launcher menu failed after the selected GOG app could not be opened"
+if grep -Fq 'steam://run/327030' "$failed_gog_open_log"; then
+    fail "launcher fell back to Steam after the selected GOG installation failed to open"
+fi
+
 printf 'q\n' | bash "$launcher" > "$tmp_dir/menu.out" 2>&1 \
     || fail "launcher did not accept piped menu input"
 if grep -Fq '/dev/tty' "$tmp_dir/menu.out"; then
@@ -160,5 +249,16 @@ if grep -Fq '/dev/tty' "$tmp_dir/menu.out"; then
 fi
 grep -Fq 'Okay. No changes were made from this menu choice.' "$tmp_dir/menu.out" \
     || fail "launcher did not process piped quit input"
+
+control_game_app="$tmp_dir/Control"$'\033'"Path/Worms W.M.D.app"
+mkdir -p "$control_game_app/Contents/MacOS"
+printf '#!/bin/bash\nexit 0\n' > "$control_game_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$control_game_app/Contents/MacOS/Worms W.M.D"
+printf '7\n\nq\n' | GAME_APP="$control_game_app" bash "$launcher" \
+    > "$tmp_dir/control-path-menu.out" 2>&1 \
+    || fail "launcher menu crashed while rejecting a control-byte GAME_APP"
+if LC_ALL=C grep -q '[[:cntrl:]]' "$tmp_dir/control-path-menu.out"; then
+    fail "launcher rendered a terminal control byte from GAME_APP"
+fi
 
 printf 'Launcher friction regression check passed.\n'

@@ -35,11 +35,11 @@ Back up and restore your save games, settings, and replays:
 ./tools/backup_saves.sh --restore ~/Documents/WormsWMD-SaveBackups/saves-20251225-120000.tar.gz
 ```
 
-New save backups include a `MANIFEST.tsv` file. Restore validates archive
-layout before extraction, verifies the manifest when present, copies backup
-contents into a temporary tree, replaces the backed-up save roots, and verifies
-that stale files absent from the backup did not survive. Older legacy backups
-that predate manifests restore with an explicit warning.
+New save backups include a `MANIFEST.tsv` file. Restore rejects exact/canonical
+duplicate members, control-character paths, links, and special entries before
+use; it verifies the manifest, stages each save tree, replaces the backed-up
+roots, and checks that stale files did not survive. Older legacy backups that
+predate manifests restore with an explicit warning.
 
 ## Steam update watcher
 
@@ -109,10 +109,17 @@ email addresses, and common secret-like key/value strings. Support bundles
 contain diagnostics, macOS version, Rosetta package version when available,
 x86_64 execution status, sanitized installer history, runtime invariant status,
 pre-built Qt package verification details, backup integrity status, and
-available backup manifests; they do not include raw logs, crash logs, save
-files, game binaries, or private config file contents. The support-bundle
+deduplicated backup manifests. They also report the selected installation,
+Mach-O run paths, resolved or optional executable dependencies, and backup
+storefront metadata. They do not include raw logs, crash logs, save files, game
+binaries, or private config file contents. The support-bundle
 archive also normalizes tar owner and group metadata so it does not expose the
-local macOS account name.
+local macOS account name. Terminal escape sequences and other C0/DEL controls
+are removed from support text while TSV tabs remain intact.
+
+If more than one installation is detected, direct diagnostics require
+`GAME_APP`. The friendly launcher prompts once and preserves that selection for
+apply, verify, support, and launch actions.
 
 ## Enhanced launcher
 

@@ -108,8 +108,8 @@ check_arch() {
 
     archs=$(lipo -archs "$bin" 2>/dev/null || true)
     if [[ -z "$archs" ]]; then
-        echo "WARNING: Unable to read architectures for $label"
-        ((warnings++))
+        echo "ERROR: Unable to read architectures for $label"
+        ((errors++))
         return
     fi
 
@@ -143,9 +143,18 @@ check_missing_deps() {
             continue
         fi
 
+        if ! worms_path_inside_root "$GAME_APP/Contents" "$resolved"; then
+            continue
+        fi
+
         if [ ! -f "$resolved" ]; then
-            echo "ERROR: Missing dependency for $(basename "$bin"): $dep"
-            ((errors++))
+            if worms_macho_dependency_is_weak "$bin" "$dep"; then
+                echo "WARNING: $(basename "$bin") has optional missing dependency: $dep"
+                ((warnings++))
+            else
+                echo "ERROR: Missing dependency for $(basename "$bin"): $dep"
+                ((errors++))
+            fi
         fi
     done < <(worms_otool_dependencies "$bin")
 }
@@ -153,15 +162,28 @@ check_missing_deps() {
 check_unsafe_deps() {
     local bin="$1"
     local label="$2"
-    local dep
+    local dep resolved
 
     while IFS= read -r dep; do
         case "$dep" in
             @executable_path/*|@loader_path/*)
+                resolved=$(worms_expand_macho_path "$dep" "$bin" "$GAME_EXEC" || true)
+                if [[ -z "$resolved" ]] \
+                    || ! worms_path_inside_root "$GAME_APP/Contents" "$resolved"; then
+                    echo "ERROR: $label has dependency resolving outside the app bundle: $dep"
+                    ((errors++))
+                elif $VERBOSE; then
+                    echo "PATH: $label -> $dep -> ${resolved#"$GAME_APP"/}"
+                fi
                 ;;
             @rpath/*)
-                if [[ "$dep" == "@rpath/libsharpyuv.0.dylib" ]] && [[ "$label" == libwebp*.dylib ]]; then
-                    echo "WARNING: $label has optional unresolved WebP dependency: $dep"
+                resolved=$(worms_resolve_macho_rpath_dependency "$bin" "$dep" "$GAME_EXEC" "$GAME_APP" || true)
+                if [[ -n "$resolved" ]]; then
+                    if $VERBOSE; then
+                        echo "RPATH: $label -> $dep -> ${resolved#"$GAME_APP"/}"
+                    fi
+                elif worms_macho_dependency_is_weak "$bin" "$dep"; then
+                    echo "WARNING: $label has optional unresolved @rpath dependency: $dep"
                     ((warnings++))
                 else
                     echo "ERROR: $label has unresolved @rpath dependency: $dep"
@@ -172,6 +194,10 @@ check_unsafe_deps() {
                 ;;
             /*)
                 echo "ERROR: $label has external absolute dependency: $dep"
+                ((errors++))
+                ;;
+            *)
+                echo "ERROR: $label has unportable relative dependency: $dep"
                 ((errors++))
                 ;;
         esac
@@ -190,6 +216,17 @@ else
     check_missing_deps "$GAME_EXEC"
     print_deps "$GAME_EXEC" "Main executable"
 fi
+
+# Check storefront libraries stored beside the main executable (GOG Galaxy).
+for lib in "$GAME_APP/Contents/MacOS/"*.dylib; do
+    if [ -f "$lib" ]; then
+        name=$(basename "$lib")
+        check_unsafe_deps "$lib" "$name"
+        check_arch "$lib" "$name"
+        check_missing_deps "$lib"
+        print_deps "$lib" "$name"
+    fi
+done
 
 # Check frameworks
 echo ""
@@ -291,6 +328,26 @@ echo "OK: Library dependencies checked"
 # Check plugins
 echo ""
 echo "--- Checking plugins ---"
+plugin_inventory_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-plugin-inventory.XXXXXX")
+if ! find "$GAME_PLUGINS" \( -type l -o \( -type f -name '*.dylib' \) \) -print0 \
+    > "$plugin_inventory_file" 2>/dev/null; then
+    echo "ERROR: Unable to inventory every Qt plugin entry"
+    ((errors++))
+else
+    while IFS= read -r -d '' plugin; do
+        if [[ -L "$plugin" ]]; then
+            echo "ERROR: Linked Qt plugin entry is not supported: ${plugin#"$GAME_APP/Contents/"}"
+            ((errors++))
+            continue
+        fi
+        name=$(basename "$plugin")
+        check_unsafe_deps "$plugin" "$name"
+        check_arch "$plugin" "$name"
+        check_missing_deps "$plugin"
+        print_deps "$plugin" "$name"
+    done < "$plugin_inventory_file"
+fi
+rm -f "$plugin_inventory_file"
 if [ ! -f "$GAME_PLUGINS/platforms/libqcocoa.dylib" ]; then
     echo "ERROR: Required platform plugin missing: platforms/libqcocoa.dylib"
     ((errors++))
@@ -299,15 +356,6 @@ if [ ! -f "$GAME_PLUGINS/imageformats/libqsvg.dylib" ]; then
     echo "ERROR: Required image plugin missing: imageformats/libqsvg.dylib"
     ((errors++))
 fi
-for plugin in "$GAME_PLUGINS/platforms/"*.dylib "$GAME_PLUGINS/imageformats/"*.dylib; do
-    if [ -f "$plugin" ]; then
-        name=$(basename "$plugin")
-        check_unsafe_deps "$plugin" "$name"
-        check_arch "$plugin" "$name"
-        check_missing_deps "$plugin"
-        print_deps "$plugin" "$name"
-    fi
-done
 echo "OK: Plugins checked"
 
 # Check Info.plist and config URLs

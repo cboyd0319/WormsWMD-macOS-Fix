@@ -19,11 +19,11 @@ This fix is designed to be safe against:
 | Threat | Mitigation |
 |--------|------------|
 | Malicious code injection | All scripts use `set -euo pipefail`, no `eval` on user input |
-| Path traversal attacks | Archive validation rejects `../` and absolute paths |
+| Path traversal attacks | Archive validation rejects `../`, absolute/control paths, and canonical aliases |
 | Man-in-the-middle attacks | HTTPS with TLS 1.2+ required, checksums verified |
 | Insecure game URLs | HTTP URLs upgraded to HTTPS, staging URLs disabled |
 | Privilege escalation | No `sudo`, no SUID, runs entirely as current user |
-| Symlink attacks | Temp files use `mktemp`, cleanup traps prevent dangling files |
+| Symlink attacks | Temp files use `mktemp`; whole bundle trees reject escaping symlinks and hardlinks before recursive mutation |
 | Supply chain attacks | Pre-built packages require SHA256, metadata, manifest, and architecture verification |
 
 ## What the fix modifies
@@ -35,7 +35,9 @@ This fix is designed to be safe against:
 | `Contents/Frameworks/` | Replace Qt frameworks | Upgrade Qt 5.3.2 to 5.15.x |
 | `Contents/Frameworks/AGL.framework/` | Add stub library | Satisfy removed AGL dependency |
 | `Contents/Frameworks/*.dylib` | Add dependency libraries | Bundle required runtime libraries |
-| `Contents/PlugIns/` | Replace Qt plugins | Update platform and image plugins |
+| `Contents/PlugIns/` | Replace Qt plugins | Update platform/image plugins and remove known stale Qt 5.3 categories |
+| `Contents/MacOS/` | Rewrite matching install names and ad-hoc sign nested code | Keep runtime references portable, including GOG Galaxy |
+| `Contents/_CodeSignature/` | Replace signature resources | Match the ad-hoc signed bundle |
 | `Contents/Info.plist` | Update metadata | Add bundle ID, HiDPI flags, min version |
 | `Contents/Resources/DataOSX/*.txt` | Update URLs | Use HTTPS, disable internal staging URLs |
 | `Contents/Resources/CommonData/*.txt` | Update URLs | Use HTTPS for analytics/HTTP config |
@@ -125,7 +127,8 @@ Actions built the asset from this repository.
 Pre-built Qt framework packages undergo multiple verification steps:
 
 1. **Source verification**: Downloaded only from local `dist/` or the pinned
-   release commit's `dist/` directory
+   release commit's `dist/` directory; dependency source symlinks are resolved
+   before provenance-prefix allowlisting
 2. **Checksum validation**: SHA256 hash must match the `.sha256` file
 3. **Version and metadata validation**: Package names and `METADATA.txt` must
    agree on a numeric Qt 5.15.x version and x86_64 architecture
@@ -136,12 +139,13 @@ Pre-built Qt framework packages undergo multiple verification steps:
    - `MANIFEST.txt`
    - `SOURCE_PROVENANCE.tsv`
 5. **Path traversal and link protection**: Archives containing `../`, `/..`,
-   absolute paths, unsafe symlink targets, hardlinks, or special files are
-   rejected
+   absolute/control-character paths, unsafe symlink targets, hardlinks, special
+   files, or exact/canonical duplicate members are rejected
 6. **Required content validation**: Required Qt frameworks, the Cocoa platform
    plugin, metadata, and plugin directories must be present after extraction
-7. **Architecture validation**: Framework and plugin binaries must contain an
-   `x86_64` Mach-O slice
+7. **Architecture and closure validation**: Framework, plugin, and dependency
+   binaries must be readable Mach-O files with an `x86_64` slice, and required
+   non-system dependencies must exist in the package
 8. **Package manifest validation**: `MANIFEST.txt` is verified when present in
    the archive; extracted cache directories get a generated manifest when the
    legacy archive does not include one
@@ -162,6 +166,8 @@ This signature:
 - Allows the app to run without Gatekeeper warnings
 - Does not require an Apple Developer account
 - Is not notarized (Apple notarization would require the original developer)
+- Is verified with `codesign --verify --deep --strict` before the rollback
+  boundary closes; a signing or verification failure restores the backup
 
 The signature can be verified with:
 
@@ -191,7 +197,7 @@ User-controllable environment variables are validated:
 
 | Variable | Validation |
 |----------|------------|
-| `GAME_APP` | Must be a directory containing `Contents/MacOS/Worms W.M.D`; writable bundle subpaths must not be symlinks or resolve outside `Contents` |
+| `GAME_APP` | Must contain `Contents/MacOS/Worms W.M.D`; nested paths reject control characters, special entries, escaping symlinks, and hardlinks before recursive mutation |
 | `INSTALL_DIR` | Refuses system paths, home directory, non-empty non-repo directories, and Git repositories with a different remote |
 | `INSTALL_REF` | Defaults to pinned release `v1.7.5`; raw tag bootstraps pin the release tag, and the mainline maintenance bootstrap verifies the exact release commit; non-default refs require `WORMSWMD_ALLOW_UNPINNED_REF=1` |
 | `LOG_FILE` | Must be a regular `.log` path under `~/Library/Logs` |
@@ -222,7 +228,7 @@ All interactive prompts:
 
 ## Security audit checklist
 
-Last audit: 2026-06-22
+Last audit: 2026-08-26
 
 | Category | Status | Notes |
 |----------|--------|-------|
@@ -230,16 +236,16 @@ Last audit: 2026-06-22
 | Path traversal | Pass | Qt and save-backup archive validation, link rejection, no unvalidated path concatenation |
 | Network security | Pass | HTTPS-only, TLS 1.2+, checksums required |
 | Privilege escalation | Pass | No sudo/doas, no SUID, user-level only |
-| Symlink attacks | Pass | Main installer uses a per-run `mktemp` build directory, cleanup traps, bundle containment checks, and archive link rejection |
+| Symlink attacks | Pass | Main installer uses per-run staging, whole-bundle symlink/hardlink checks, mutation-directory containment, and archive link rejection |
 | Race conditions | Pass | Atomic operations where possible |
 | Secret exposure | Pass | No credentials in fix code; game config secrets documented in report |
 | Support bundle privacy | Pass | Sanitized bundles include OS, Rosetta, installer-history, runtime-invariant, Qt-package, and backup-integrity context without raw logs, saves, game binaries, or private config contents |
-| Dependency security | Pass | Checksums, metadata, manifests, and x86_64 slice checks for pre-built Qt |
+| Dependency security | Pass | Checksums, metadata, canonical manifests, complete closure checks, and readable x86_64 slices for pre-built Qt |
 | CI pinning | Pass | GitHub Actions use full commit SHAs, explicit stable runner labels, and a pinned ShellCheck binary version |
-| Code signing | Pass | Ad-hoc signature applied, quarantine cleared |
+| Code signing | Pass | Ad-hoc signature applied and strictly verified inside the rollback boundary; quarantine cleared afterward |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
-| Backup restore | Pass | Game backups validate manifests and safe symlinks; save archives reject links and special files before restore; legacy backups are flagged |
+| Backup restore | Pass | Verified staged v2 backups exactly replace `MacOS`, bind to app/storefront identity, use atomic collision-resistant publication, reject invalid metadata/unrecorded entries, and preserve v1 merge behavior |
 | Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
 
 ## Verifying the fix
@@ -310,14 +316,19 @@ lipo -archs "$HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/W
 
 The fix automatically creates a backup before making changes:
 
-**Backup location**: `~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS/`
+**Backup location**: `~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS/` after a
+hidden staging backup passes metadata and manifest verification
 
 **Backup contents**:
 - `Frameworks/` - Original Qt frameworks and libraries
 - `PlugIns/` - Original Qt plugins
+- `MacOS/` - Original launch files, main executable, and storefront libraries
+- `_CodeSignature/` - Original signature resources when present
 - `Info.plist` - Original app metadata
 - `DataOSX/` - Original configuration files
 - `CommonData/` - Original shared configuration files
+- `BACKUP_METADATA.tsv` - Canonical source app, storefront, executable identity,
+  complete-MacOS marker, and signature-presence metadata
 - `BACKUP_MANIFEST.tsv` - SHA256 and size manifest for backup verification
 
 **Restore command**:
@@ -371,7 +382,10 @@ Qt package supply-chain process:
 
 3. **Ad-hoc code signature**: The app is signed with an ad-hoc signature, not a Developer ID. This may trigger Gatekeeper warnings on some systems.
 
-4. **Legacy backups cannot be fully verified**: Backups created before manifest support can still be restored, but the scripts warn that they lack checksum manifests.
+4. **Legacy backups cannot be fully identified or verified**: Backups created
+   before manifest or source-metadata support can still be restored with an
+   explicit warning when one installation is present. Ambiguous multi-install
+   legacy restore is refused.
 
 5. **Game config secrets**: The original game ships with confirmed API credentials in config files. These are documented in TEAM17_DEVELOPER_REPORT.md (redacted) for Team17's awareness. The fix does not modify these credentials.
 

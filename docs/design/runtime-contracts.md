@@ -37,6 +37,10 @@ The main installer runs the fix scripts in this logical order:
 7. `scripts/05_verify_installation.sh` - verify framework, plugin, dependency,
    metadata, code-signing, quarantine, and config URL state.
 
+Hard runtime verification runs before ad-hoc signing, and strict signature
+verification remains inside the rollback boundary. Only afterward may the
+installer clear quarantine, reset Qt window geometry, and commit.
+
 Do not reorder these steps unless the verification contract is updated in the
 same change.
 
@@ -44,7 +48,11 @@ same change.
 
 The fix may modify files inside the selected `Worms W.M.D.app` bundle and may
 create user-owned backups, logs, cache files, and optional user LaunchAgents.
-It must not modify system directories or require elevated privileges.
+It must not modify system directories or require elevated privileges. Mutable
+bundle directories, including `Contents/MacOS`, must resolve inside the selected
+app rather than through a link to an external directory. Nested paths must not
+contain control characters, unsupported entry types, escaping symlinks, or
+hardlinked files that recursive signing could mutate outside the bundle.
 
 The default app path is:
 
@@ -53,26 +61,42 @@ $HOME/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.ap
 ```
 
 `GAME_APP` may point elsewhere. Always quote it because the bundle path contains
-spaces. When `GAME_APP` is not set and the default Steam path is absent, user
-entrypoints may auto-detect common Steam library, GOG, `/Applications`,
-`$HOME/Applications`, and `$HOME/Games` app-bundle locations.
+spaces. When `GAME_APP` is not set, user entrypoints enumerate common Steam
+library, GOG, `/Applications`, `$HOME/Applications`, and `$HOME/Games`
+app-bundle locations. Multiple installations require an explicit or interactive
+selection and must not silently fall back to Steam.
 
 ## Backup And Restore Contract
 
-Before destructive bundle changes, the fix creates a timestamped backup under
-`~/Documents/WormsWMD-Backup-*/`. Restore behavior must keep covering:
+Before destructive changes, the fix verifies a hidden staging backup, reserves
+a final name with a hidden atomic lock, then publishes it under
+`~/Documents/WormsWMD-Backup-*/`. Restore must cover:
 
 - `Contents/Frameworks/`
 - `Contents/PlugIns/`
+- `Contents/MacOS/`, including the main executable and GOG Galaxy libraries
+- `Contents/_CodeSignature/` when it existed before the fix
 - `Contents/Info.plist` when backed up
 - DataOSX config files when backed up
 - CommonData config files when backed up
+- `BACKUP_METADATA.tsv` with source-app and executable identity
 - `BACKUP_MANIFEST.tsv` for checksum and size verification of new backups
 
 When a game-bundle backup includes `BACKUP_MANIFEST.tsv`, restore and rollback
 must verify it before copying files back and must verify the restored files
-afterward. Backups without a manifest are legacy backups and may be restored
-only with an explicit warning.
+afterward. Backups without source metadata are legacy backups and may be
+restored only with an explicit warning. A backup containing metadata that is
+missing, malformed, duplicated, or not bound into its manifest is invalid, not
+legacy.
+
+Manifest verification must reject missing, changed, duplicate, unsupported,
+control-character, and unrecorded non-directory entries. Version 2 records
+symlink paths/targets; version 1 remains readable without symlink identity.
+
+New automatic restores require a matching canonical app and storefront.
+Metadata v2 requires a complete `MacOS` tree and staged replacement; v1 keeps
+historical merge behavior. Legacy backups without source metadata require one
+unambiguous installation. Failed verification is never reported as rollback.
 
 Backup creation may repair the fixer's own stale AGL framework symlink layout
 inside the backup copy before manifest validation. This self-heals repeated
@@ -82,7 +106,8 @@ symlinks that escape the backup root.
 Save-game backup behavior belongs to `tools/backup_saves.sh` and must remain
 separate from game-bundle restore behavior. Save-game archives must validate
 their tar layout and entry metadata before extraction, reject symlinks,
-hardlinks, and special files, verify `MANIFEST.tsv` when present, restore
+hardlinks, special files, canonical duplicate aliases, and control-character
+paths, verify `MANIFEST.tsv` when present, restore
 backed-up save roots from a temporary copy before replacing the target, detect
 stale files that were absent from the backup, and warn when restoring older
 archives that do not include a manifest.
@@ -91,8 +116,10 @@ archives that do not include a manifest.
 
 The preferred Qt source is the prebuilt archive in `dist/` plus its `.sha256`
 file. Archive extraction must reject unsafe layouts, traversal paths, unsafe
-symlink targets, hardlinks, and special files. Remote fallback must use a pinned
-commit for `dist/` contents. If a legacy archive lacks `MANIFEST.txt`, the
+symlink targets, hardlinks, special files, control-character paths, and exact or
+canonical duplicate archive members.
+Remote fallback must use a pinned commit for `dist/` contents. If a legacy
+archive lacks `MANIFEST.txt`, the
 downloader must generate and verify a cache-local manifest before installer use.
 Homebrew is a fallback, not the primary happy path.
 
@@ -100,8 +127,9 @@ When replacing the Qt archive:
 
 - Update the matching checksum file.
 - Validate the archive layout, package metadata, required frameworks/plugins,
-  archive manifest when present, generated cache manifest, and x86_64 Mach-O
-  slices.
+  complete dependency closure, archive manifest when present, generated cache
+  manifest, and readable x86_64 Mach-O slices.
+- Resolve dependency source symlinks before applying provenance-prefix policy.
 - Run the packaging or install verification relevant to the change.
 - Update user docs if the version, source, or fallback behavior changes.
 
@@ -115,6 +143,17 @@ where possible, and post-backup failures must trigger rollback.
 Copied Qt framework binaries must be made owner-writable before
 `install_name_tool` rewrites them. Package inputs may intentionally be
 read-only, but the game-bundle copies are mutable installer working files.
+
+`@rpath` is not an error by itself. Verification resolves run paths from the
+loading binary and main executable, accepts targets only inside the selected
+app bundle, and reports unresolved weak-load dependencies as optional warnings.
+The weak-load policy applies consistently to `@rpath`, `@executable_path`, and
+`@loader_path`. Unresolved strong dependencies and external absolute
+dependencies remain errors. Direct token paths must remain inside `Contents`,
+and relative dependency names are unportable errors. Intended
+`install_name_tool` mutations must fail with their underlying error instead of
+being silently ignored. Verification covers storefront dylibs in `MacOS`, every
+framework/root dylib, and every installed plugin category.
 
 When multiple local Qt packages are present, scripts should choose the highest
 verified supported Qt 5.15.x version rather than the newest file by modification
@@ -179,7 +218,11 @@ must not include raw `.log`, `.trace`, crash-log, save, game-binary, or private
 config-file contents. Support-bundle archives should normalize tar owner/group
 metadata so archive listings do not expose local account names.
 The friendly launcher's support option should delegate to
-`tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop`.
+`tools/collect_diagnostics.sh --bundle --bundle-output ~/Desktop` while
+preserving the selected `GAME_APP`. Direct diagnostics with multiple detected
+installations and no explicit target must report ambiguity instead of choosing
+one. Support bundles should include sanitized run-path resolution, backup source
+metadata, and one copy of byte-identical backup manifests.
 
 ## Validation Contract
 

@@ -4,7 +4,74 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
-No user-facing changes yet.
+### Changed
+
+- Support bundles now stay bound to the Steam or GOG installation selected in
+  the friendly launcher, report Mach-O run-path resolution, label backup source
+  metadata, remove ANSI fragments, and include only one copy of identical
+  backup manifests.
+- The Qt 5.15.19 package now contains the complete 16-dylib runtime closure,
+  including `libsharpyuv.0.dylib`, without duplicate plugin/tar entries or
+  build-only `.prl` metadata.
+- Quarantine removal and Qt geometry reset now happen only after hard runtime
+  and ad-hoc signature verification succeeds.
+
+### Fixed
+
+- Fixed issue #20 verification for GOG executables by resolving `@rpath`
+  dependencies through `LC_RPATH` and allowing unresolved weak-load
+  dependencies as warnings. Required unresolved dependencies still fail.
+- Applied the weak-load warning policy consistently to missing
+  `@executable_path` and `@loader_path` dependencies.
+- Fixed game-bundle backup and rollback coverage for the complete `MacOS`
+  directory, including GOG's `libGalaxy.dylib`, and existing signature resources.
+- Build and verify backups under a hidden staging name before publishing them
+  for restore, preventing interrupted backups from being selected as legacy.
+- Reserve final backup names with hidden atomic publication locks so concurrent
+  runs cannot nest one staged backup inside another run's destination.
+- Version 2 backup metadata marks complete `MacOS` coverage so restore performs
+  a staged directory swap and removes files absent from the backup; version 1
+  metadata remains readable with its prior merge behavior.
+- Bound new backups to their canonical source app and prevented an automatic
+  restore from applying a GOG backup to Steam, or a Steam backup to GOG.
+- Required both canonical path and storefront identity to match before an
+  automatic restore, including when different installations reuse a path.
+- Rejected game bundles whose mutable `Contents/MacOS` directory resolves
+  outside the selected app.
+- Rejected nested bundle symlinks, hardlinks, special entries, and all C-locale
+  control-byte paths that recursive signing or mutation could otherwise follow.
+- Fixed friendly-launcher option 7 so an interactive Steam or GOG selection is
+  used for the actual launch action.
+- Made install-name rewrite failures and AGL compiler failures actionable
+  instead of suppressing their underlying errors.
+- Stopped rollback from claiming success when restored-file verification
+  fails.
+- Made restore guidance use the recorded Steam or GOG storefront instead of
+  always recommending Steam repair.
+- Made manifest verification reject unrecorded extra files and Qt archive
+  validation reject unreadable archives and duplicate members before extraction.
+- Added v2 manifest coverage for symlink paths and target digests while keeping
+  existing v1 backups compatible with their legacy guarantees.
+- Rejected canonical archive aliases, duplicate manifest paths, special entries,
+  and control-character paths across game, save, Qt, and release integrity checks.
+- Canonicalized absolute Qt dependency sources before provenance allowlisting so
+  `cp -L` cannot follow an approved-prefix symlink to an external target.
+- Made missing or malformed current backup metadata fail closed instead of
+  falling through to the legacy restore path.
+- Rejected direct Mach-O dependencies that escape the app, unportable relative
+  dependencies, and unreadable required architectures; verification now checks
+  GOG libraries in `Contents/MacOS` and every installed Qt plugin category.
+- Removed stale Qt 5.3 accessibility and print-support plugins when installing
+  Qt 5.15, and stopped GOG launch failures from falling back to Steam.
+- Rejected linked Qt plugin entries so presence checks cannot bypass dependency
+  and architecture traversal.
+- Made plugin inventory failures hard verification errors instead of silently
+  accepting unreadable categories.
+- Removed OSC/CSI and other C0/DEL controls from support text while preserving
+  manifest tabs, and stopped the launcher from interpreting path backslashes.
+- Matched manual restore storefront ambiguity handling to automatic restore.
+- Made ad-hoc signing and signature verification transactional so partial
+  signing failures restore all covered game binaries.
 
 ## Mainline maintenance after 1.7.5 (2026-08-11)
 

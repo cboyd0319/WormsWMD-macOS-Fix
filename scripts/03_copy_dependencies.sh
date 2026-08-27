@@ -104,8 +104,9 @@ if [[ "$QT_SOURCE" == "prebuild" ]]; then
     if [[ $bundled_count -gt 0 ]]; then
         echo "Found $bundled_count bundled dependencies"
         echo ""
-        echo "Copied $bundled_count libraries"
-        echo "COPIED_LIBS=$bundled_count"
+        echo "Verified $bundled_count bundled libraries"
+        echo "BUNDLED_LIBS=$bundled_count"
+        echo "COPIED_LIBS=0"
         echo "MISSING_LIBS=0"
         exit 0
     else

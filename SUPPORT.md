@@ -9,6 +9,10 @@ ask them to open `README_FIRST.txt`. The intended path is:
 4. If it fails, choose option 5 and attach the Desktop support bundle to an
    issue.
 
+When both Steam and GOG installations exist, the launcher asks which one to use
+and keeps that choice for the support bundle. Do not create the bundle from a
+different installation than the failed fix.
+
 If the person wants to verify the download first, ask them to download the
 matching `.zip.sha256` file from the same release and run:
 
