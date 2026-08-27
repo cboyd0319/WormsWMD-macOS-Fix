@@ -76,7 +76,8 @@ git status --short
   replied to, and resolved. GitHub Security run 14 and CI run 113 passed at the
   exact reviewed head, including the full macOS job.
 - 2026-08-27: PR #26 merged to protected `main` as
-  `671f1285b69fd4a1597044521525b61f39d5ee13`. This is the exact PR 3 base.
+  `671f1285b69fd4a1597044521525b61f39d5ee13`. PR 3 must start from the latest
+  protected `main`, including this closeout record.
 
 ## Surprises & Discoveries
 
@@ -113,4 +114,4 @@ local and hosted gates passed; `dist` bytes and user saves were unchanged.
 Residual player/runtime findings are handed to PR 3: the fixed Steam app's
 plugin self-install IDs are false positives in dependency verification, and a
 separate `/Applications` installation remains unfixed. PR 3 starts from
-`671f1285b69fd4a1597044521525b61f39d5ee13`.
+the latest protected `main`, including this closeout record.
