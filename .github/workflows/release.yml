@@ -19,8 +19,8 @@ jobs:
 
     steps:
       - name: Checkout
-        # actions/checkout v7.0.0
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Make scripts executable
         run: chmod +x fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix.command" scripts/*.sh tools/*.sh
@@ -53,8 +53,8 @@ jobs:
         run: ./tools/build_release_bundle.sh --version "${{ steps.release_names.outputs.version }}"
 
       - name: Attest release assets
-        # actions/attest v4.1.1
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763
+        # actions/attest v4.2.2
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-path: |
             build/release/WormsWMD-macOS-Fix-*.zip

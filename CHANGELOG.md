@@ -4,7 +4,10 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
-No user-facing changes yet.
+### Security
+
+- Updated the immutable `actions/checkout` pin to the verified v7.0.1 tag.
+- Updated the immutable `actions/attest` pin to the verified v4.2.2 tag.
 
 ## Mainline maintenance after 1.7.6 (2026-08-26)
 
