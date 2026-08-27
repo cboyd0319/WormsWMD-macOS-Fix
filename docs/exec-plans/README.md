@@ -31,7 +31,7 @@ the plan before continuing.
 
 ## Current Plans
 
-- [Open pull request resolution](2026-08-26-open-pr-resolution.md) - active
+- [Open pull request resolution](2026-08-26-open-pr-resolution.md) - completed
   resolution of the superseded GOG fix and current GitHub Actions updates.
 - [v1.7.6 release](2026-08-26-v1.7.6-release.md) - completed release preparation,
   publication, asset verification, and post-release commit pinning for issue #20.

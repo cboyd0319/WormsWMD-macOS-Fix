@@ -1,6 +1,6 @@
 # Open Pull Request Resolution
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -45,9 +45,9 @@ Out of scope:
   for `actions/checkout` and `actions/attest` from their official repositories.
 - [x] Milestone 3: Apply the combined workflow update and pass local workflow,
   harness, syntax, pin, and diff checks.
-- [ ] Milestone 4: Push the maintenance commit and require one hosted CI run to
+- [x] Milestone 4: Push the maintenance commit and require one hosted CI run to
   exercise the new checkout action.
-- [ ] Milestone 5: Post specific maintainer responses, close PRs #17, #18, and
+- [x] Milestone 5: Post specific maintainer responses, close PRs #17, #18, and
   #21, and confirm no open pull requests remain.
 
 ## Verification
@@ -82,6 +82,14 @@ Hosted verification requires all jobs in the single `main` CI run to pass.
   The attest action executes only in a release workflow, so ordinary CI cannot
   exercise it; official verified-tag provenance and its unchanged input and
   permission contract are the available pre-release evidence.
+- 2026-08-26: Pushed combined maintenance commit `ba2b653`. CI run
+  `33035871545` passed all checkout steps, all repository regressions, C
+  validation, ShellCheck, and release-bundle smoke.
+- 2026-08-26: Thanked the PR #21 contributor and closed the conflicting change
+  as superseded by the broader v1.7.6 implementation. Documented the applied
+  checkout v7.0.1 update on PR #18 and the newer attest v4.2.2 update on PR #17,
+  then closed both outdated Dependabot branches. GitHub reports no open pull
+  requests.
 
 ## Surprises & Discoveries
 
@@ -102,4 +110,7 @@ Hosted verification requires all jobs in the single `main` CI run to pass.
 
 ## Outcomes & Retrospective
 
-Pending local checks, hosted CI, and hosted PR cleanup.
+All open pull requests were resolved without merging stale or conflicting
+branches. Current `main` carries the latest verified checkout and attest action
+pins, its combined CI run passed, and the issue #20 contributor received a
+specific explanation and acknowledgement before PR #21 was closed.
