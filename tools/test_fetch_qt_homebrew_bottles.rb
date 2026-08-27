@@ -330,7 +330,7 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     archive = File.join(@tmp, 'valid.tar.gz')
     valid = entry
     root = "#{valid['name']}/#{valid['version']}"
-    write_archive(archive, "#{root}/.brew/qt@5.rb" => formula_metadata(valid))
+    write_archive(archive, { "#{root}/.brew/qt@5.rb" => formula_metadata(valid) })
     digest = Digest::SHA256.file(archive).hexdigest
     valid = valid.merge(
       'bottle_sha256' => digest,
@@ -344,7 +344,7 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     assert_equal(root, actual_root)
 
     wrong = File.join(@tmp, 'wrong.tar.gz')
-    write_archive(wrong, 'other/1.0/file' => 'x')
+    write_archive(wrong, { 'other/1.0/file' => 'x' })
     wrong_digest = Digest::SHA256.file(wrong).hexdigest
     wrong_entry = valid.merge(
       'bottle_sha256' => wrong_digest,
