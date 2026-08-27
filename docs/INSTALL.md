@@ -173,9 +173,13 @@ if [[ -f "$BACKUP_DIR/BACKUP_METADATA.tsv" ]]; then
 
   GAME_EXEC="$GAME_APP/Contents/MacOS/Worms W.M.D"
   GAME_DEPENDENCIES=$(otool -arch x86_64 -L "$GAME_EXEC" 2>/dev/null || true)
-  if grep -Fqi 'libGalaxy.dylib' <<< "$GAME_DEPENDENCIES"; then
+  HAS_GALAXY=false
+  HAS_STEAM=false
+  grep -Fqi 'libGalaxy.dylib' <<< "$GAME_DEPENDENCIES" && HAS_GALAXY=true
+  grep -Fqi 'libsteam_api.dylib' <<< "$GAME_DEPENDENCIES" && HAS_STEAM=true
+  if $HAS_GALAXY && ! $HAS_STEAM; then
     SELECTED_GAME_SOURCE=gog
-  elif grep -Fqi 'libsteam_api.dylib' <<< "$GAME_DEPENDENCIES"; then
+  elif $HAS_STEAM && ! $HAS_GALAXY; then
     SELECTED_GAME_SOURCE=steam
   else
     echo "Could not identify the selected Steam or GOG installation." >&2

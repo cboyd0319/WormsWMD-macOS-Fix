@@ -127,7 +127,8 @@ Actions built the asset from this repository.
 Pre-built Qt framework packages undergo multiple verification steps:
 
 1. **Source verification**: Downloaded only from local `dist/` or the pinned
-   release commit's `dist/` directory
+   release commit's `dist/` directory; dependency source symlinks are resolved
+   before provenance-prefix allowlisting
 2. **Checksum validation**: SHA256 hash must match the `.sha256` file
 3. **Version and metadata validation**: Package names and `METADATA.txt` must
    agree on a numeric Qt 5.15.x version and x86_64 architecture
@@ -244,7 +245,7 @@ Last audit: 2026-08-26
 | Code signing | Pass | Ad-hoc signature applied and strictly verified inside the rollback boundary; quarantine cleared afterward |
 | Input validation | Pass | Environment variables and user input validated |
 | Game URL security | Pass | HTTP upgraded to HTTPS, staging URLs disabled |
-| Backup restore | Pass | Verified staged v2 backups cover and exactly replace all `MacOS` files, bind to canonical app/storefront identity, reject invalid metadata/unrecorded entries, and preserve v1 legacy merge behavior |
+| Backup restore | Pass | Verified staged v2 backups exactly replace `MacOS`, bind to app/storefront identity, use atomic collision-resistant publication, reject invalid metadata/unrecorded entries, and preserve v1 merge behavior |
 | Release provenance | Pass | Release assets have SHA-256 checksums and GitHub artifact attestations |
 
 ## Verifying the fix

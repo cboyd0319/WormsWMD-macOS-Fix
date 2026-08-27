@@ -114,7 +114,8 @@ Mach-O run paths, resolved or optional executable dependencies, and backup
 storefront metadata. They do not include raw logs, crash logs, save files, game
 binaries, or private config file contents. The support-bundle
 archive also normalizes tar owner and group metadata so it does not expose the
-local macOS account name.
+local macOS account name. Terminal escape sequences and other C0/DEL controls
+are removed from support text while TSV tabs remain intact.
 
 If more than one installation is detected, direct diagnostics require
 `GAME_APP`. The friendly launcher prompts once and preserves that selection for

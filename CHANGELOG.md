@@ -27,6 +27,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   directory, including GOG's `libGalaxy.dylib`, and existing signature resources.
 - Build and verify backups under a hidden staging name before publishing them
   for restore, preventing interrupted backups from being selected as legacy.
+- Reserve final backup names with hidden atomic publication locks so concurrent
+  runs cannot nest one staged backup inside another run's destination.
 - Version 2 backup metadata marks complete `MacOS` coverage so restore performs
   a staged directory swap and removes files absent from the backup; version 1
   metadata remains readable with its prior merge behavior.
@@ -52,6 +54,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   existing v1 backups compatible with their legacy guarantees.
 - Rejected canonical archive aliases, duplicate manifest paths, special entries,
   and control-character paths across game, save, Qt, and release integrity checks.
+- Canonicalized absolute Qt dependency sources before provenance allowlisting so
+  `cp -L` cannot follow an approved-prefix symlink to an external target.
 - Made missing or malformed current backup metadata fail closed instead of
   falling through to the legacy restore path.
 - Rejected direct Mach-O dependencies that escape the app, unportable relative
@@ -61,6 +65,11 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   Qt 5.15, and stopped GOG launch failures from falling back to Steam.
 - Rejected linked Qt plugin entries so presence checks cannot bypass dependency
   and architecture traversal.
+- Made plugin inventory failures hard verification errors instead of silently
+  accepting unreadable categories.
+- Removed OSC/CSI and other C0/DEL controls from support text while preserving
+  manifest tabs, and stopped the launcher from interpreting path backslashes.
+- Matched manual restore storefront ambiguity handling to automatic restore.
 - Made ad-hoc signing and signature verification transactional so partial
   signing failures restore all covered game binaries.
 

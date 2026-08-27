@@ -15,6 +15,35 @@ fail() {
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wormswmd-installer-rollback.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
 
+publish_function="$tmp_dir/publish_game_backup.sh"
+awk '/^publish_game_backup\(\)/ {inside=1} inside {print} inside && /^}/ {exit}' \
+    "$ROOT_DIR/fix_worms_wmd.sh" > "$publish_function"
+[[ -s "$publish_function" ]] || fail "could not extract backup publication helper"
+(
+    # shellcheck source=/dev/null
+    source "$ROOT_DIR/scripts/common.sh"
+    BACKUP_DIR=""
+    BACKUP_PUBLISH_LOCK=""
+    BACKUP_MANIFEST_NAME="BACKUP_MANIFEST.tsv"
+    export BACKUP_DIR BACKUP_PUBLISH_LOCK BACKUP_MANIFEST_NAME
+    # shellcheck source=/dev/null
+    source "$publish_function"
+
+    collision_root="$tmp_dir/publication-collision"
+    collision_base="$collision_root/WormsWMD-Backup-20990101-010101"
+    collision_stage="$collision_root/.WormsWMD-Backup.partial.test"
+    mkdir -p "$collision_base" "$collision_stage"
+    printf 'existing backup\n' > "$collision_base/existing.txt"
+    printf 'staged manifest\n' > "$collision_stage/BACKUP_MANIFEST.tsv"
+    publish_game_backup "$collision_stage" "$collision_base"
+    [[ "$BACKUP_DIR" == "${collision_base}-1" ]] \
+        || fail "backup publication did not reserve a new path after collision: $BACKUP_DIR"
+    grep -Fxq 'existing backup' "$collision_base/existing.txt" \
+        || fail "backup publication modified the existing destination"
+    [[ ! -e "$collision_base/.WormsWMD-Backup.partial.test" ]] \
+        || fail "backup publication nested staging inside an existing backup"
+)
+
 agl_error_bin="$tmp_dir/agl-error-bin"
 agl_error_build="$tmp_dir/agl-error-build"
 mkdir -p "$agl_error_bin" "$agl_error_build"

@@ -54,6 +54,9 @@ worms_find_game_apps() {
     local unique_games=()
 
     while IFS= read -r -d '' path; do
+        if worms_has_control_chars "$path"; then
+            continue
+        fi
         if [[ -d "$path" ]] && [[ -f "$path/Contents/MacOS/Worms W.M.D" ]]; then
             found_games+=("$path")
         fi

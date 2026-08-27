@@ -189,6 +189,12 @@ disposable copy is created first.
 - 2026-08-26: Repeated the live GOG apply/restore path with metadata v2 and an
   injected post-fix `MacOS` dylib. The staged swap removed the extra entry and
   again reproduced the 3,097-record baseline plus both original GOG hashes.
+- 2026-08-26: The following Copilot pass produced two inline and five
+  suppressed findings. Absolute Qt sources are now canonicalized before
+  provenance checks; backup publication reserves names atomically; support
+  sanitization strips OSC/CSI plus other controls; launcher rendering no longer
+  interprets path backslashes; plugin discovery fails closed on inventory
+  errors; and manual restore rejects dual-store identity like automatic restore.
 
 ## Surprises & Discoveries
 

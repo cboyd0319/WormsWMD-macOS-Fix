@@ -253,9 +253,12 @@ resolve_packaging_dependency() {
             fi
             ;;
         /*)
-            if [[ -f "$dependency" ]] && dependency_path_allowed "$dependency"; then
-                printf '%s\n' "$dependency"
-                return 0
+            if [[ -f "$dependency" ]]; then
+                candidate_real=$(realpath "$dependency" 2>/dev/null || true)
+                if [[ -n "$candidate_real" ]] && dependency_path_allowed "$candidate_real"; then
+                    printf '%s\n' "$candidate_real"
+                    return 0
+                fi
             fi
             ;;
     esac

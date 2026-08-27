@@ -68,8 +68,9 @@ selection and must not silently fall back to Steam.
 
 ## Backup And Restore Contract
 
-Before destructive changes, the fix verifies a hidden staging backup, then
-publishes it under `~/Documents/WormsWMD-Backup-*/`. Restore must cover:
+Before destructive changes, the fix verifies a hidden staging backup, reserves
+a final name with a hidden atomic lock, then publishes it under
+`~/Documents/WormsWMD-Backup-*/`. Restore must cover:
 
 - `Contents/Frameworks/`
 - `Contents/PlugIns/`
@@ -128,6 +129,7 @@ When replacing the Qt archive:
 - Validate the archive layout, package metadata, required frameworks/plugins,
   complete dependency closure, archive manifest when present, generated cache
   manifest, and readable x86_64 Mach-O slices.
+- Resolve dependency source symlinks before applying provenance-prefix policy.
 - Run the packaging or install verification relevant to the change.
 - Update user docs if the version, source, or fallback behavior changes.
 

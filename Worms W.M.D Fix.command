@@ -25,7 +25,7 @@ source "$LAUNCHER_DIR/scripts/common.sh"
 worms_color_init auto
 
 print_line() {
-    printf '%b\n' "$*"
+    printf '%s\n' "$*"
 }
 
 read_answer() {
@@ -33,10 +33,10 @@ read_answer() {
     local answer=""
 
     if [[ -n "$TTY_DEVICE" ]]; then
-        printf '%b' "$prompt" > "$TTY_DEVICE"
+        printf '%s' "$prompt" > "$TTY_DEVICE"
         IFS= read -r answer < "$TTY_DEVICE" || answer=""
     else
-        printf '%b' "$prompt" >&2
+        printf '%s' "$prompt" >&2
         IFS= read -r answer || answer=""
     fi
 
@@ -106,6 +106,7 @@ select_game_app_if_needed() {
     local games=()
 
     if [[ -n "${GAME_APP:-}" ]]; then
+        worms_reject_control_chars "$GAME_APP" "GAME_APP" || return 1
         export GAME_APP
         return 0
     fi
@@ -127,7 +128,7 @@ select_game_app_if_needed() {
     worms_print_step "Choose the Worms W.M.D installation to use"
     i=1
     for game in "${games[@]}"; do
-        print_line "  $i) $game"
+        printf '  %s) %s\n' "$i" "$game"
         i=$((i + 1))
     done
 
@@ -218,7 +219,7 @@ launch_game() {
 
     if [[ -n "${GAME_APP:-}" ]]; then
         worms_print_warning "Could not launch the selected game installation automatically."
-        print_line "Open this installation directly: $GAME_APP"
+        printf 'Open this installation directly: %s\n' "$GAME_APP"
         return 1
     fi
 

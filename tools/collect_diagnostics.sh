@@ -101,9 +101,22 @@ sanitize_report() {
     local output="$2"
 
     awk -v home="$HOME" '
-        BEGIN { ansi = sprintf("%c", 27) "\\[[0-9;]*[[:alpha:]]" }
+        BEGIN {
+            esc = sprintf("%c", 27)
+            bel = sprintf("%c", 7)
+            ansi = esc "\\[[0-9;]*[[:alpha:]]"
+            osc_bel = esc "\\][^" bel "]*" bel
+            osc_st = esc "\\][^" esc "]*" esc "\\\\"
+            for (i = 1; i < 32; i++) {
+                if (i != 9) controls[++control_count] = sprintf("%c", i)
+            }
+            controls[++control_count] = sprintf("%c", 127)
+        }
         {
+            gsub(osc_bel, "")
+            gsub(osc_st, "")
             gsub(ansi, "")
+            for (i = 1; i <= control_count; i++) gsub(controls[i], "")
             gsub(home, "~")
             gsub(/\/Users\/[^\/[:space:]]+/, "/Users/[redacted-user]")
             gsub(/\/Volumes\/[^"<>]*/, "[redacted-path]")
@@ -129,6 +142,9 @@ latest_fix_logs() {
 
     find "$log_dir" -maxdepth 1 -type f -name 'fix_worms_wmd-*.log' -print0 2>/dev/null \
         | while IFS= read -r -d '' log_file; do
+            if worms_has_control_chars "$log_file"; then
+                continue
+            fi
             mtime=$(stat -f "%m" "$log_file" 2>/dev/null || echo 0)
             printf '%s\t%s\n' "$mtime" "$log_file"
         done \
@@ -765,6 +781,9 @@ collect_diagnostics() {
         if [[ "$backup_count" -gt 0 ]]; then
             find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null \
                 | while IFS= read -r -d '' backup; do
+                    if worms_has_control_chars "$backup"; then
+                        continue
+                    fi
                     mtime=$(stat -f "%m" "$backup" 2>/dev/null || echo 0)
                     printf '%s\t%s\n' "$mtime" "$backup"
                 done \
@@ -1139,6 +1158,9 @@ copy_backup_manifests() {
         seen_hashes_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-support-hashes.XXXXXX")
         find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d -name "WormsWMD-Backup-*" -print0 2>/dev/null \
             | while IFS= read -r -d '' backup; do
+                if worms_has_control_chars "$backup"; then
+                    continue
+                fi
                 printf '%s\t%s\n' "$(stat -f '%m' "$backup" 2>/dev/null || echo 0)" "$backup"
             done \
             | sort -nr \

@@ -32,6 +32,14 @@ grep -Fq 'select_game_app_if_needed' <<< "$readiness_block" \
 launch_block=$(awk '/^launch_game\(\)/ {inside=1} inside {print} /^}/ && inside {exit}' "$launcher")
 grep -Fq 'select_game_app_if_needed' <<< "$launch_block" \
     || fail "launcher launch action does not preserve the selected installation"
+# shellcheck disable=SC2016
+if grep -Fq 'print_line "  $i) $game"' "$launcher" \
+    || grep -Fq 'print_line "Open this installation directly: $GAME_APP"' "$launcher"; then
+    fail "launcher still sends an untrusted game path through printf %b"
+fi
+if grep -Fq "printf '%b" "$launcher"; then
+    fail "launcher still interprets backslash escapes in rendered text"
+fi
 grep -Fq 'tools/preflight_check.sh" --quick' "$launcher" \
     || fail "launcher readiness check does not run quick preflight"
 grep -Fq 'fix_worms_wmd.sh" --verify' "$launcher" \
@@ -55,6 +63,9 @@ grep -Fq "| \`7\` | Launch Worms W.M.D. |" "$readme" \
     || fail "README.md launcher options table is missing option 7"
 grep -Fq 'option 7 to launch Worms W.M.D' "$install_doc" \
     || fail "docs/INSTALL.md launcher option list is missing option 7"
+# shellcheck disable=SC2016
+grep -Fq 'if $HAS_GALAXY && ! $HAS_STEAM' "$install_doc" \
+    || fail "manual restore docs do not reject ambiguous storefront identity"
 grep -Fq "GAME_APP=\"\$GAME_APP\" ./fix_worms_wmd.sh --force" "$ROOT_DIR/tools/watch_for_updates.sh" \
     || fail "watcher daemon reapply does not forward GAME_APP"
 if ! grep -F "GAME_APP=\"\$GAME_APP\" ./fix_worms_wmd.sh" "$ROOT_DIR/tools/watch_for_updates.sh" | grep -Fvq -- "--force"; then
@@ -238,5 +249,16 @@ if grep -Fq '/dev/tty' "$tmp_dir/menu.out"; then
 fi
 grep -Fq 'Okay. No changes were made from this menu choice.' "$tmp_dir/menu.out" \
     || fail "launcher did not process piped quit input"
+
+control_game_app="$tmp_dir/Control"$'\033'"Path/Worms W.M.D.app"
+mkdir -p "$control_game_app/Contents/MacOS"
+printf '#!/bin/bash\nexit 0\n' > "$control_game_app/Contents/MacOS/Worms W.M.D"
+chmod +x "$control_game_app/Contents/MacOS/Worms W.M.D"
+printf '7\n\nq\n' | GAME_APP="$control_game_app" bash "$launcher" \
+    > "$tmp_dir/control-path-menu.out" 2>&1 \
+    || fail "launcher menu crashed while rejecting a control-byte GAME_APP"
+if LC_ALL=C grep -q '[[:cntrl:]]' "$tmp_dir/control-path-menu.out"; then
+    fail "launcher rendered a terminal control byte from GAME_APP"
+fi
 
 printf 'Launcher friction regression check passed.\n'

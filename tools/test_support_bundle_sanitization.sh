@@ -99,10 +99,12 @@ cat > "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000001.log" <
 SUCCESS: All checks passed!
 ERROR: Post-verify failure
 LOG
-printf '\033[0;31mERROR: Colored failure detail\033[0m\n' \
-    >> "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000001.log"
-printf 'Rolled back to original state.\n' \
-    >> "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000001.log"
+{
+    printf '\033[0;31mERROR: Colored failure detail\033[0m\n'
+    printf '\033]0;hidden OSC title\007ERROR: OSC failure\033\\\n'
+    printf 'ERROR: isolated controls\007\010\177 removed\n'
+    printf 'Rolled back to original state.\n'
+} >> "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000001.log"
 
 mkdir -p "$test_home/Documents/WormsWMD-Backup-20260101-000000"
 cat > "$test_home/Documents/WormsWMD-Backup-20260101-000000/BACKUP_MANIFEST.tsv" <<'TSV'
@@ -139,6 +141,12 @@ grep -Fq "Inferred outcome: failure: rollback completed" "$extract_dir/install-s
     || fail "install summary misclassified a mixed success/error rollback log"
 if grep -Eq '\[[0-9;]+m' "$extract_dir/install-summary.txt"; then
     fail "install summary contains visible ANSI escape fragments"
+fi
+if grep -Fq 'hidden OSC title' "$extract_dir/install-summary.txt"; then
+    fail "install summary retained an OSC terminal-control payload"
+fi
+if LC_ALL=C grep -q '[[:cntrl:]]' "$extract_dir/install-summary.txt"; then
+    fail "install summary retained an unsafe C0 or DEL control byte"
 fi
 grep -Fq "Required runtime invariant matrix" "$extract_dir/runtime-invariants.txt" \
     || fail "runtime invariant matrix is missing"

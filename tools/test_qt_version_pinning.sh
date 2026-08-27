@@ -15,6 +15,17 @@ fail() {
     exit 1
 }
 
+extract_function() {
+    local function_name="$1"
+    local source_file="$2"
+
+    awk -v signature="^${function_name}\\(\\)" '
+        $0 ~ signature {inside=1}
+        inside {print}
+        inside && /^}/ {exit}
+    ' "$source_file"
+}
+
 assert_supported() {
     local version="$1"
 
@@ -56,6 +67,23 @@ fi
 latest=$(worms_latest_qt_package_by_version "$tmp_dir" false || true)
 [[ "$(basename "$latest")" == "qt-frameworks-x86_64-5.15.19.tar.gz" ]] \
     || fail "did not choose the highest supported Qt 5.15 package"
+
+packager_functions="$tmp_dir/packager-functions.sh"
+extract_function dependency_path_allowed "$ROOT_DIR/tools/package_qt_frameworks.sh" > "$packager_functions"
+extract_function resolve_packaging_dependency "$ROOT_DIR/tools/package_qt_frameworks.sh" >> "$packager_functions"
+# shellcheck source=/dev/null
+source "$packager_functions"
+QT_PREFIX="$tmp_dir/allowed-prefix"
+QT_PREFIX_REAL="$QT_PREFIX"
+QT_DEP_PREFIX=""
+QT_DEP_PREFIX_REAL=""
+export QT_PREFIX QT_PREFIX_REAL QT_DEP_PREFIX QT_DEP_PREFIX_REAL
+mkdir -p "$QT_PREFIX/lib" "$tmp_dir/outside-prefix"
+printf 'external dependency\n' > "$tmp_dir/outside-prefix/libescape.dylib"
+ln -s "$tmp_dir/outside-prefix/libescape.dylib" "$QT_PREFIX/lib/libescape.dylib"
+escaped_dependency=$(resolve_packaging_dependency unused "$QT_PREFIX/lib/libescape.dylib" || true)
+[[ -z "$escaped_dependency" ]] \
+    || fail "Qt packager accepted an allowlisted symlink whose target escapes provenance roots"
 
 # shellcheck disable=SC2016
 grep -Fq 'worms_supported_qt5_version "$QT_VERSION"' "$ROOT_DIR/tools/package_qt_frameworks.sh" \

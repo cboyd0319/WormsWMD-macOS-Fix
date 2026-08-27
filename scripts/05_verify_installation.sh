@@ -328,10 +328,26 @@ echo "OK: Library dependencies checked"
 # Check plugins
 echo ""
 echo "--- Checking plugins ---"
-while IFS= read -r -d '' plugin_link; do
-    echo "ERROR: Linked Qt plugin entry is not supported: ${plugin_link#"$GAME_APP/Contents/"}"
+plugin_inventory_file=$(mktemp "${TMPDIR:-/tmp}/wormswmd-plugin-inventory.XXXXXX")
+if ! find "$GAME_PLUGINS" \( -type l -o \( -type f -name '*.dylib' \) \) -print0 \
+    > "$plugin_inventory_file" 2>/dev/null; then
+    echo "ERROR: Unable to inventory every Qt plugin entry"
     ((errors++))
-done < <(find "$GAME_PLUGINS" -type l -print0 2>/dev/null)
+else
+    while IFS= read -r -d '' plugin; do
+        if [[ -L "$plugin" ]]; then
+            echo "ERROR: Linked Qt plugin entry is not supported: ${plugin#"$GAME_APP/Contents/"}"
+            ((errors++))
+            continue
+        fi
+        name=$(basename "$plugin")
+        check_unsafe_deps "$plugin" "$name"
+        check_arch "$plugin" "$name"
+        check_missing_deps "$plugin"
+        print_deps "$plugin" "$name"
+    done < "$plugin_inventory_file"
+fi
+rm -f "$plugin_inventory_file"
 if [ ! -f "$GAME_PLUGINS/platforms/libqcocoa.dylib" ]; then
     echo "ERROR: Required platform plugin missing: platforms/libqcocoa.dylib"
     ((errors++))
@@ -340,13 +356,6 @@ if [ ! -f "$GAME_PLUGINS/imageformats/libqsvg.dylib" ]; then
     echo "ERROR: Required image plugin missing: imageformats/libqsvg.dylib"
     ((errors++))
 fi
-while IFS= read -r -d '' plugin; do
-    name=$(basename "$plugin")
-    check_unsafe_deps "$plugin" "$name"
-    check_arch "$plugin" "$name"
-    check_missing_deps "$plugin"
-    print_deps "$plugin" "$name"
-done < <(find "$GAME_PLUGINS" -type f -name '*.dylib' -print0 2>/dev/null)
 echo "OK: Plugins checked"
 
 # Check Info.plist and config URLs

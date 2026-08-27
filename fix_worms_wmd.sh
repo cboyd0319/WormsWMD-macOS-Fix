@@ -55,6 +55,7 @@ GAME_APP_AUTO_DETECTED=false
 DRY_RUN=false
 BACKUP_DIR=""
 BACKUP_STAGING_DIR=""
+BACKUP_PUBLISH_LOCK=""
 CLEANUP_NEEDED=false
 BUILD_DIR="${BUILD_DIR:-}"
 BUILD_DIR_MANAGED=false
@@ -420,11 +421,67 @@ cleanup() {
     if [[ -n "$BACKUP_STAGING_DIR" ]] && [[ -d "$BACKUP_STAGING_DIR" ]]; then
         rm -rf "$BACKUP_STAGING_DIR" 2>/dev/null || true
     fi
+    if [[ -n "$BACKUP_PUBLISH_LOCK" ]] && [[ -d "$BACKUP_PUBLISH_LOCK" ]]; then
+        rmdir "$BACKUP_PUBLISH_LOCK" 2>/dev/null || true
+    fi
 
     # Clean up the per-run build directory created by this script.
     if $BUILD_DIR_MANAGED && [[ -n "$BUILD_DIR" ]] && [[ -d "$BUILD_DIR" ]]; then
         rm -rf "$BUILD_DIR" 2>/dev/null || true
     fi
+}
+
+publish_game_backup() {
+    local staging_dir="$1"
+    local base="$2"
+    local candidate lock nested
+    local counter=0
+
+    while [[ "$counter" -le 1000 ]]; do
+        if [[ "$counter" -eq 0 ]]; then
+            candidate="$base"
+        else
+            candidate="${base}-${counter}"
+        fi
+        lock="$(dirname "$candidate")/.$(basename "$candidate").publish-lock"
+
+        if ! mkdir "$lock" 2>/dev/null; then
+            counter=$((counter + 1))
+            continue
+        fi
+        BACKUP_PUBLISH_LOCK="$lock"
+
+        if [[ -e "$candidate" ]] || [[ -L "$candidate" ]]; then
+            rmdir "$lock"
+            BACKUP_PUBLISH_LOCK=""
+            counter=$((counter + 1))
+            continue
+        fi
+
+        if mv "$staging_dir" "$candidate"; then
+            if [[ -f "$candidate/$BACKUP_MANIFEST_NAME" ]]; then
+                rmdir "$lock"
+                BACKUP_PUBLISH_LOCK=""
+                BACKUP_DIR="$candidate"
+                return 0
+            fi
+
+            nested="$candidate/$(basename "$staging_dir")"
+            if [[ -d "$nested" ]] && ! mv "$nested" "$staging_dir"; then
+                echo "Unable to recover staged backup after a publication collision." >&2
+                rmdir "$lock" 2>/dev/null || true
+                BACKUP_PUBLISH_LOCK=""
+                return 1
+            fi
+        fi
+
+        rmdir "$lock" 2>/dev/null || true
+        BACKUP_PUBLISH_LOCK=""
+        counter=$((counter + 1))
+    done
+
+    echo "Unable to reserve a unique final backup path." >&2
+    return 1
 }
 
 game_source_for_backup() {
@@ -1672,9 +1729,9 @@ do_fix() {
     echo ""
     print_step "Creating backup..."
 
-    local backup_final_dir
+    local backup_name_base
     mkdir -p "$HOME/Documents"
-    backup_final_dir=$(worms_unique_path "$HOME/Documents/WormsWMD-Backup-$(date +%Y%m%d-%H%M%S)")
+    backup_name_base="$HOME/Documents/WormsWMD-Backup-$(date +%Y%m%d-%H%M%S)"
     BACKUP_STAGING_DIR=$(mktemp -d "$HOME/Documents/.WormsWMD-Backup.partial.XXXXXX")
 
     start_spinner "Backing up Frameworks..."
@@ -1721,9 +1778,8 @@ do_fix() {
     start_spinner "Creating backup manifest (this can take a few minutes)..."
     write_game_backup_manifest "$BACKUP_STAGING_DIR"
     stop_spinner
-    mv "$BACKUP_STAGING_DIR" "$backup_final_dir"
+    publish_game_backup "$BACKUP_STAGING_DIR" "$backup_name_base"
     BACKUP_STAGING_DIR=""
-    BACKUP_DIR="$backup_final_dir"
     print_substep "Backup manifest created: $BACKUP_MANIFEST_NAME"
     print_substep "Backup created: $BACKUP_DIR"
     CLEANUP_NEEDED=true

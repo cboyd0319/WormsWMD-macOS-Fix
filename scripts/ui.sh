@@ -22,15 +22,15 @@ worms_color_init() {
     esac
 
     if $enable; then
-        RED='\033[0;31m'
-        GREEN='\033[0;32m'
-        YELLOW='\033[1;33m'
-        BLUE='\033[0;34m'
-        CYAN='\033[0;36m'
-        BOLD='\033[1m'
-        DIM='\033[2m'
-        NC='\033[0m'
-        RESET='\033[0m'
+        RED=$'\033[0;31m'
+        GREEN=$'\033[0;32m'
+        YELLOW=$'\033[1;33m'
+        BLUE=$'\033[0;34m'
+        CYAN=$'\033[0;36m'
+        BOLD=$'\033[1m'
+        DIM=$'\033[2m'
+        NC=$'\033[0m'
+        RESET=$'\033[0m'
     else
         RED=''
         GREEN=''
@@ -48,21 +48,21 @@ worms_color_init() {
 }
 
 worms_print_error() {
-    echo -e "${RED}ERROR:${NC} $1"
+    printf '%s\n' "${RED}ERROR:${NC} $1"
 }
 
 worms_print_warning() {
-    echo -e "${YELLOW}WARNING:${NC} $1"
+    printf '%s\n' "${YELLOW}WARNING:${NC} $1"
 }
 
 worms_print_success() {
-    echo -e "${GREEN}SUCCESS:${NC} $1"
+    printf '%s\n' "${GREEN}SUCCESS:${NC} $1"
 }
 
 worms_print_info() {
-    echo -e "${BLUE}INFO:${NC} $1"
+    printf '%s\n' "${BLUE}INFO:${NC} $1"
 }
 
 worms_print_step() {
-    echo -e "${GREEN}==>${NC} $1"
+    printf '%s\n' "${GREEN}==>${NC} $1"
 }
