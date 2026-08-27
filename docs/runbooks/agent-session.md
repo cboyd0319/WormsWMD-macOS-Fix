@@ -116,6 +116,16 @@ Release packaging:
 ./tools/build_release_bundle.sh --version local-smoke
 ```
 
+Protected Qt candidate rebuild, only after source/lock changes merge:
+
+```bash
+gh workflow run rebuild-qt.yml --ref main
+gh run watch RUN_ID --exit-status
+```
+
+Record the source SHA, run ID, candidate digest, attestation, and comparison
+evidence. Describe it as two clean same-runner builds, not independent builders.
+
 Release publication:
 
 ```bash

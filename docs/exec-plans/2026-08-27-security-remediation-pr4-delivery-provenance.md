@@ -36,7 +36,7 @@ releases, unrelated dependency versions, and independent-builder claims.
 - [x] Define all 17 component identities/scopes and prove policy failures.
 - [x] Generate scoped SBOM evidence and actionable pinned scanner reports.
 - [x] Normalize Mach-O paths, compare artifacts deeply, and prove TIFF runtime.
-- [ ] Add protected exact-main two-build nonpublishing rebuild evidence.
+- [x] Add protected exact-main two-build nonpublishing rebuild evidence.
 - [ ] Refresh only the reviewed libtiff 4.7.2 lock input.
 - [ ] Split release privilege and add incident recovery.
 - [ ] Run full local/adversarial gates, merge one reviewed PR, and record PR 5 base.
@@ -78,6 +78,10 @@ git status --short
   normalized current package validates. Deep exact/version-aware comparison
   rejects structural drift. A direct x86_64 QImageReader probe decoded a
   deterministic 1x1 TIFF against the current runtime under Rosetta.
+- 2026-08-27: Manual rebuild workflow refuses non-main refs, checks exact HEAD,
+  uses two separate caches/roots, requires byte-identical package evidence,
+  deep comparison and TIFF success, then attests/uploads seven-day candidate
+  evidence with read plus short-lived attestation scopes only.
 
 ## Surprises & Discoveries
 

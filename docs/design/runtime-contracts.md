@@ -171,6 +171,13 @@ embedded URLs, entitlements, and signatures. Version-aware comparison may
 classify version/hash changes as expected but never structural drift. The TIFF
 runtime probe uses direct `clang++` plus `QImageReader`, not extracted `qmake`.
 
+The nonpublishing rebuild workflow is manual-only and refuses refs other than
+exact protected `main`. It uses two isolated bottle caches and roots on one
+hosted Intel runner, packages twice, requires byte identity plus deep evidence,
+runs the TIFF probe, and attests/uploads a seven-day candidate. It has no
+contents write, release, PR, cross-run cache, or self-hosted authority. PR 5 may
+introduce artifact bytes only when they equal this protected candidate digest.
+
 The reviewed bottle closure is `packaging/qt-homebrew-lock.tsv`; `dist/` keeps
 generated evidence. Fetching bounds exact GHCR digest downloads, drops
 cross-origin authorization, validates without `qmake`, and stages beside the

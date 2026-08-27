@@ -74,6 +74,11 @@ it.
   events or Qt policy, provenance, artifact, VEX, generator, or scanner changes.
   Tool failure and zero runtime inventory fail; findings begin report-only and
   retain seven-day evidence for maintainer triage.
+- Qt candidate artifacts can be built only by a manual workflow dispatched on
+  exact protected `main`. It performs two cache-free, isolated builds on one
+  hosted runner, requires byte identity and deep comparison, runs the TIFF
+  probe, and publishes only an attested seven-day workflow artifact. A later
+  artifact PR must match that digest; the workflow cannot publish a release.
 
 ## What it can still do
 

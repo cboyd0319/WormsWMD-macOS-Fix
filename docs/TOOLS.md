@@ -278,6 +278,20 @@ TIFF test fetches only the checksum-locked Qt bottle for headers, compiles a
 direct x86_64 `QImageReader` probe with `clang++`, and decodes a deterministic
 1x1 TIFF against the shipped runtime under Rosetta. It never executes `qmake`.
 
+After packaging source, lock, normalizers, comparison, and probe changes merge,
+run the protected nonpublishing rebuild from exact `main`:
+
+```bash
+gh workflow run rebuild-qt.yml --ref main
+```
+
+The workflow refuses every other ref, checks out the exact dispatch SHA without
+persisted credentials, uses two separate download caches and prefix roots,
+requires byte-identical archives/checksums/provenance plus deep comparison,
+runs the TIFF probe, and attests/uploads seven-day candidate evidence. It has no
+contents write, release publication, PR creation, or cross-run cache authority.
+The output proves two clean builds on one runner, not independent builders.
+
 The fetcher bounds downloads and redirects, verifies the copied archive digest,
 uses the shared bottle inspector, checks exact formula/version/revision roots
 against embedded formula metadata, never executes `qmake`, and stages output beside

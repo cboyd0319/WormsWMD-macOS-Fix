@@ -452,12 +452,13 @@ check_harness_line_caps() {
     check_line_cap ".github/copilot-instructions.md" 80
     check_line_cap "docs/style/agent-harness.md" 260
     check_line_cap "docs/runbooks/agent-session.md" 240
-    check_line_cap "docs/design/runtime-contracts.md" 280
+    check_line_cap "docs/design/runtime-contracts.md" 300
     check_line_cap "docs/exec-plans/TEMPLATE.md" 120
     check_line_cap "docs/exec-plans/README.md" 160
     check_line_cap "tools/validate_harness.sh" 720
     check_line_cap ".github/workflows/ci.yml" 200
     check_line_cap ".github/workflows/github-security.yml" 180
+    check_line_cap ".github/workflows/rebuild-qt.yml" 220
     check_line_cap ".github/workflows/release.yml" 140
 }
 
@@ -592,6 +593,7 @@ require_file ".github/CODEOWNERS"
 require_file ".github/copilot-instructions.md"
 require_file ".github/workflows/ci.yml"
 require_file ".github/workflows/github-security.yml"
+require_file ".github/workflows/rebuild-qt.yml"
 require_file ".github/workflows/release.yml"
 require_file "docs/README.md"
 require_file "docs/design/runtime-contracts.md"

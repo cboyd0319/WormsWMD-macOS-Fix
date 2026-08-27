@@ -1,0 +1,127 @@
+name: Rebuild Qt Candidate
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: rebuild-qt-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    name: Two clean same-runner Qt builds
+    runs-on: macos-26-intel
+    timeout-minutes: 60
+    permissions:
+      contents: read # Read the exact protected-main source and lock.
+      id-token: write # Request the short-lived attestation identity token.
+      attestations: write # Publish candidate artifact attestations.
+      artifact-metadata: write # Record candidate metadata with attestations.
+    steps:
+      - name: Checkout exact dispatch commit
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Require protected main source
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_SHA" ]]
+          git diff --quiet --exit-code
+
+      - name: Prepare executable tools
+        run: chmod +x scripts/*.sh tools/*.sh
+
+      - name: Record builder identity
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/qt-rebuild-evidence.txt"
+          {
+            echo "Claim: same-runner clean rebuilds, not independent builders"
+            echo "Source commit: $EXPECTED_SHA"
+            echo "Workflow run: $RUN_ID"
+            echo "Runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+            sw_vers
+            xcodebuild -version
+            /usr/bin/python3 --version
+            ruby --version
+            tar --version
+            gzip --version
+            clang --version | sed -n '1p'
+            printf 'Lock SHA-256: '
+            shasum -a 256 packaging/qt-homebrew-lock.tsv | awk '{print $1}'
+          } > "$evidence"
+
+      - name: Build twice from isolated bottle roots
+        run: |
+          set -euo pipefail
+          work_root="$RUNNER_TEMP/qt-rebuild"
+          mkdir -p "$work_root"
+          qt_version=$(awk -F '\t' '$1 == "qt@5" {print $2; exit}' packaging/qt-homebrew-lock.tsv)
+          source_epoch=$(git show -s --format=%ct HEAD)
+          ./tools/fetch_qt_homebrew_bottles.rb \
+            --lock packaging/qt-homebrew-lock.tsv \
+            --cache "$work_root/cache-one" \
+            --output "$work_root/prefix-one"
+          ./tools/fetch_qt_homebrew_bottles.rb \
+            --lock packaging/qt-homebrew-lock.tsv \
+            --cache "$work_root/cache-two" \
+            --output "$work_root/prefix-two"
+          for build_number in one two; do
+            prefix="$work_root/prefix-$build_number"
+            SOURCE_DATE_EPOCH="$source_epoch" \
+            QT_PREFIX="$prefix/opt/qt@5" \
+            QT_DEP_PREFIX="$prefix" \
+            QT_PACKAGE_VERSION="$qt_version" \
+              ./tools/package_qt_frameworks.sh \
+                --output "$work_root/output-$build_number" \
+                --version "$qt_version"
+          done
+          archive_one="$work_root/output-one/qt-frameworks-x86_64-${qt_version}.tar.gz"
+          archive_two="$work_root/output-two/qt-frameworks-x86_64-${qt_version}.tar.gz"
+          cmp -s "$archive_one" "$archive_two"
+          cmp -s "${archive_one}.sha256" "${archive_two}.sha256"
+          cmp -s \
+            "$work_root/output-one/qt-frameworks-x86_64-${qt_version}.source-provenance.tsv" \
+            "$work_root/output-two/qt-frameworks-x86_64-${qt_version}.source-provenance.tsv"
+          ./tools/compare_qt_artifacts.sh "$archive_one" "$archive_two" \
+            --report "$work_root/comparison.json"
+          QT_HEADERS_PREFIX="$work_root/prefix-one" \
+          QT_RUNTIME_ARCHIVE="$archive_one" \
+            ./tools/test_qt_tiff_runtime.sh
+          candidate="$work_root/candidate"
+          mkdir -p "$candidate"
+          cp "$archive_one" "${archive_one}.sha256" \
+            "$work_root/output-one/qt-frameworks-x86_64-${qt_version}.source-provenance.tsv" \
+            "$work_root/comparison.json" \
+            "$RUNNER_TEMP/qt-rebuild-evidence.txt" \
+            "$candidate/"
+          printf 'Candidate SHA-256: ' \
+            >> "$candidate/qt-rebuild-evidence.txt"
+          shasum -a 256 "$archive_one" | awk '{print $1}' \
+            >> "$candidate/qt-rebuild-evidence.txt"
+
+      - name: Attest candidate archive
+        # actions/attest v4.2.2
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: ${{ runner.temp }}/qt-rebuild/candidate/*.tar.gz
+
+      - name: Upload nonpublishing candidate evidence
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qt-same-runner-rebuild-${{ github.sha }}
+          retention-days: 7
+          path: ${{ runner.temp }}/qt-rebuild/candidate/

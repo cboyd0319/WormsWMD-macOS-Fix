@@ -127,6 +127,40 @@ else
     done
 fi
 
+rebuild_workflow="$ROOT_DIR/.github/workflows/rebuild-qt.yml"
+if [[ ! -f "$rebuild_workflow" ]]; then
+    fail ".github/workflows/rebuild-qt.yml is required"
+else
+    # These are literal workflow source markers.
+    # shellcheck disable=SC2016
+    for marker in \
+        'workflow_dispatch:' \
+        '[[ "$GITHUB_REF" == "refs/heads/main" ]]' \
+        'ref: ${{ github.sha }}' \
+        'persist-credentials: false' \
+        'contents: read' \
+        'id-token: write' \
+        'attestations: write' \
+        '--cache "$work_root/cache-one"' \
+        '--cache "$work_root/cache-two"' \
+        './tools/compare_qt_artifacts.sh' \
+        'cmp -s' \
+        'same-runner clean rebuilds' \
+        'retention-days: 7' \
+        'actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6'; do
+        if ! grep -Fq -- "$marker" "$rebuild_workflow"; then
+            fail "Qt rebuild workflow is missing protected evidence marker: $marker"
+        fi
+    done
+    if grep -Eq '^[[:space:]]+(push|pull_request|schedule|release):' "$rebuild_workflow"; then
+        fail "Qt rebuild workflow must be workflow_dispatch only"
+    fi
+    if grep -Fq 'actions/cache@' "$rebuild_workflow" \
+        || grep -Eq 'contents:[[:space:]]+write|gh release|create-pull-request' "$rebuild_workflow"; then
+        fail "Qt rebuild workflow has cache or publication authority"
+    fi
+fi
+
 if ! grep -Eq '^[[:space:]]+default-days:[[:space:]]+7[[:space:]]*$' \
     "$ROOT_DIR/.github/dependabot.yml"; then
     fail "Dependabot GitHub Actions updates require a seven-day cooldown"

@@ -17,7 +17,8 @@ trap 'rm -rf "$tmp_dir"' EXIT
 runtime_root="$tmp_dir/runtime"
 mkdir -p "$runtime_root"
 
-archive="$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.tar.gz"
+archive="${QT_RUNTIME_ARCHIVE:-$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.tar.gz}"
+worms_reject_control_chars "$archive" "Qt TIFF runtime archive"
 archive_sha=$(awk 'NR == 1 {print $1; exit}' "${archive}.sha256")
 worms_copy_and_inspect_archive \
     "$archive" "$tmp_dir/inspected.tar.gz" qt "$archive_sha" --quiet

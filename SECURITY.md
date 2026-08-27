@@ -134,6 +134,12 @@ manifest/metadata/provenance/hash, architecture/load-command/URL, entitlement,
 and signature evidence. A direct x86_64 `QImageReader` probe decodes a synthetic
 TIFF against the current package before artifact refresh.
 
+`.github/workflows/rebuild-qt.yml` is manual-only and fails unless dispatched
+from exact protected `main`. One hosted Intel runner performs two isolated,
+cache-free fetch/package passes, requires byte identity and deep comparison,
+runs the TIFF probe, and attests/uploads seven-day candidate evidence. It has
+only read and short-lived attestation scopes, never contents/release write.
+
 The authoritative rebuild input is `packaging/qt-homebrew-lock.tsv`; the
 `dist/` TSV is generated evidence. Bottle rebuilds validate the exact allowlisted
 closure, GHCR digest path, archive profile, formula/version root, revision, and

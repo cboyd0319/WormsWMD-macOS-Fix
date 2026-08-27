@@ -39,6 +39,7 @@ new_fixture() {
         .github/CODEOWNERS \
         .github/pull_request_template.md \
         .github/workflows/ci.yml \
+        .github/workflows/rebuild-qt.yml \
         docs/README.md \
         docs/exec-plans/README.md \
         docs/exec-plans/2026-08-27-security-remediation-pr1-harness-hooks.md \
