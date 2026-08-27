@@ -210,6 +210,18 @@ if env "${installer_env[@]}" FAKE_BINARY_HASH_MISMATCH=1 \
     fail "hook installer --check accepted a changed installed scanner digest"
 fi
 
+for official_remote in \
+    "git@github.com:cboyd0319/WormsWMD-macOS-Fix" \
+    "git@github.com:cboyd0319/WormsWMD-macOS-Fix.git" \
+    "ssh://git@github.com/cboyd0319/WormsWMD-macOS-Fix" \
+    "ssh://git@github.com/cboyd0319/WormsWMD-macOS-Fix.git"; do
+    env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" --uninstall >/dev/null
+    git -C "$fixture" remote set-url origin "$official_remote"
+    env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" >/dev/null \
+        || fail "hook installer rejected official remote form: $official_remote"
+done
+git -C "$fixture" remote set-url origin https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
+
 env "${installer_env[@]}" "$fixture/tools/install_git_hooks.sh" --uninstall >/dev/null
 if git -C "$fixture" config --local --get core.hooksPath >/dev/null 2>&1; then
     fail "hook installer --uninstall retained core.hooksPath"

@@ -133,7 +133,7 @@ ensure_trusted_checkout() {
     upstream_main=$(git -C "$ROOT_DIR" rev-parse refs/remotes/origin/main 2>/dev/null || true)
     origin_url=$(git -C "$ROOT_DIR" config --get remote.origin.url 2>/dev/null || true)
     case "$origin_url" in
-        https://github.com/cboyd0319/WormsWMD-macOS-Fix|https://github.com/cboyd0319/WormsWMD-macOS-Fix.git|git@github.com:cboyd0319/WormsWMD-macOS-Fix.git)
+        https://github.com/cboyd0319/WormsWMD-macOS-Fix|https://github.com/cboyd0319/WormsWMD-macOS-Fix.git|git@github.com:cboyd0319/WormsWMD-macOS-Fix|git@github.com:cboyd0319/WormsWMD-macOS-Fix.git|ssh://git@github.com/cboyd0319/WormsWMD-macOS-Fix|ssh://git@github.com/cboyd0319/WormsWMD-macOS-Fix.git)
             if [[ -n "$upstream_main" && "$head_commit" == "$upstream_main" ]]; then
                 return 0
             fi

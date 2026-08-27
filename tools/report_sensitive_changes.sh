@@ -61,6 +61,9 @@ blob_is_binary_or_large() {
 
     [[ "$object_id" =~ ^0+$ ]] && return 1
     size=$(git cat-file -s "$object_id" 2>/dev/null || echo 0)
+    if [[ "$size" == 0 ]]; then
+        return 1
+    fi
     if [[ "$size" =~ ^[0-9]+$ ]] && (( size > 1048576 )); then
         return 0
     fi

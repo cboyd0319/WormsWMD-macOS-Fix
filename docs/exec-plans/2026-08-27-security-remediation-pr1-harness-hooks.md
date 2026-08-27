@@ -76,6 +76,10 @@ git status --short
   GNU `stat -f` returning successful filesystem text instead of failing; the
   validator now accepts the macOS result only when numeric and otherwise uses
   GNU `stat -c`. A simulated GNU-stat regression passes locally.
+- 2026-08-27: The one requested Copilot review identified two valid edge cases.
+  Red-green regressions now cover official SCP/SSH remote URL forms and empty
+  text blobs, which are accepted without weakening unrelated-origin or binary
+  detection.
 
 ## Surprises & Discoveries
 

