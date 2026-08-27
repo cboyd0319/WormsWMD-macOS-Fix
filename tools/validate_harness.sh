@@ -68,14 +68,22 @@ repo_file_link_count() {
     local path="$1"
     local count
 
-    count=$(stat -f "%l" "$path" 2>/dev/null || stat -c "%h" "$path" 2>/dev/null || echo 0)
+    count=$(stat -f "%l" "$path" 2>/dev/null || true)
+    if [[ ! "$count" =~ ^[0-9]+$ ]]; then
+        count=$(stat -c "%h" "$path" 2>/dev/null || echo 0)
+    fi
     printf '%s\n' "$count"
 }
 
 repo_file_size() {
     local path="$1"
+    local size
 
-    stat -f "%z" "$path" 2>/dev/null || stat -c "%s" "$path" 2>/dev/null || echo 0
+    size=$(stat -f "%z" "$path" 2>/dev/null || true)
+    if [[ ! "$size" =~ ^[0-9]+$ ]]; then
+        size=$(stat -c "%s" "$path" 2>/dev/null || echo 0)
+    fi
+    printf '%s\n' "$size"
 }
 
 validate_repo_source() {

@@ -72,6 +72,10 @@ git status --short
 - 2026-08-27: Adversarial review added official-origin verification, protected
   `/usr/bin/shasum` and `/usr/bin/uname` resolution, plan/security-policy change
   reporting, bounded link-target diagnostics, and lower-noise content detection.
+- 2026-08-27: PR #25 opened at commit `cb6ffef`. Its first Ubuntu run exposed
+  GNU `stat -f` returning successful filesystem text instead of failing; the
+  validator now accepts the macOS result only when numeric and otherwise uses
+  GNU `stat -c`. A simulated GNU-stat regression passes locally.
 
 ## Surprises & Discoveries
 
@@ -80,6 +84,9 @@ git status --short
 - Git does not enumerate untracked FIFOs through `git ls-files --others`, so the
   validator combines Git's regular/link inventory with a bounded filesystem
   pass for nonignored special files.
+- GNU `stat -f` may exit successfully with filesystem details, so command
+  failure is not a portable selector. Numeric result validation must own the
+  macOS-to-GNU fallback.
 
 ## Decision Log
 

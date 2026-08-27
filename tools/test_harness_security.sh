@@ -66,11 +66,16 @@ new_fixture() {
 run_validator_bounded() {
     local fixture="$1"
     local output="$2"
+    local path_prefix="${3:-}"
     local waited=0
 
     (
         cd "$fixture"
-        ./tools/validate_harness.sh
+        if [[ -n "$path_prefix" ]]; then
+            PATH="$path_prefix:$PATH" ./tools/validate_harness.sh
+        else
+            ./tools/validate_harness.sh
+        fi
     ) >"$output" 2>&1 &
     validator_pid=$!
 
@@ -104,6 +109,29 @@ run_validator_bounded "$fixture" "$test_dir/baseline.out"
 status=$?
 set -e
 [[ "$status" -eq 0 ]] || fail "baseline harness fixture did not validate"
+
+gnu_stat_bin="$test_dir/gnu-stat-bin"
+mkdir -p "$gnu_stat_bin"
+cat > "$gnu_stat_bin/stat" <<'STUB'
+#!/bin/bash
+if [[ "${1:-}" == "-f" ]]; then
+    printf '%s\n' "simulated GNU filesystem stat output"
+    exit 0
+fi
+if [[ "$(/usr/bin/uname -s)" == "Darwin" && "${1:-}" == "-c" ]]; then
+    case "${2:-}" in
+        %h) exec /usr/bin/stat -f %l "$3" ;;
+        %s) exec /usr/bin/stat -f %z "$3" ;;
+    esac
+fi
+exec /usr/bin/stat "$@"
+STUB
+chmod +x "$gnu_stat_bin/stat"
+set +e
+run_validator_bounded "$fixture" "$test_dir/gnu-stat.out" "$gnu_stat_bin"
+status=$?
+set -e
+[[ "$status" -eq 0 ]] || fail "harness validator rejected GNU stat output fallback"
 
 fixture="$test_dir/unsafe-sources"
 new_fixture "$fixture"
