@@ -124,7 +124,7 @@ When replacing the Qt archive:
 - Validate the archive layout, package metadata, required frameworks/plugins,
   complete dependency closure, archive manifest when present, generated cache
   manifest, and readable x86_64 Mach-O slices.
-- Resolve dependency source symlinks before applying provenance-prefix policy.
+- Resolve dependencies through owning-image paths into canonical Qt, explicit dependency, or Intel Cellar roots; never basename-search.
 - Run the packaging or install verification relevant to the change.
 - Update user docs if the version, source, or fallback behavior changes.
 

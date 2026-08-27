@@ -30,7 +30,7 @@ settings, tags, release publication, and PR 4 delivery/provenance work.
 
 - [x] Contain save restore destinations and prove rollback.
 - [x] Authenticate Qt cache reuse against archive authority.
-- [ ] Contain Homebrew dependency sources canonically.
+- [x] Contain Homebrew dependency sources canonically.
 - [ ] Classify strict signatures and recursive quarantine.
 - [ ] Bind update downloads to exact checksums and atomic publish.
 - [ ] Harden traces, diagnostics, crashes, and LaunchAgent updates.
@@ -76,6 +76,12 @@ git status --short
   are retained and pruned only by marker. Foreign, mode, interruption,
   missing-authority, and forged-manifest regressions pass. No-network warm reuse
   measured 3 seconds locally.
+- 2026-08-27: One shared dependency resolver now rejects lexical traversal,
+  linked/hardlinked/non-x86 sources, external roots, ambiguity, and basename
+  conflicts while preserving loader-owned rpaths, spaces, custom roots, and the
+  canonical Intel Cellar. Runtime copying and packaging share the policy. The
+  installed Steam app completed read-only verification with zero findings after
+  excluding each Mach-O image's own install ID.
 
 ## Surprises & Discoveries
 
@@ -93,6 +99,8 @@ git status --short
 - The cache marker is internal to the atomically renamed directory and binds
   canonical published path plus full archive digest; archive bytes remain the
   manifest authority.
+- Dependency source policy is canonical and shared; copied bundle targets have
+  a separate in-bundle regular-file/x86_64 check before reuse.
 
 ## Outcomes & Retrospective
 

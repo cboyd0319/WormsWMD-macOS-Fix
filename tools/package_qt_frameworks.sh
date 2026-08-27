@@ -167,30 +167,15 @@ qt_source_label() {
     fi
 }
 
-dependency_path_allowed() {
-    local path="$1"
+packaging_dependency_roots() {
+    local cellar_real
 
-    case "$path" in
-        /usr/local/*)
-            return 0
-            ;;
-    esac
-
-    if [[ "$path" == "$QT_PREFIX"/* ]]; then
-        return 0
+    [[ -n "$QT_PREFIX_REAL" ]] && printf '%s\n' "$QT_PREFIX_REAL"
+    if [[ "$QT_PREFIX" == "/usr/local/opt/qt@5" ]]; then
+        cellar_real=$(worms_real_dir /usr/local/Cellar || true)
+        [[ -n "$cellar_real" ]] && printf '%s\n' "$cellar_real"
     fi
-    if [[ -n "$QT_PREFIX_REAL" ]] && [[ "$path" == "$QT_PREFIX_REAL"/* ]]; then
-        return 0
-    fi
-
-    if [[ -n "$QT_DEP_PREFIX" ]] && [[ "$path" == "$QT_DEP_PREFIX"/* ]]; then
-        return 0
-    fi
-    if [[ -n "$QT_DEP_PREFIX_REAL" ]] && [[ "$path" == "$QT_DEP_PREFIX_REAL"/* ]]; then
-        return 0
-    fi
-
-    return 1
+    [[ -n "$QT_DEP_PREFIX_REAL" ]] && printf '%s\n' "$QT_DEP_PREFIX_REAL"
 }
 
 validate_packaged_binary() {
@@ -219,47 +204,14 @@ prune_framework_for_runtime() {
 resolve_packaging_dependency() {
     local binary="$1"
     local dependency="$2"
-    local dependency_suffix rpath expanded candidate candidate_real
+    local root
+    local roots=()
 
-    case "$dependency" in
-        @rpath/*)
-            dependency_suffix=${dependency#@rpath/}
-            while IFS= read -r rpath; do
-                [[ -n "$rpath" ]] || continue
-                expanded=$(worms_expand_macho_path "$rpath" "$binary" "$binary" || true)
-                [[ -n "$expanded" ]] || continue
-                candidate="${expanded%/}/$dependency_suffix"
-                [[ -f "$candidate" ]] || continue
-                candidate_real=$(realpath "$candidate" 2>/dev/null || true)
-                [[ -n "$candidate_real" ]] || continue
-                if dependency_path_allowed "$candidate_real"; then
-                    printf '%s\n' "$candidate_real"
-                    return 0
-                fi
-            done < <(worms_macho_rpaths "$binary")
-            ;;
-        @executable_path/*|@loader_path/*)
-            candidate=$(worms_expand_macho_path "$dependency" "$binary" "$binary" || true)
-            if [[ -f "$candidate" ]]; then
-                candidate_real=$(realpath "$candidate" 2>/dev/null || true)
-                if [[ -n "$candidate_real" ]] && dependency_path_allowed "$candidate_real"; then
-                    printf '%s\n' "$candidate_real"
-                    return 0
-                fi
-            fi
-            ;;
-        /*)
-            if [[ -f "$dependency" ]]; then
-                candidate_real=$(realpath "$dependency" 2>/dev/null || true)
-                if [[ -n "$candidate_real" ]] && dependency_path_allowed "$candidate_real"; then
-                    printf '%s\n' "$candidate_real"
-                    return 0
-                fi
-            fi
-            ;;
-    esac
-
-    return 1
+    while IFS= read -r root; do
+        [[ -n "$root" ]] && roots+=("$root")
+    done < <(packaging_dependency_roots)
+    worms_resolve_macho_dependency_source \
+        "$binary" "$dependency" "$binary" "${roots[@]}"
 }
 
 normalize_archive_inputs() {
@@ -330,6 +282,14 @@ if ! ruby -e 'require ARGV.fetch(0); WormsBottleFetcher.read_lock(ARGV.fetch(1))
     exit 1
 fi
 QT_PREFIX_REAL=$(cd "$QT_PREFIX" && pwd -P)
+if [[ "$QT_PREFIX" == "/usr/local/opt/qt@5" ]]; then
+    STANDARD_CELLAR_REAL=$(worms_real_dir /usr/local/Cellar || true)
+    if [[ -z "$STANDARD_CELLAR_REAL" ]] \
+        || ! worms_path_inside_root "$STANDARD_CELLAR_REAL" "$QT_PREFIX_REAL"; then
+        worms_print_error "/usr/local/opt/qt@5 must resolve inside /usr/local/Cellar"
+        exit 1
+    fi
+fi
 if [[ -n "$QT_DEP_PREFIX" ]]; then
     if [[ ! -d "$QT_DEP_PREFIX" ]]; then
         worms_print_error "Dependency prefix not found: $QT_DEP_PREFIX"
@@ -453,13 +413,17 @@ copy_deps() {
         [[ "$source_dep" == *.dylib ]] || continue
         dep_name=$(basename "$dep")
 
-        if grep -Fqx -- "$dep_name" "$COPIED_DEPS_FILE"; then
+        if ! worms_record_dependency_source \
+            "$COPIED_DEPS_FILE" "$dep_name" "$source_dep"; then
+            worms_print_error "Dependency basename has conflicting sources: $dep_name"
+            return 1
+        fi
+        if [[ -f "$DEPS_DIR/$dep_name" ]] || [[ -f "$FRAMEWORKS_DIR/$dep_name" ]]; then
             continue
         fi
 
-        cp -L "$source_dep" "$DEPS_DIR/$dep_name"
+        cp "$source_dep" "$DEPS_DIR/$dep_name"
         validate_packaged_binary "$DEPS_DIR/$dep_name"
-        echo "$dep_name" >> "$COPIED_DEPS_FILE"
         echo "  Copied $dep_name"
 
         copy_deps "$source_dep"

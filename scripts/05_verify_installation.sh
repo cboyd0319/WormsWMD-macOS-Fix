@@ -162,9 +162,13 @@ check_missing_deps() {
 check_unsafe_deps() {
     local bin="$1"
     local label="$2"
-    local dep resolved
+    local dep resolved install_id
+
+    install_id=$(worms_macho_install_id "$bin" || true)
 
     while IFS= read -r dep; do
+        [[ -n "$dep" ]] || continue
+        [[ "$dep" == "$install_id" ]] && continue
         case "$dep" in
             @executable_path/*|@loader_path/*)
                 resolved=$(worms_expand_macho_path "$dep" "$bin" "$GAME_EXEC" || true)

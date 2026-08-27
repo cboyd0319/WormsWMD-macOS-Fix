@@ -74,7 +74,7 @@ The fix does not modify system directories, collect telemetry, alter `PATH` or
 | `INSTALL_DIR` | User project path; not home/system/non-empty foreign repository |
 | `INSTALL_REF` | Defaults to v1.7.6; other refs require explicit developer opt-in |
 | `LOG_FILE` | Regular `.log` beneath `~/Library/Logs` |
-| `QT_PREFIX` | Required Qt 5.15.x layout and explicit custom-prefix opt-in |
+| `QT_PREFIX`/`QT_DEP_PREFIX` | Explicit roots; canonical regular x86_64 dependencies only |
 | Archive files | Bounded owner-only copy, external digest where available, shared profile, same-copy extraction |
 | External Steam save root | Exact canonical `327030` destination, explicit `--yes`, per invocation only |
 

@@ -548,6 +548,147 @@ worms_path_inside_root() {
     return 1
 }
 
+worms_macho_path_has_parent_component() {
+    local path="$1"
+
+    case "/$path/" in
+        *"/../"*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+worms_validate_dependency_source() {
+    local candidate="$1"
+    shift
+    local candidate_real root root_real archs allowed=false
+
+    if worms_has_control_chars "$candidate" || [[ -L "$candidate" ]] \
+        || [[ ! -f "$candidate" ]]; then
+        echo "Dependency source must be a regular non-symlink file: $candidate" >&2
+        return 1
+    fi
+    if [[ "$(worms_file_link_count "$candidate")" -ne 1 ]]; then
+        echo "Dependency source must not be hardlinked: $candidate" >&2
+        return 1
+    fi
+    candidate_real=$(realpath "$candidate" 2>/dev/null || true)
+    [[ -n "$candidate_real" ]] || return 1
+
+    for root in "$@"; do
+        [[ -n "$root" ]] || continue
+        root_real=$(worms_real_dir "$root" || true)
+        [[ -n "$root_real" ]] || continue
+        case "$candidate_real" in
+            "$root_real"/*)
+                allowed=true
+                break
+                ;;
+        esac
+    done
+    $allowed || {
+        echo "Dependency source resolves outside allowed roots: $candidate_real" >&2
+        return 1
+    }
+
+    archs=$(lipo -archs "$candidate_real" 2>/dev/null || true)
+    if ! printf '%s\n' "$archs" | tr ' ' '\n' | grep -qx x86_64; then
+        echo "Dependency source is missing x86_64: $candidate_real (${archs:-unreadable})" >&2
+        return 1
+    fi
+    printf '%s\n' "$candidate_real"
+}
+
+worms_resolve_macho_dependency_source() {
+    local binary="$1"
+    local dependency="$2"
+    local game_exec="$3"
+    shift 3
+    local dependency_suffix rpath expanded candidate resolved item
+    local existing=false
+    local resolved_sources=()
+
+    if worms_has_control_chars "$dependency" \
+        || worms_macho_path_has_parent_component "$dependency"; then
+        echo "Unsafe lexical dependency path: $dependency" >&2
+        return 1
+    fi
+
+    case "$dependency" in
+        @rpath/*)
+            dependency_suffix=${dependency#@rpath/}
+            while IFS= read -r rpath; do
+                [[ -n "$rpath" ]] || continue
+                worms_has_control_chars "$rpath" && continue
+                expanded=$(worms_expand_macho_path \
+                    "$rpath" "$binary" "$game_exec" || true)
+                [[ -n "$expanded" ]] || continue
+                candidate="${expanded%/}/$dependency_suffix"
+                [[ -e "$candidate" ]] || [[ -L "$candidate" ]] || continue
+                resolved=$(worms_validate_dependency_source "$candidate" "$@" \
+                    2>/dev/null || true)
+                [[ -n "$resolved" ]] || continue
+                existing=false
+                for item in "${resolved_sources[@]:-}"; do
+                    [[ "$item" == "$resolved" ]] && existing=true
+                done
+                $existing || resolved_sources+=("$resolved")
+            done < <(worms_macho_rpaths "$binary")
+            ;;
+        @executable_path|@executable_path/*|@loader_path|@loader_path/*)
+            candidate=$(worms_expand_macho_path \
+                "$dependency" "$binary" "$game_exec" || true)
+            [[ -n "$candidate" ]] || return 1
+            resolved=$(worms_validate_dependency_source "$candidate" "$@") \
+                || return 1
+            resolved_sources+=("$resolved")
+            ;;
+        /*)
+            resolved=$(worms_validate_dependency_source "$dependency" "$@") \
+                || return 1
+            resolved_sources+=("$resolved")
+            ;;
+        *)
+            echo "Unsupported relative dependency source: $dependency" >&2
+            return 1
+            ;;
+    esac
+
+    if (( ${#resolved_sources[@]} == 0 )); then
+        return 1
+    fi
+    if (( ${#resolved_sources[@]} > 1 )); then
+        echo "Multiple valid dependency sources for $dependency:" >&2
+        printf '  %s\n' "${resolved_sources[@]}" >&2
+        return 2
+    fi
+    printf '%s\n' "${resolved_sources[0]}"
+}
+
+worms_record_dependency_source() {
+    local records_file="$1"
+    local dependency_name="$2"
+    local source_path="$3"
+    local existing
+
+    if [[ "$dependency_name" == */* ]] \
+        || worms_has_control_chars "$dependency_name" \
+        || worms_has_control_chars "$source_path"; then
+        return 1
+    fi
+    existing=$(awk -F '\t' -v name="$dependency_name" \
+        '$1 == name {print $2; exit}' "$records_file" 2>/dev/null || true)
+    if [[ -n "$existing" ]]; then
+        if [[ "$existing" != "$source_path" ]]; then
+            echo "Dependency basename maps to multiple sources: $dependency_name" >&2
+            return 1
+        fi
+        return 0
+    fi
+    printf '%s\t%s\n' "$dependency_name" "$source_path" >> "$records_file"
+}
+
 worms_path_creatable_inside_root() {
     local root="$1"
     local path="$2"
