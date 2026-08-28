@@ -22,6 +22,7 @@ worms_color_init auto
 
 OUTPUT_DIR="$ROOT_DIR/build/release"
 VERSION="${VERSION:-}"
+BUILD_TIMESTAMP="${BUILD_TIMESTAMP:-}"
 SKIP_ZIP=false
 COPIED_ITEMS=()
 
@@ -35,6 +36,7 @@ USAGE:
 OPTIONS:
     --output-dir DIR   Write bundle output under DIR (default: build/release)
     --version VERSION  Use VERSION in the folder and zip name
+    --timestamp TIME   Use a timezone-aware ISO-8601 build timestamp
     --skip-zip         Create the folder and manifest, but skip zip/checksum
     --help, -h         Show this help
 
@@ -72,6 +74,19 @@ detect_version() {
     sanitize_version "$(date '+%Y%m%d-%H%M%S')"
 }
 
+detect_timestamp() {
+    local value="${BUILD_TIMESTAMP:-}"
+
+    if [[ -z "$value" ]]; then
+        value=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    fi
+    if [[ ! "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
+        worms_print_error "--timestamp must be a timezone-aware ISO-8601 timestamp."
+        exit 1
+    fi
+    printf '%s\n' "$value"
+}
+
 copy_item() {
     local rel="$1"
     local src="$ROOT_DIR/$rel"
@@ -94,7 +109,7 @@ Worms W.M.D macOS Fix release bundle
 ====================================
 
 Version: $release_version
-Built: $(date '+%Y-%m-%d %H:%M:%S %Z')
+Built: $release_timestamp
 Repository: https://github.com/cboyd0319/WormsWMD-macOS-Fix
 
 Start here:
@@ -164,6 +179,14 @@ while [[ $# -gt 0 ]]; do
             VERSION="$2"
             shift 2
             ;;
+        --timestamp)
+            if [[ -z "${2:-}" ]] || [[ "$2" == -* ]]; then
+                worms_print_error "--timestamp requires a value."
+                exit 1
+            fi
+            BUILD_TIMESTAMP="$2"
+            shift 2
+            ;;
         --skip-zip)
             SKIP_ZIP=true
             shift
@@ -181,6 +204,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 release_version=$(detect_version)
+release_timestamp=$(detect_timestamp)
 bundle_name="WormsWMD-macOS-Fix-$release_version"
 bundle_dir="$OUTPUT_DIR/$bundle_name"
 

@@ -77,9 +77,10 @@ git status --short
   missing-authority, and forged-manifest regressions pass. No-network warm reuse
   measured 3 seconds locally.
 - 2026-08-27: One shared dependency resolver now rejects lexical traversal,
-  linked/hardlinked/non-x86 sources, external roots, ambiguity, and basename
-  conflicts while preserving loader-owned rpaths, spaces, custom roots, and the
-  canonical Intel Cellar. Runtime copying and packaging share the policy. The
+  escaping aliases, hardlinked/non-x86 sources, external roots, ambiguity, and
+  basename conflicts while preserving loader-owned rpaths, contained soname
+  aliases, spaces, custom roots, and the canonical Intel Cellar. Runtime copying
+  and packaging share the policy. The
   installed Steam app completed read-only verification with zero findings after
   excluding each Mach-O image's own install ID.
 - 2026-08-27: Shared strict classification now derives complete-fixed state

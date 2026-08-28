@@ -341,6 +341,8 @@ mkdir -p "$resolver_tools" "$resolver_root/bin" \
 : > "$resolver_owner"
 : > "$resolver_game_exec"
 printf 'valid dependency\n' > "$resolver_root/deps/libValid.dylib"
+printf 'internal alias target\n' > "$resolver_root/deps/libInternalReal.dylib"
+ln -s libInternalReal.dylib "$resolver_root/deps/libInternalAlias.dylib"
 printf 'first duplicate\n' > "$resolver_root/deps-one/libDuplicate.dylib"
 printf 'second duplicate\n' > "$resolver_root/deps-two/libDuplicate.dylib"
 printf 'arm only\n' > "$resolver_root/deps/libNoX86.dylib"
@@ -392,6 +394,12 @@ resolved_source=$(PATH="$resolver_tools:$PATH" worms_resolve_macho_dependency_so
     "$resolver_root_real")
 [[ "$resolved_source" == "$resolver_root_real/deps/libValid.dylib" ]] \
     || fail "loader-owned rpath with spaces resolved incorrectly: $resolved_source"
+internal_alias_source=$(PATH="$resolver_tools:$PATH" \
+    worms_resolve_macho_dependency_source \
+    "$resolver_owner" '@rpath/libInternalAlias.dylib' "$resolver_game_exec" \
+    "$resolver_root_real" || true)
+[[ "$internal_alias_source" == "$resolver_root_real/deps/libInternalReal.dylib" ]] \
+    || fail "contained Homebrew-style soname alias did not resolve canonically: $internal_alias_source"
 
 exec_rpath_root="$tmp_dir/Executable Rpath Root"
 exec_rpath_tools="$tmp_dir/executable-rpath-tools"

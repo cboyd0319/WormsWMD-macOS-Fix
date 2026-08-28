@@ -56,7 +56,12 @@ jobs:
 
       - name: Test release SBOM generation
         run: python3 tools/test_generate_sbom.py
-
+      - name: Test Qt vulnerability policy
+        run: /usr/bin/python3 tools/test_qt_vulnerability_policy.py
+      - name: Test deterministic Mach-O UUID normalization
+        run: /usr/bin/python3 tools/test_normalize_macho_uuid.py
+      - name: Test release ZIP verification
+        run: /usr/bin/python3 tools/test_verify_release_zip.py
       - name: Test bounded archive inspection
         run: /usr/bin/python3 tools/test_archive_inspector.py
       - name: Test Homebrew bottle safety
@@ -167,6 +172,10 @@ jobs:
         run: ./tools/test_qt_cache_integrity.sh
       - name: Test Qt version pinning
         run: ./tools/test_qt_version_pinning.sh
+      - name: Test Qt artifact comparison
+        run: ./tools/test_qt_artifact_comparison.sh
+      - name: Test Qt TIFF runtime
+        run: ./tools/test_qt_tiff_runtime.sh
       - name: Check script permissions
         run: |
           echo "Verifying scripts are executable..."

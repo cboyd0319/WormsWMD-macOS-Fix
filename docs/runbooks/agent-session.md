@@ -83,6 +83,12 @@ GitHub workflow or release automation:
 ./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
+/usr/bin/python3 tools/test_qt_vulnerability_policy.py
+./tools/scan_qt_sbom.sh --local-report
+/usr/bin/python3 tools/test_normalize_macho_uuid.py
+/usr/bin/python3 tools/test_verify_release_zip.py
+./tools/test_qt_artifact_comparison.sh
+./tools/test_qt_tiff_runtime.sh
 /usr/bin/python3 tools/test_archive_inspector.py
 ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/test_git_hooks.sh
@@ -110,6 +116,16 @@ Release packaging:
 ./tools/build_release_bundle.sh --version local-smoke --skip-zip
 ./tools/build_release_bundle.sh --version local-smoke
 ```
+
+Protected Qt candidate rebuild, only after source/lock changes merge:
+
+```bash
+gh workflow run rebuild-qt.yml --ref main
+gh run watch RUN_ID --exit-status
+```
+
+Record the source SHA, run ID, candidate digest, attestation, and comparison
+evidence. Describe it as two clean same-runner builds, not independent builders.
 
 Release publication:
 
@@ -153,6 +169,10 @@ the bootstrap commit guard to the tag target. The workflow creates or resumes a
 draft, uploads and attests every asset, applies the matching `CHANGELOG.md`
 section as release notes, and only then publishes the immutable release. It
 must refuse to overwrite an already-published release.
+Configure required reviewers on the GitHub `release` environment before the
+next tag. For signing-key loss, workflow compromise, ruleset break-glass, asset
+withdrawal, or corrective publication, follow
+[`release-incident.md`](release-incident.md).
 
 After the tag workflow publishes assets, verify:
 

@@ -498,28 +498,31 @@ module WormsBottleFetcher
     end.reject(&:empty?)
   end
 
-  def relocate_macho!(root)
+  def relocate_macho!(root, relocation_root = root)
     relocated = 0
     checked = []
     Find.find(File.join(root, 'Cellar')) do |path|
       next unless macho_candidate?(path) && macho_file?(path)
       checked << path
       current_id = mach_o_id(path)
-      new_id = relocate_path(current_id, root)
+      new_id = relocate_path(current_id, relocation_root)
       if !current_id.empty? && current_id != new_id
         run!('install_name_tool', '-id', new_id, path)
         relocated += 1
       end
       mach_o_deps(path).each do |dependency|
-        relocated_dependency = relocate_path(dependency, root)
+        relocated_dependency = relocate_path(dependency, relocation_root)
         next if dependency == relocated_dependency
         run!('install_name_tool', '-change', dependency, relocated_dependency, path)
         relocated += 1
       end
     end
     leftovers = checked.flat_map { |path| [mach_o_id(path), *mach_o_deps(path)] }
-                       .grep(/@@HOMEBREW_(PREFIX|CELLAR|REPOSITORY)@@/)
-    raise Error, "Unrelocated Homebrew placeholders remain:\n#{leftovers.uniq.join("\n")}" unless leftovers.empty?
+                       .select do |value|
+      value.match?(/@@HOMEBREW_(PREFIX|CELLAR|REPOSITORY)@@/) ||
+        value == root || value.start_with?("#{root}/")
+    end
+    raise Error, "Unrelocated or staging Homebrew paths remain:\n#{leftovers.uniq.join("\n")}" unless leftovers.empty?
     relocated
   end
 
@@ -665,7 +668,7 @@ module WormsBottleFetcher
     staging = Dir.mktmpdir(".#{File.basename(target.path)}.stage-", parent)
     begin
       install_entries!(entries, staging, cache)
-      relocated = relocate_macho!(staging)
+      relocated = relocate_macho!(staging, target.path)
       root_entry = entries.find { |entry| entry.fetch('name') == DEFAULT_FORMULA }
       raise Error, "Bottle lock omitted #{DEFAULT_FORMULA}" unless root_entry
       _qt_prefix, qt_version = validate_qt!(staging, root_entry)

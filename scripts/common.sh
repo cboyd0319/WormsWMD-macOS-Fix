@@ -658,17 +658,20 @@ worms_validate_dependency_source() {
     shift
     local candidate_real root root_real archs allowed=false
 
-    if worms_has_control_chars "$candidate" || [[ -L "$candidate" ]] \
-        || [[ ! -f "$candidate" ]]; then
-        echo "Dependency source must be a regular non-symlink file: $candidate" >&2
-        return 1
-    fi
-    if [[ "$(worms_file_link_count "$candidate")" -ne 1 ]]; then
-        echo "Dependency source must not be hardlinked: $candidate" >&2
+    if worms_has_control_chars "$candidate" || [[ ! -f "$candidate" ]]; then
+        echo "Dependency source must resolve to a regular file: $candidate" >&2
         return 1
     fi
     candidate_real=$(realpath "$candidate" 2>/dev/null || true)
-    [[ -n "$candidate_real" ]] || return 1
+    if [[ -z "$candidate_real" ]] || [[ ! -f "$candidate_real" ]] \
+        || [[ -L "$candidate_real" ]]; then
+        echo "Dependency source must resolve to a regular non-symlink file: $candidate" >&2
+        return 1
+    fi
+    if [[ "$(worms_file_link_count "$candidate_real")" -ne 1 ]]; then
+        echo "Dependency source must not be hardlinked: $candidate_real" >&2
+        return 1
+    fi
 
     for root in "$@"; do
         [[ -n "$root" ]] || continue

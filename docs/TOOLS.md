@@ -256,6 +256,42 @@ QT_PACKAGE_VERSION=5.15.19 \
 ./scripts/download_qt_frameworks.sh --check
 ```
 
+Packaging normalizes every Mach-O ID and internal import to `@rpath`, removes
+build-specific `LC_RPATH` values, and recomputes `LC_UUID` from UUID-neutral
+bytes before manifest creation. Unexpected absolute or missing internal loads
+fail. This removes temporary prefix identity without using `qmake`.
+
+Compare two Qt artifacts or allow reviewed version/hash-only changes:
+
+```bash
+./tools/compare_qt_artifacts.sh first.tar.gz second.tar.gz
+./tools/compare_qt_artifacts.sh first.tar.gz second.tar.gz \
+  --allow-version-change --report comparison.json
+./tools/test_qt_artifact_comparison.sh
+./tools/test_qt_tiff_runtime.sh
+```
+
+The comparator inspects bounded copies and reports archive digest, member type,
+mode, symlink, manifest, metadata, provenance, per-file hash, architecture,
+Mach-O ID/import/rpath, embedded URL, entitlement, and signature evidence. The
+TIFF test fetches only the checksum-locked Qt bottle for headers, compiles a
+direct x86_64 `QImageReader` probe with `clang++`, and decodes a deterministic
+1x1 TIFF against the shipped runtime under Rosetta. It never executes `qmake`.
+
+After packaging source, lock, normalizers, comparison, and probe changes merge,
+run the protected nonpublishing rebuild from exact `main`:
+
+```bash
+gh workflow run rebuild-qt.yml --ref main
+```
+
+The workflow refuses every other ref, checks out the exact dispatch SHA without
+persisted credentials, uses two separate download caches and prefix roots,
+requires byte-identical archives/checksums/provenance plus deep comparison,
+runs the TIFF probe, and attests/uploads seven-day candidate evidence. It has no
+contents write, release publication, PR creation, or cross-run cache authority.
+The output proves two clean builds on one runner, not independent builders.
+
 The fetcher bounds downloads and redirects, verifies the copied archive digest,
 uses the shared bottle inspector, checks exact formula/version/revision roots
 against embedded formula metadata, never executes `qmake`, and stages output beside
@@ -270,10 +306,17 @@ in a dedicated reviewed change:
 ```bash
 ./tools/fetch_qt_homebrew_bottles.rb \
   --lock packaging/qt-homebrew-lock.tsv \
-  --refresh-formula qt@5 \
-  --version 5.15.19 \
+  --refresh-formula libtiff \
+  --version 4.7.2 \
   --write-lock /tmp/qt-homebrew-lock.candidate.tsv
 ```
+
+For the v1.7.7 transition, review that raw candidate and retain only the
+libtiff row. Current formula resolution also proposes unrelated dependency/tap
+churn; it is not authoritative merely because it is current. The committed
+packaging lock intentionally gets ahead of the 4.7.1 provenance in `dist` until
+the protected rebuild and artifact-only PR restore three-way byte equality.
+Do not create a tag during this transition.
 
 Build the player-facing release folder and zip:
 
@@ -293,3 +336,23 @@ checksummed Qt archive, then converts it into a deterministic CycloneDX 1.6
 JSON SBOM. The release workflow publishes that `.cdx.json` file and creates an
 SBOM attestation that binds it to the release zip. Generation also hashes the
 built zip and rejects a checksum mismatch before writing the SBOM.
+
+`packaging/qt-component-policy.tsv` maps every lock row to supplier identity,
+runtime or build scope, shipped-file evidence, version-neutral purl, reviewed
+NVD CPE identity when runtime, review date, and owner. The SBOM lists the 12
+shipped runtime components as required dependencies and the five non-shipped
+inputs under CycloneDX formulation. Versions always come from the selected
+provenance file.
+
+Run the pinned report-only vulnerability scan locally:
+
+```bash
+/usr/bin/python3 tools/test_qt_vulnerability_policy.py
+./tools/scan_qt_sbom.sh --local-report
+```
+
+The scan requires Grype 0.117.0, fails on tool/policy/VEX errors or zero runtime
+inventory, warns on unmapped runtime identity, and writes deterministic JSON
+under `build/security/`. Vulnerability matches remain visible and do not block
+unrelated PRs during burn-in. Optional VEX rows require a named advisory,
+component, state, rationale, owner, review date, and unexpired review deadline.

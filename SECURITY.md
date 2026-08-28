@@ -126,6 +126,19 @@ The shipped Qt archive is accepted only after verifying:
    hashes, formula hashes, and tap commit. SBOM generation requires its
    standalone copy to be byte-identical to the copy inside the checksummed
    archive.
+6. Canonical `@rpath` IDs/imports, no component rpaths or build-prefix loads,
+   and deterministic UUIDs computed after load-command normalization.
+
+Maintainer comparison separately records archive/member/mode/symlink,
+manifest/metadata/provenance/hash, architecture/load-command/URL, entitlement,
+and signature evidence. A direct x86_64 `QImageReader` probe decodes a synthetic
+TIFF against the current package before artifact refresh.
+
+`.github/workflows/rebuild-qt.yml` is manual-only and fails unless dispatched
+from exact protected `main`. One hosted Intel runner performs two isolated,
+cache-free fetch/package passes, requires byte identity and deep comparison,
+runs the TIFF probe, and attests/uploads seven-day candidate evidence. It has
+only read and short-lived attestation scopes, never contents/release write.
 
 The authoritative rebuild input is `packaging/qt-homebrew-lock.tsv`; the
 `dist/` TSV is generated evidence. Bottle rebuilds validate the exact allowlisted
@@ -134,6 +147,13 @@ bounded embedded formula metadata.
 They do not execute extracted `qmake`. Output is staged beside the target and
 cannot replace or clean a nonempty directory without its exact path-bound
 ownership marker and the matching explicit flag.
+
+PR 4 intentionally advances only the authoritative libtiff row from 4.7.1 to
+4.7.2 while `dist` retains current 4.7.1 provenance. The other 16 rows remain
+unchanged. No tag or release is allowed in this state; tag publication must
+require byte equality among the packaging lock, versioned standalone
+provenance, and archive-embedded provenance. PR 5 restores that equality with
+the protected candidate artifact.
 
 ## GitHub and CI controls
 
@@ -203,15 +223,38 @@ For future tags, the release workflow:
    archive, then generates deterministic CycloneDX 1.6 JSON from it.
 5. Hashes the built release zip, verifies its checksum file, and uses that
    verified digest as the SBOM root hash.
-6. Attests build assets and separately binds the SBOM to the zip.
-7. Uploads notes/assets to a resumable draft, then publishes it immutably.
-8. Refuses to overwrite any published release.
+6. Uploads a read-only build artifact; manual dispatch stops here.
+7. For an annotated tag only, a second read-only job proves the tag commit is on
+   `origin/main`, downloads only this workflow's build artifact, rebuilds the
+   expected source tree deterministically, and compares exact packaged content,
+   safe modes, checksum, ZIP manifest, three-way Qt provenance, and SBOM.
+8. Only after verification, an environment-approved publish job receives
+   release/attestation scopes and downloads that verified workflow artifact.
+9. It rechecks the checksum, attests assets/SBOM, uploads only the exact asset
+   inventory to a resumable draft, rechecks the live tag object, then publishes
+   immutably and refuses to overwrite a published release.
 
-The SBOM lists the release plus the 17 Homebrew bottle components used for the
-bundled Qt runtime. It records bottle/source/formula hashes and source URLs. The
-flat lock proves the complete set, not internal edges, so only the
-release-to-component relationship is asserted. Game files, macOS, Rosetta,
-Xcode, and optional user-installed Homebrew fallbacks are outside its scope.
+The `release` environment must have a required reviewer configured before the
+next tag; PR4 references but does not mutate that repository setting. The
+current sole-maintainer model permits self-review so releases remain possible;
+enable prevention after adding a second trusted maintainer. Publication fails
+closed if the environment API shows no reviewer. Incident response follows
+[`docs/runbooks/release-incident.md`](docs/runbooks/release-incident.md).
+
+The SBOM lists the release plus 12 shipped runtime components as required
+dependencies. Five non-shipped bottle inputs remain explicit CycloneDX
+formulation components. The version-neutral component policy records supplier,
+shipped or negative evidence, NVD CPE identity, rationale, review date, and
+owner; versions come only from selected provenance. The flat lock proves the
+complete input set, not internal build edges. Game files, macOS, Rosetta, Xcode,
+and optional user-installed Homebrew fallbacks are outside its scope.
+
+The GitHub Security workflow installs checksum-pinned Grype 0.117.0 and scans
+only scheduled/manual/release events or Qt artifact, packaging, policy, VEX,
+SBOM, scanner, or workflow changes. Tool failure, invalid/expired VEX, and zero
+runtime inventory fail. Findings and unmapped identity begin report-only with
+seven-day evidence; no advisory is suppressed without component-specific,
+owned, dated, expiring reachability rationale.
 
 v1.7.6 predates SBOM publication and repository-level immutability. Its hosted
 zip checksum and build attestation remain independently verifiable.
@@ -240,6 +283,8 @@ both its build provenance and SBOM relationship.
 ./tools/test_ci_changed_paths.sh
 ./tools/test_ci_change_classification.sh
 python3 tools/test_generate_sbom.py
+/usr/bin/python3 tools/test_qt_vulnerability_policy.py
+./tools/scan_qt_sbom.sh --local-report
 /usr/bin/python3 tools/test_archive_inspector.py
 ruby tools/test_fetch_qt_homebrew_bottles.rb
 ./tools/validate_harness.sh
@@ -262,6 +307,7 @@ Runtime verification remains:
 | Limitation | Current mitigation |
 | --- | --- |
 | Qt package is not independently signed | Locked inputs, checksums, manifests, Mach-O closure, release attestation |
+| Clean rebuilds use one hosted runner | Two cache-free roots, deterministic UUID/load commands, deep comparison, and explicit same-runner wording |
 | Archive inspection needs Python 3.9+ | macOS 26 Apple Command Line Tools provide it; mutating archive operations fail with install/update guidance |
 | Update downloader verifies an exact checksum but not attestation | Users can run `gh attestation verify` on the downloaded zip |
 | Modified game uses ad-hoc signing | Strict deep verification in rollback and classified standalone checks |
@@ -271,6 +317,8 @@ Runtime verification remains:
 | Admin branch bypass remains enabled | Required checks/review still apply normally; second trusted reviewer needed before enforcement |
 | v1.7.6 is mutable and has no SBOM | Existing checksum/build attestation; future releases immutable with SBOM |
 | First hosted SBOM publication is not yet exercised | Generator passed official CycloneDX schema and zip-root-hash tests; next tag is final end-to-end proof |
+| Qt vulnerability findings are report-only during burn-in | Pinned scanner, exact runtime inventory, deterministic evidence, explicit VEX expiry, and maintainer triage |
+| Packaging lock is temporarily ahead of `dist` | No tag; release equality gate; PR 5 must use the protected candidate and restore three-way provenance equality |
 
 ## Reporting a vulnerability
 

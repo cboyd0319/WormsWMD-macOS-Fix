@@ -33,6 +33,18 @@ The checksum proves the downloaded zip matches the release asset. The
 attestation links the release asset to the GitHub Actions workflow that built
 it.
 
+Manual dispatch can only build and upload a read-only workflow artifact. For a
+tag, a second read-only job proves protected-main ancestry and rechecks checksum,
+ZIP manifest, every packaged file and mode against a deterministic source
+rebuild, three-way Qt provenance, and regenerated SBOM. Only then can the
+`release` environment publish job receive write/attestation scopes and download
+the exact verified current-run inventory. It rechecks the live tag object before
+publication. A required environment reviewer must be configured first.
+The publish job checks those rules through GitHub's environment API and fails
+closed when the environment is absent or has no required reviewer. The current
+sole-maintainer model permits self-review until a second trusted maintainer can
+provide independent approval.
+
 ## What makes this lower risk
 
 - No `sudo`, administrator password, kernel extension, or system-wide installer.
@@ -66,8 +78,24 @@ it.
   attestations exist. Repository-level immutability protects future published
   releases; v1.7.6 predates that GitHub setting.
 - Starting with the next tagged release after v1.7.6, releases publish a
-  deterministic CycloneDX SBOM for the complete checksum-locked Qt bottle
-  inventory. GitHub's SBOM attestation binds that inventory to the release zip.
+  deterministic CycloneDX SBOM. Twelve shipped Qt/runtime components are
+  required dependencies; five non-shipped bottle inputs remain build
+  formulation evidence. GitHub's SBOM attestation binds that inventory to the
+  release zip.
+- A checksum-pinned Grype 0.117.0 scan runs only for scheduled/manual/release
+  events or Qt policy, provenance, artifact, VEX, generator, or scanner changes.
+  Tool failure and zero runtime inventory fail; findings begin report-only and
+  retain seven-day evidence for maintainer triage.
+- Qt candidate artifacts can be built only by a manual workflow dispatched on
+  exact protected `main`. It performs two cache-free, isolated builds on one
+  hosted runner, requires byte identity and deep comparison, runs the TIFF
+  probe, and publishes only an attested seven-day workflow artifact. A later
+  artifact PR must match that digest; the workflow cannot publish a release.
+- The packaging lock may intentionally get ahead of the shipped archive for one
+  reviewed source-only PR. During that interval the versioned standalone and
+  embedded `dist` provenance still describe current bytes, no tag is allowed,
+  and release publication must fail. PR 5 must copy the protected candidate
+  bytes and restore equality across the lock and both provenance copies.
 
 ## What it can still do
 
