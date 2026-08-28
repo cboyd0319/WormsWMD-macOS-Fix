@@ -83,6 +83,7 @@ jobs:
             SOURCE_DATE_EPOCH="$source_epoch" \
             QT_PREFIX="$prefix/opt/qt@5" \
             QT_DEP_PREFIX="$prefix" \
+            QT_PACKAGE_SOURCE_LABEL="Locked Homebrew bottle closure" \
             QT_PACKAGE_VERSION="$qt_version" \
               ./tools/package_qt_frameworks.sh \
                 --output "$work_root/output-$build_number" \
