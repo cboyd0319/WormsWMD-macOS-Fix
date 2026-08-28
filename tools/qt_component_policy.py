@@ -45,10 +45,18 @@ MAX_POLICY_BYTES = 1_048_576
 MAX_VEX_BYTES = 1_048_576
 MAX_SCAN_REPORT_BYTES = 32 * 1024 * 1024
 MAX_VEX_REVIEW_AGE = timedelta(days=90)
+EXPECTED_GRYPE_VERSION = "0.117.0"
 
 
 class QtPolicyError(ValueError):
     """Raised when Qt scope, scanner, or VEX evidence is not trustworthy."""
+
+
+def decode_utf8(data: bytes, label: str) -> str:
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise QtPolicyError(f"{label} is not valid UTF-8") from error
 
 
 def read_bounded_file(path: Path, max_bytes: int, label: str) -> bytes:
@@ -72,7 +80,7 @@ def read_component_policy(path: Path) -> list[dict[str, str]]:
     policy = read_bounded_file(path, MAX_POLICY_BYTES, "Component policy")
     lines = [
         line
-        for line in policy.decode("utf-8").splitlines()
+        for line in decode_utf8(policy, "Component policy").splitlines()
         if line and not line.startswith("#")
     ]
     if not lines:
@@ -193,7 +201,7 @@ def read_vex(path: Path, as_of: date) -> list[dict[str, str]]:
     vex = read_bounded_file(path, MAX_VEX_BYTES, "VEX policy")
     lines = [
         line
-        for line in vex.decode("utf-8").splitlines()
+        for line in decode_utf8(vex, "VEX policy").splitlines()
         if line and not line.startswith("#")
     ]
     if not lines:
@@ -231,7 +239,7 @@ def read_vex(path: Path, as_of: date) -> list[dict[str, str]]:
 def read_json_document(path: Path, max_bytes: int, label: str) -> dict[str, Any]:
     data = read_bounded_file(path, max_bytes, label)
     try:
-        document = json.loads(data.decode("utf-8"))
+        document = json.loads(decode_utf8(data, label))
     except json.JSONDecodeError as error:
         raise QtPolicyError(f"Invalid {label} JSON") from error
     if not isinstance(document, dict):
@@ -262,6 +270,14 @@ def normalize_grype_report(
     if any(not isinstance(component.get("name"), str) for component in runtime_components):
         raise QtPolicyError("Runtime component is missing its name")
     runtime_names = {component["name"] for component in runtime_components}
+    if len(runtime_names) != len(runtime_components):
+        raise QtPolicyError("Qt SBOM contains duplicate runtime component names")
+    runtime_versions = {
+        component["name"]: component.get("version")
+        for component in runtime_components
+    }
+    if any(not isinstance(version, str) for version in runtime_versions.values()):
+        raise QtPolicyError("Runtime component is missing its version")
     unmapped = sorted(
         component["name"]
         for component in runtime_components
@@ -274,6 +290,16 @@ def normalize_grype_report(
         or not isinstance(descriptor, dict) \
         or not isinstance(source, dict):
         raise QtPolicyError("Grype report is missing required result fields")
+    configuration = descriptor.get("configuration")
+    source_target = source.get("target")
+    if descriptor.get("name") != "grype" \
+        or descriptor.get("version") != EXPECTED_GRYPE_VERSION \
+        or not isinstance(configuration, dict) \
+        or configuration.get("by-cve") is not True \
+        or source.get("type") != "sbom-file" \
+        or not isinstance(source_target, str) \
+        or Path(source_target).name != sbom_path.name:
+        raise QtPolicyError("Scanner identity or SBOM source is not trusted")
 
     vex_rows: list[dict[str, str]] = []
     if vex_path is not None:
@@ -297,6 +323,15 @@ def normalize_grype_report(
             raise QtPolicyError(
                 "Grype report match lacks artifact or vulnerability"
             )
+        artifact_name = artifact.get("name")
+        artifact_version = artifact.get("version")
+        advisory_id = vulnerability.get("id")
+        if not isinstance(artifact_name, str) \
+            or artifact_name not in runtime_versions \
+            or artifact_version != runtime_versions.get(artifact_name) \
+            or not isinstance(advisory_id, str) \
+            or not advisory_id:
+            raise QtPolicyError("Grype match does not map to the runtime SBOM")
         vex = vex_by_match.get((vulnerability.get("id"), artifact.get("name")))
         if vex is not None:
             match["wormswmdVex"] = vex

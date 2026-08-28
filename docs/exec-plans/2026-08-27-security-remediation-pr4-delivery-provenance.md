@@ -106,6 +106,12 @@ git status --short
   mapped runtime components and four report-only libtiff matches. The source-only
   dist guard passed. Steam passes strict verification; the installed GOG copy is
   preserved as an unfixed baseline for PR 5's protected-artifact runtime gate.
+- 2026-08-27: The single Copilot review produced three valid findings. Invalid
+  UTF-8 now becomes a bounded policy error, normalized scan evidence requires
+  pinned Grype identity, `--by-cve`, the exact SBOM source and runtime mapping,
+  and release ZIPs require Unix mode metadata. New red regressions and the full
+  local gate pass; one consolidated correction push and final hosted checks
+  remain.
 
 ## Surprises & Discoveries
 

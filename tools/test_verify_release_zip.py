@@ -11,7 +11,7 @@ import warnings
 import zipfile
 from pathlib import Path
 
-from verify_release_zip import ReleaseZipError, verify_release_zip
+from verify_release_zip import ReleaseZipError, verify_release_zip, zip_entry_type
 
 
 class VerifyReleaseZipTests(unittest.TestCase):
@@ -66,6 +66,13 @@ class VerifyReleaseZipTests(unittest.TestCase):
             result = verify_release_zip(archive, expected)
             self.assertEqual(result["root"], "WormsWMD-macOS-Fix-test")
             self.assertEqual(result["entries"], 1)
+
+    def test_rejects_file_without_unix_mode_metadata(self) -> None:
+        info = zipfile.ZipInfo("payload.txt")
+        info.create_system = 0
+        info.external_attr = 0x20
+        with self.assertRaises(ReleaseZipError):
+            zip_entry_type(info)
 
     def test_rejects_mismatch_extra_traversal_and_escaping_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

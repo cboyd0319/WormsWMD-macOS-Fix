@@ -42,10 +42,14 @@ def safe_member_name(name: str) -> str:
 
 
 def zip_entry_type(info: zipfile.ZipInfo) -> str:
-    if info.is_dir():
-        return "directory"
     mode = (info.external_attr >> 16) & 0xFFFF
-    if mode == 0 or stat.S_ISREG(mode):
+    if mode == 0:
+        raise ReleaseZipError(
+            f"Release ZIP entry lacks Unix mode metadata: {info.filename}"
+        )
+    if info.is_dir() and stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISREG(mode):
         return "file"
     if stat.S_ISLNK(mode):
         raise ReleaseZipError(f"Release ZIP contains a symbolic link: {info.filename}")
@@ -182,8 +186,7 @@ def verify_release_zip(
             roots.add(PurePosixPath(name).parts[0])
             entry_types[name] = zip_entry_type(info)
             raw_mode = (info.external_attr >> 16) & 0xFFFF
-            if raw_mode:
-                safe_permissions(raw_mode, info.filename)
+            safe_permissions(raw_mode, info.filename)
         if len(roots) != 1:
             raise ReleaseZipError("Release ZIP must contain exactly one root directory")
         root = roots.pop()
