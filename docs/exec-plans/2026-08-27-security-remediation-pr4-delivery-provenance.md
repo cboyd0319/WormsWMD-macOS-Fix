@@ -110,8 +110,16 @@ git status --short
   UTF-8 now becomes a bounded policy error, normalized scan evidence requires
   pinned Grype identity, `--by-cve`, the exact SBOM source and runtime mapping,
   and release ZIPs require Unix mode metadata. New red regressions and the full
-  local gate pass; one consolidated correction push and final hosted checks
-  remain.
+  local gate passed, followed by one consolidated correction push and green
+  final hosted checks.
+- 2026-08-27: PR 28 merged as `7f607071...` after final hosted checks passed.
+  Protected rebuild 33131306511 correctly withheld artifacts when clean archives
+  differed because metadata embedded `prefix-one` versus `prefix-two`. The
+  corrective workflow now supplies one stable source label. Before any new
+  hosted run, the exact two-cache/two-prefix build completed locally with both
+  archives at `7caf51f4...`; checksum/provenance, deep comparison, 35 canonical
+  Mach-O files, TIFF decode, libtiff 4.7.2 ABI, and candidate SBOM/Grype parsing
+  all passed with no retained build path.
 
 ## Surprises & Discoveries
 
