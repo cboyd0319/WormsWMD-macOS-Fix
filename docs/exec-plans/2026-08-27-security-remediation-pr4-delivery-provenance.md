@@ -1,6 +1,6 @@
 # Security Remediation PR 4: Delivery And Provenance
 
-Status: Active
+Status: Completed
 
 ## Problem
 
@@ -39,7 +39,7 @@ releases, unrelated dependency versions, and independent-builder claims.
 - [x] Add protected exact-main two-build nonpublishing rebuild evidence.
 - [x] Refresh only the reviewed libtiff 4.7.2 lock input.
 - [x] Split release privilege and add incident recovery.
-- [ ] Run full local/adversarial gates, merge one reviewed PR, and record PR 5 base.
+- [x] Run full local/adversarial gates, merge reviewed PRs, and hand off PR 5.
 
 ## Verification
 
@@ -120,6 +120,14 @@ git status --short
   archives at `7caf51f4...`; checksum/provenance, deep comparison, 35 canonical
   Mach-O files, TIFF decode, libtiff 4.7.2 ABI, and candidate SBOM/Grype parsing
   all passed with no retained build path.
+- 2026-08-27: Corrective PR 29 merged as `2890a5a9...` after exhaustive local
+  two-root reproduction, the complete local gate, hosted CI/security, and an
+  automatic review with zero comments. Protected rebuild 33133277901 then
+  passed from that exact `main`: both builds matched, comparison/TIFF passed,
+  and an attested seven-day candidate was uploaded at SHA-256 `6738dd6e...`.
+  Downloaded evidence matches the lock in standalone and embedded form, records
+  35 canonical Mach-O files and no build path, and verifies as SLSA provenance
+  from the exact workflow, source commit, `main` ref, and hosted runner.
 
 ## Surprises & Discoveries
 
@@ -150,5 +158,14 @@ git status --short
 
 ## Outcomes & Retrospective
 
-Implementation is in progress. Complete with PR URL, commits, local/hosted
-evidence, scanner disposition, lock review, residual risks, and exact PR 5 base.
+PR 28 delivered the source-only security program and PR 29 corrected the one
+clean-root metadata difference found by the first protected run. All local and
+hosted gates are green. The protected candidate digest is
+`6738dd6e76235455a0b552a1586077717ca77311e6f3ade20e75c962e8d6c96b`;
+its attestation and run 33133277901 bind it to `2890a5a9...` on `main`.
+
+No `dist` bytes, repository settings, tag, or release changed. PR 5 owns the
+artifact update, GitHub release controls, Steam/GOG apply-and-launch validation,
+and v1.7.7. Residual risk remains explicit: rebuilds are same-runner rather than
+independent, scanner findings remain report-only during burn-in, and `main`
+stays intentionally nonreleasable until PR 5 restores provenance equality.

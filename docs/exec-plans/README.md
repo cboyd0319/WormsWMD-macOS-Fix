@@ -31,9 +31,9 @@ the plan before continuing.
 
 ## Current Plans
 
-- [Security remediation PR 4: delivery and provenance](2026-08-27-security-remediation-pr4-delivery-provenance.md) - active
+- [Security remediation PR 4: delivery and provenance](2026-08-27-security-remediation-pr4-delivery-provenance.md) - completed
   scoped SBOM/scanner evidence, deterministic Qt build, source lock, and release
-  privilege separation.
+  privilege separation and an attested protected-build candidate.
 - [Security remediation PR 3: player and runtime safety](2026-08-27-security-remediation-pr3-player-runtime-safety.md) - completed
   save/cache containment, dependency and signature policy, exact updates, and
   atomic owned local output.
