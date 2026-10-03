@@ -9,6 +9,13 @@ assert.doesNotMatch(workflow, /actions\/checkout|\brun:|\brequire\(|\bimport\b|\
 assert.match(workflow, /pull_request_target:\n    branches: \[main\]\n    types: \[opened, reopened, ready_for_review, edited\]/);
 assert.match(workflow, /pull-requests: write/);
 assert.match(workflow, /cancel-in-progress: false/);
+const groupTemplate = workflow.match(/^  group: (.+)$/m)[1].replace(/\$\{\{(.*?)\}\}/g, '${$1}');
+const group = new Function('github', `return \`${groupTemplate}\`;`);
+const groupFor = (action, changes = {}, number = 7) => group({ event: { action, changes, pull_request: { number } } });
+assert.notEqual(groupFor('opened'), groupFor('edited'), 'ignored edits must not evict a pending review');
+for (const action of ['reopened', 'ready_for_review']) assert.equal(groupFor(action), groupFor('opened'));
+assert.equal(groupFor('edited', { base: {} }), groupFor('opened'), 'eligible requests must serialize together');
+assert.notEqual(groupFor('opened', {}, 8), groupFor('opened'), 'PRs must have independent queues');
 assert.match(workflow, /actions\/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd/);
 assert.equal(workflow.match(/\buses:/g).length, 1, 'only the pinned metadata action may run');
 assert.doesNotMatch(script, /\$\{\{/);

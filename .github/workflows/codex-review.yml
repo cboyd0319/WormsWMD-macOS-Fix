@@ -8,7 +8,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: codex-review-${{ github.event.pull_request.number }}
+  # Ignored edits must not replace pending eligible requests in GitHub's queue.
+  group: codex-review-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && !github.event.changes.base && 'metadata' || 'review' }}
   cancel-in-progress: false
 
 jobs:
