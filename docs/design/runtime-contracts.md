@@ -214,6 +214,9 @@ under `build/release/` by default. The bundle may include repository source,
 scripts, tools, docs, the reviewed packaging lock, original assets, and verified `dist/` packages.
 It must not include `.git`, local build output, downloaded sample projects,
 game binaries, save files, support bundles, logs, secrets, or user data.
+Complete release bundles use the included local launcher and omit `install.sh`
+and `Install Fix.command`. Those download-only bootstraps come from main after
+their exact release pins are finalized; tagged copies remain fail-closed.
 
 Release bundles must include `RELEASE_INFO.txt` and `RELEASE_MANIFEST.tsv`; a
 zip requires a matching `.sha256`. Tagged GitHub releases also publish a

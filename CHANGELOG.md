@@ -14,6 +14,9 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 - Include sanitized AGL compiler and SDK diagnostics in support bundles.
 - Sign the fixed bundle before strict installation verification, preserving
   rollback on signing or verification failure.
+- Reject empty bootstrap commit pins and preserve reviewed PCRE2 source pins
+  during dependency refresh. Complete release zips use the local launcher and
+  omit download bootstraps whose pins are finalized on main after tagging.
 - Ship the protected, reproducible Qt candidate matching the source lock,
   including libtiff 4.7.2, PCRE2 10.49, and updated checksum and provenance.
 

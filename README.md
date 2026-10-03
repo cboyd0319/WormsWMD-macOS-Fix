@@ -124,7 +124,7 @@ gh attestation verify WormsWMD-macOS-Fix-v1.7.7.zip --repo cboyd0319/WormsWMD-ma
 Review the installer script directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.7/install.sh
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh
 ```
 
 ## Terminal Install
@@ -132,13 +132,14 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.7
 Use the release zip unless you specifically prefer Terminal.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.7/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The bootstrap is pinned to release `v1.7.7`
-by default. The `v1.7.7` raw tag bootstrap pins the release tag, and the
-mainline maintenance bootstrap verifies the exact `v1.7.7` tag target commit.
+launcher menu as the release zip. The mainline bootstrap selects release `v1.7.7`
+and verifies its exact commit before running it. Bootstrap pins are finalized
+after the tag exists; tagged bootstrap copies remain disabled. The complete
+release zip includes the local launcher and needs no download bootstrap.
 
 ## Pre-Flight Check
 

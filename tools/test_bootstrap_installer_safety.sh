@@ -108,4 +108,21 @@ for entrypoint in install.sh "Install Fix.command"; do
         || fail "$entrypoint has no valid release pin or pending sentinel"
 done
 
+# A complete release bundle must launch its own installer, not ship pending
+# download bootstraps whose final tag commit cannot be embedded in that tag.
+bundle_source="$tmp_dir/bundle-source"
+mkdir -p "$bundle_source/tools" "$bundle_source/scripts"
+cp "$ROOT_DIR/tools/build_release_bundle.sh" "$bundle_source/tools/"
+cp "$ROOT_DIR/scripts/common.sh" "$ROOT_DIR/scripts/ui.sh" "$bundle_source/scripts/"
+cp "$ROOT_DIR/install.sh" "$ROOT_DIR/Install Fix.command" "$bundle_source/"
+printf '#!/bin/bash\nexit 0\n' > "$bundle_source/fix_worms_wmd.sh"
+cp "$bundle_source/fix_worms_wmd.sh" "$bundle_source/Worms W.M.D Fix.command"
+bash "$bundle_source/tools/build_release_bundle.sh" \
+    --version bootstrap-test --output-dir "$tmp_dir/bundles" --skip-zip >/dev/null
+bundle="$tmp_dir/bundles/WormsWMD-macOS-Fix-bootstrap-test"
+[[ -x "$bundle/Worms W.M.D Fix.command" && -x "$bundle/fix_worms_wmd.sh" ]] \
+    || fail "release bundle omitted its local installer entrypoints"
+[[ ! -e "$bundle/install.sh" && ! -e "$bundle/Install Fix.command" ]] \
+    || fail "release bundle shipped download bootstraps with unresolved release pins"
+
 printf 'Bootstrap installer safety check passed.\n'

@@ -39,7 +39,8 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 
 ## Bootstrap installer
 
-If you only downloaded `Install Fix.command`, double-click it. It clones or
+Download the current [Install Fix.command](https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/Install%20Fix.command)
+from the main branch, then double-click it. It clones or
 updates this repository under `~/.wormswmd-fix` and opens the friendly launcher
 when it is available.
 
@@ -50,15 +51,16 @@ and they refuse Git repositories with a different remote.
 Terminal users can use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/v1.7.7/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/install.sh | bash
 ```
 
 With no command-line flags and an interactive Terminal, `install.sh` opens the
 same friendly launcher menu. When flags are provided, it forwards them directly
 to `fix_worms_wmd.sh`. By default, the bootstrap pins the cloned repository to
-release `v1.7.7`. The release-tag bootstrap pins the tag and the mainline
-maintenance bootstrap verifies the exact release commit. Non-default refs
-require `WORMSWMD_ALLOW_UNPINNED_REF=1`.
+release `v1.7.7` and verifies its exact commit. Use the mainline bootstrap:
+tagged copies retain a pending pin and refuse to run. The complete release zip
+uses its included local launcher and omits download bootstraps. Non-default
+refs require `WORMSWMD_ALLOW_UNPINNED_REF=1`.
 
 ## Preview changes
 

@@ -166,9 +166,9 @@ the bootstrap default tag together. If bootstrap exact-commit verification is
 used, the release commit cannot contain its own hash. Cut and push the tag
 first, verify the release workflow, then add a follow-up `main` commit pinning
 the bootstrap commit guard to the tag target. The workflow creates or resumes a
-draft, uploads and attests every asset, applies the matching `CHANGELOG.md`
-section as release notes, and only then publishes the immutable release. It
-must refuse to overwrite an already-published release.
+draft, uploads and attests every asset, applies matching changelog notes, then
+publishes the immutable release. It refuses to overwrite published releases.
+The zip omits download bootstraps. Link standalone bootstraps from main; tagged copies retain pending pins and cannot contain their own SHA.
 Configure required reviewers on the GitHub `release` environment before the
 next tag. For signing-key loss, workflow compromise, ruleset break-glass, asset
 withdrawal, or corrective publication, follow
