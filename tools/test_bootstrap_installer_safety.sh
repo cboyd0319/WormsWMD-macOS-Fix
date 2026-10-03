@@ -73,7 +73,7 @@ run_pin_check() (
     local fixture_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     local pin_functions="$tmp_dir/pin-functions.sh"
     RED="" NC=""
-    DEFAULT_INSTALL_REF="v1.7.7" INSTALL_REF="v1.7.7"
+    DEFAULT_INSTALL_REF="v1.7.8" INSTALL_REF="v1.7.8"
     DEFAULT_INSTALL_COMMIT="$pin" INSTALL_COMMIT="$pin"
     INSTALL_DIR="$tmp_dir/checkout"
     print_error() { :; }
@@ -96,7 +96,7 @@ run_pin_check() (
 )
 
 for entrypoint in install.sh "Install Fix.command"; do
-    for pin in "" PENDING_v1_7_7 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; do
+    for pin in "" PENDING_v1_7_8 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; do
         if run_pin_check "$entrypoint" "$pin" >/dev/null 2>&1; then
             fail "$entrypoint accepted an empty, pending, or mismatched release pin"
         fi

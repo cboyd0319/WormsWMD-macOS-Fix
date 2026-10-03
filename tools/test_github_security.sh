@@ -253,7 +253,7 @@ for marker in \
     '--archive "dist/qt-frameworks-x86_64-5.15.19.tar.gz"' \
     '--release-archive "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip"' \
     '--release-checksum "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip.sha256"' \
-    'sbom-path: build/release/WormsWMD-macOS-Fix-*.cdx.json' \
+    'sbom-path: build/release/WormsWMD-macOS-Fix-${{ needs.verify-release.outputs.version }}.cdx.json' \
     'build/release/*.cdx.json' \
     'gh release create "$GITHUB_REF_NAME" --draft' \
     'gh release edit "$GITHUB_REF_NAME" --draft=false' \

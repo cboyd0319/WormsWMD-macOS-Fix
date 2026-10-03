@@ -10,7 +10,7 @@ Use the release bundle:
 1. Download the latest release zip from:
    https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest
 2. Optionally download the matching `.zip.sha256` file and verify it:
-   `shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.7.zip.sha256`
+   `shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.8.zip.sha256`
 3. Unzip it.
 4. Open `README_FIRST.txt`.
 5. Double-click `Worms W.M.D Fix.command`.
@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/i
 With no command-line flags and an interactive Terminal, `install.sh` opens the
 same friendly launcher menu. When flags are provided, it forwards them directly
 to `fix_worms_wmd.sh`. By default, the bootstrap pins the cloned repository to
-release `v1.7.7` and verifies its exact commit. Use the mainline bootstrap:
+release `v1.7.8` and verifies its exact commit. Use the mainline bootstrap:
 tagged copies retain a pending pin and refuse to run. The complete release zip
 uses its included local launcher and omits download bootstraps. Non-default
 refs require `WORMSWMD_ALLOW_UNPINNED_REF=1`.
@@ -78,7 +78,7 @@ The helper scripts under `scripts/` are internal building blocks and do not
 provide the same recovery path when run one by one.
 
 ```bash
-git clone --branch v1.7.7 --depth 1 https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
+git clone --branch v1.7.8 --depth 1 https://github.com/cboyd0319/WormsWMD-macOS-Fix.git
 cd WormsWMD-macOS-Fix
 
 # Optional: set this only when the game is outside the usual Steam/GOG paths.

@@ -2,9 +2,14 @@
 
 Notable changes are listed here. This project follows Keep a Changelog and Semantic Versioning.
 
-## 1.7.7 (2026-10-03)
+## 1.7.8 (2026-10-03)
+
+This release includes the fixes prepared for the unpublished v1.7.7 tag.
 
 ### Fixed
+
+- Pass the exact SBOM filename to the attestation action so verified release
+  publication completes; the action does not expand globs in `sbom-path`.
 
 - Fixed the AGL build failure path reported in issues #30 and #31: select the
   Apple compiler and macOS SDK together, omit the unused OpenGL dependency,

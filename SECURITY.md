@@ -81,7 +81,7 @@ bootstrap fails.
 | --- | --- |
 | `GAME_APP` | Expected executable plus contained, regular, link-safe mutable trees |
 | `INSTALL_DIR` | User project path; not home/system/non-empty foreign repository |
-| `INSTALL_REF` | Defaults to v1.7.7; other refs require explicit developer opt-in |
+| `INSTALL_REF` | Defaults to v1.7.8; other refs require explicit developer opt-in |
 | `LOG_FILE` | Regular `.log` beneath `~/Library/Logs` |
 | `QT_PREFIX`/`QT_DEP_PREFIX` | Explicit roots; canonical regular x86_64 dependencies only |
 | Archive files | Bounded owner-only copy, external digest where available, shared profile, same-copy extraction |
@@ -277,13 +277,13 @@ zip checksum and build attestation remain independently verifiable.
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.7.zip.sha256
-gh attestation verify WormsWMD-macOS-Fix-v1.7.7.zip \
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.8.zip.sha256
+gh attestation verify WormsWMD-macOS-Fix-v1.7.8.zip \
   --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
-Starting with v1.7.7, also download
-`WormsWMD-macOS-Fix-v1.7.7.cdx.json`; `gh attestation verify` on the zip returns
+Starting with v1.7.8, also download
+`WormsWMD-macOS-Fix-v1.7.8.cdx.json`; `gh attestation verify` on the zip returns
 both its build provenance and SBOM relationship.
 
 ### Maintainer security checks
