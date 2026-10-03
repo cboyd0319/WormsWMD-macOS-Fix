@@ -538,6 +538,12 @@ This package is part of the WormsWMD-macOS-Fix project.
 https://github.com/cboyd0319/WormsWMD-macOS-Fix
 EOF
 
+# Preserve the notices for the source-built PCRE2 runtime and its JIT compiler.
+for license in PCRE2-LICENSE.txt PCRE2-SLJIT-LICENSE.txt; do
+    printf '\n--- %s ---\n\n' "$license" >> "$WORK_DIR/METADATA.txt"
+    cat "$REPO_DIR/packaging/$license" >> "$WORK_DIR/METADATA.txt"
+done
+
 # Create package manifest before archiving
 worms_print_step "Creating manifest..."
 manifest_inputs=(Frameworks PlugIns METADATA.txt)

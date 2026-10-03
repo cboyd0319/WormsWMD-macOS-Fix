@@ -18,6 +18,14 @@ Official reference pages:
 - No official Team17 or Worms artwork is bundled.
 - No WebPets sample assets are bundled.
 
+## PCRE2 runtime
+
+The Intel runtime includes [PCRE2 10.49](https://github.com/PCRE2Project/pcre2/releases/tag/pcre2-10.49),
+built from the checksum-pinned upstream source. Its
+[PCRE2 notice](packaging/PCRE2-LICENSE.txt) and
+[SLJIT notice](packaging/PCRE2-SLJIT-LICENSE.txt) are copied verbatim from that
+release and included in the Qt archive's `METADATA.txt`.
+
 ## Adding assets later
 
 Only add third-party art, screenshots, GIFs, icons, or sprites when the exact
