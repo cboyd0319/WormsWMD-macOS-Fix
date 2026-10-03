@@ -304,6 +304,60 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     assert_equal(['freetype'], changes.map(&:first))
   end
 
+  def test_refresh_source_and_qt_closure_preserves_reviewed_source_without_an_intel_bottle
+    original = Fetcher.read_lock(LOCK)
+    source = original.find { |item| item['name'] == 'pcre2' }
+    qt = entry('qt@5', '5.15.20')
+    metadata = {
+      'pcre2' => { 'versions' => { 'stable' => source.fetch('version') }, 'dependencies' => [] },
+      'qt@5' => {
+        'versions' => { 'stable' => qt.fetch('version') }, 'dependencies' => ['pcre2'],
+        'bottle' => { 'stable' => { 'files' => { 'sonoma' => {
+          'sha256' => qt.fetch('artifact_sha256'), 'url' => qt.fetch('artifact_url')
+        } } } },
+        'urls' => { 'stable' => { 'checksum' => qt.fetch('source_sha256') } },
+        'ruby_source_checksum' => { 'sha256' => qt.fetch('formula_sha256') },
+        'tap_git_head' => qt.fetch('tap_git_head')
+      }
+    }
+    before = File.binread(LOCK)
+    %w[pcre2 qt@5].each do |formula|
+      candidate_path = File.join(@tmp, "#{formula}-candidate.tsv")
+      result = nil
+      _stdout, stderr = capture_io do
+        Fetcher.stub(:fetch_json, ->(name) { metadata.fetch(name) }) do
+          result = Fetcher.main([
+            '--lock', LOCK, '--refresh-formula', formula,
+            '--version', metadata.fetch(formula).dig('versions', 'stable'),
+            '--write-lock', candidate_path
+          ])
+        end
+      end
+      assert_equal(0, result, stderr)
+      candidate = Fetcher.read_lock(candidate_path)
+      assert_equal(source, candidate.find { |item| item['name'] == 'pcre2' })
+      expected_qt = formula == 'qt@5' ? qt : original.find { |item| item['name'] == 'qt@5' }
+      assert_equal(expected_qt, candidate.find { |item| item['name'] == 'qt@5' })
+      assert_equal(before, File.binread(LOCK), 'refresh modified its reviewed input')
+    end
+  end
+
+  def test_refresh_rejects_unreviewed_source_version_without_writing_a_candidate
+    candidate_path = File.join(@tmp, 'unreviewed-source.tsv')
+    result = nil
+    _stdout, stderr = capture_io do
+      Fetcher.stub(:fetch_json, { 'versions' => { 'stable' => '10.50' } }) do
+        result = Fetcher.main([
+          '--lock', LOCK, '--refresh-formula', 'pcre2', '--version', '10.50',
+          '--write-lock', candidate_path
+        ])
+      end
+    end
+    assert_equal(1, result)
+    assert_includes(stderr, 'Review and pin the new pcre2 source before refreshing')
+    refute(File.exist?(candidate_path))
+  end
+
   def test_staged_relocation_targets_the_final_published_prefix
     target = Fetcher::OutputTarget.new(
       path: File.join(@tmp, 'published-prefix'), state: :absent

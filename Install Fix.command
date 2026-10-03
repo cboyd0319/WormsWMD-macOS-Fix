@@ -56,7 +56,7 @@ fi
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 INSTALL_DIR="$HOME/.wormswmd-fix"
 INSTALL_REF="v1.7.7"
-INSTALL_COMMIT=""
+INSTALL_COMMIT="PENDING_v1_7_7"
 
 directory_is_empty() {
     local dir="$1"
@@ -82,13 +82,13 @@ verify_install_commit() {
     local actual_commit
 
     actual_commit=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)
-    if [[ "$INSTALL_COMMIT" == PENDING_* ]]; then
+    if [[ -z "$INSTALL_COMMIT" || "$INSTALL_COMMIT" == PENDING_* ]]; then
         echo -e "${RED}Release commit pin is not finalized for $INSTALL_REF.${NC}"
         echo "Replace INSTALL_COMMIT with the final release commit before publishing."
         read -n 1 -s -r -p "Press any key to exit..." < /dev/tty
         exit 1
     fi
-    if [[ -n "$INSTALL_COMMIT" ]] && [[ "$actual_commit" != "$INSTALL_COMMIT" ]]; then
+    if [[ "$actual_commit" != "$INSTALL_COMMIT" ]]; then
         echo -e "${RED}Pinned release verification failed.${NC}"
         echo "Expected $INSTALL_COMMIT"
         echo "Got ${actual_commit:-unknown}"

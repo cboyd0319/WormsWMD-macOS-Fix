@@ -447,13 +447,15 @@ module WormsBottleFetcher
     raise Error, "Bottle cache target appeared during download: #{out}"
   end
 
-  def resolve_lock(root_formula, required_version, tag)
+  def resolve_lock(root_formula, required_version, tag, reviewed_entries:)
     raise Error, "Formula is not allowlisted: #{root_formula}" unless ALLOWED_FORMULAE.include?(root_formula)
     raise Error, "Invalid required version: #{required_version}" unless VERSION_RE.match?(required_version.to_s)
     raise Error, "Unsupported bottle tag: #{tag}" unless tag == DEFAULT_TAG
     queue = [root_formula]
     seen = {}
     entries = []
+    sources = reviewed_entries.select { |entry| entry['artifact_kind'] == 'source' }
+                              .to_h { |entry| [entry.fetch('name'), entry] }
     until queue.empty?
       name = queue.shift
       next if seen[name]
@@ -462,15 +464,22 @@ module WormsBottleFetcher
       version = json.dig('versions', 'stable')
       raise Error, "Formula #{name} has no stable version" unless version
       raise Error, "Expected #{root_formula} #{required_version}, found #{version}" if name == root_formula && version != required_version
-      bottle = json.dig('bottle', 'stable', 'files', tag)
-      raise Error, "Formula #{name} has no #{tag} bottle" unless bottle
-      entries << {
-        'name' => name, 'version' => version, 'artifact_kind' => 'bottle', 'artifact_tag' => tag,
-        'artifact_sha256' => bottle.fetch('sha256'), 'artifact_url' => bottle.fetch('url'),
-        'source_sha256' => json.dig('urls', 'stable', 'checksum').to_s,
-        'formula_sha256' => json.dig('ruby_source_checksum', 'sha256').to_s,
-        'tap_git_head' => json.fetch('tap_git_head', '')
-      }
+      if (source = sources[name])
+        unless source.fetch('version') == version
+          raise Error, "Review and pin the new #{name} source before refreshing (locked #{source.fetch('version')}, current #{version})"
+        end
+        entries << source.dup
+      else
+        bottle = json.dig('bottle', 'stable', 'files', tag)
+        raise Error, "Formula #{name} has no #{tag} bottle" unless bottle
+        entries << {
+          'name' => name, 'version' => version, 'artifact_kind' => 'bottle', 'artifact_tag' => tag,
+          'artifact_sha256' => bottle.fetch('sha256'), 'artifact_url' => bottle.fetch('url'),
+          'source_sha256' => json.dig('urls', 'stable', 'checksum').to_s,
+          'formula_sha256' => json.dig('ruby_source_checksum', 'sha256').to_s,
+          'tap_git_head' => json.fetch('tap_git_head', '')
+        }
+      end
       seen[name] = true
       Array(json['dependencies']).each { |dependency| queue << dependency unless seen[dependency] }
     end
@@ -827,7 +836,8 @@ module WormsBottleFetcher
         raise Error, '--refresh-formula requires --version and --write-lock'
       end
       original = read_lock(options.fetch(:lock))
-      refreshed = resolve_lock(options.fetch(:refresh_formula), options.fetch(:version), options.fetch(:tag))
+      refreshed = resolve_lock(options.fetch(:refresh_formula), options.fetch(:version), options.fetch(:tag),
+                               reviewed_entries: original)
       candidate, changes = merge_refresh(original, refreshed, options.fetch(:refresh_formula))
       validate_entries!(candidate)
       if File.expand_path(options.fetch(:write_lock)) == File.expand_path(options.fetch(:lock))

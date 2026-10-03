@@ -13,7 +13,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/cboyd0319/WormsWMD-macOS-Fix"
 DEFAULT_INSTALL_REF="v1.7.7"
-DEFAULT_INSTALL_COMMIT=""
+DEFAULT_INSTALL_COMMIT="PENDING_v1_7_7"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.wormswmd-fix}"
 INSTALL_REF="${INSTALL_REF:-$DEFAULT_INSTALL_REF}"
 
@@ -161,10 +161,7 @@ verify_default_install_commit() {
     if [[ "$INSTALL_REF" != "$DEFAULT_INSTALL_REF" ]]; then
         return 0
     fi
-    if [[ -z "$DEFAULT_INSTALL_COMMIT" ]]; then
-        return 0
-    fi
-    if [[ "$DEFAULT_INSTALL_COMMIT" == PENDING_* ]]; then
+    if [[ -z "$DEFAULT_INSTALL_COMMIT" || "$DEFAULT_INSTALL_COMMIT" == PENDING_* ]]; then
         print_error "Release commit pin is not finalized for $DEFAULT_INSTALL_REF."
         print_info "Replace DEFAULT_INSTALL_COMMIT with the final release commit before publishing."
         exit 1
