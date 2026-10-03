@@ -2,7 +2,7 @@
 
 Notable changes are listed here. This project follows Keep a Changelog and Semantic Versioning.
 
-## 1.7.7 (2026-10-02)
+## 1.7.7 (2026-10-03)
 
 ### Fixed
 
@@ -19,6 +19,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
   omit download bootstraps whose pins are finalized on main after tagging.
 - Ship the protected, reproducible Qt candidate matching the source lock,
   including libtiff 4.7.2, PCRE2 10.49, and updated checksum and provenance.
+- Refresh remote Qt archives when the pinned source commit changes, including
+  dependency updates that retain the same Qt version.
 
 ### Changed
 

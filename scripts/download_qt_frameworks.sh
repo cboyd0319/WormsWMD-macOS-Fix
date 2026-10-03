@@ -23,7 +23,7 @@ DIST_DIR="$REPO_DIR/dist"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/wormswmd-fix"
 
 GITHUB_REPO="cboyd0319/WormsWMD-macOS-Fix"
-QT_DIST_REF="${WORMSWMD_QT_DIST_REF:-7ccb5c1676f88886dcb9cbf459f6d8bcf69d7f8b}"
+QT_DIST_REF="${WORMSWMD_QT_DIST_REF:-e62705a7445d28ea048159a858878b0f787dfd13}"
 GITHUB_API_URL="https://api.github.com/repos/${GITHUB_REPO}/contents/dist?ref=${QT_DIST_REF}"
 DOWNLOAD_URL=""
 CHECKSUM_URL=""
@@ -642,7 +642,7 @@ fi
 ensure_qt_cache_root || exit 1
 
 if [[ -z "$CACHED_PACKAGE" ]]; then
-    CACHED_PACKAGE="$CACHE_DIR/$PACKAGE_NAME"
+    CACHED_PACKAGE="$CACHE_DIR/${QT_DIST_REF}-${PACKAGE_NAME}"
 fi
 
 if $USE_LOCAL; then

@@ -130,16 +130,9 @@ if grep -Eq 'qmake.*-query|capture!.*qmake|system.*qmake' \
 fi
 [[ -x "$ROOT_DIR/tools/fetch_qt_homebrew_bottles.rb" ]] \
     || fail "Homebrew bottle provenance fetcher is missing or not executable"
-if ! cmp -s "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" \
-    "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv"; then
-    # The protected builder needs the reviewed source lock on main first.
-    # Allow only this exact transition; remove it when its candidate ships.
-    [[ "$(worms_file_sha256 "$ROOT_DIR/packaging/qt-homebrew-lock.tsv")" \
-        == "52309a98883cc0467d50a7c647460db9a39fb3fa051b16c4f5cc598103a52066" \
-        && "$(worms_file_sha256 "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv")" \
-        == "ceb853f03e2efa3bd17f2607d91e74b0d9b9ce62c015f6fdf7c5086e9cc1071a" ]] \
-        || fail "packaging/dist transition does not match the reviewed PCRE2 inputs"
-fi
+cmp -s "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" \
+    "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv" \
+    || fail "packaging lock differs from shipped Qt provenance"
 
 committed_package="$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.tar.gz"
 committed_checksum=$(awk 'NR == 1 {print $1; exit}' "${committed_package}.sha256")

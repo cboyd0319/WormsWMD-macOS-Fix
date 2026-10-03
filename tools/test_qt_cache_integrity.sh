@@ -199,4 +199,79 @@ HOME="$legacy_home" XDG_CACHE_HOME="$legacy_cache_home" \
 [[ "$(worms_file_sha256 "$(qt_binary "$legacy_digest_cache" QtCore)")" == "$legacy_expected_hash" ]] \
     || fail "legacy archive reused a self-authenticated tampered cache"
 
+# Remote archives with the same Qt version must follow the immutable source pin.
+remote_fixture="$tmp_dir/remote-repo"
+remote_cache_home="$tmp_dir/remote-cache-home"
+remote_bin="$tmp_dir/remote-bin"
+make_fixture "$remote_fixture"
+mv "$remote_fixture/dist" "$remote_fixture/local-dist-disabled"
+mkdir -p "$remote_cache_home/wormswmd-fix" "$remote_bin"
+remote_name=$(basename "$archive")
+unscoped_archive="$remote_cache_home/wormswmd-fix/$remote_name"
+cp "$legacy_archive" "$unscoped_archive"
+cp "$legacy_archive.sha256" "$unscoped_archive.sha256"
+cat > "$remote_bin/curl" <<'STUB'
+#!/bin/bash
+set -euo pipefail
+output=""
+url=""
+head_only=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -o) output="$2"; shift 2 ;;
+        -sfI) head_only=true; shift ;;
+        https://*) url="$1"; shift ;;
+        *) shift ;;
+    esac
+done
+base="https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/$WORMSWMD_QT_DIST_REF/dist/qt-frameworks-x86_64-5.15.19.tar.gz"
+case "$url" in
+    "https://api.github.com/repos/cboyd0319/WormsWMD-macOS-Fix/contents/dist?ref=$WORMSWMD_QT_DIST_REF")
+        printf '[{"download_url":"%s"}]\n' "$base"
+        ;;
+    "$base"|"$base.sha256")
+        [[ "${MOCK_QT_DENY_DOWNLOADS:-false}" == false ]] || exit 99
+        $head_only && exit 0
+        [[ -n "$output" ]] || exit 98
+        if [[ "$url" == "$base" ]]; then
+            cp "$MOCK_QT_ARCHIVE" "$output"
+        else
+            cp "$MOCK_QT_ARCHIVE.sha256" "$output"
+        fi
+        ;;
+    *) exit 97 ;;
+esac
+STUB
+chmod +x "$remote_bin/curl"
+
+run_remote() {
+    HOME="$fixture_home" XDG_CACHE_HOME="$remote_cache_home" \
+        PATH="$remote_bin:$PATH" WORMSWMD_QT_DIST_REF="$1" \
+        MOCK_QT_ARCHIVE="$2" MOCK_QT_DENY_DOWNLOADS="${3:-false}" \
+        "$remote_fixture/scripts/download_qt_frameworks.sh"
+}
+
+remote_ref_a=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+remote_ref_b=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+remote_ref_c=cccccccccccccccccccccccccccccccccccccccc
+remote_output=$(run_remote "$remote_ref_a" "$archive") \
+    || fail "remote package could not replace a stale version-only archive"
+[[ "$(printf '%s\n' "$remote_output" | tail -1)" \
+    == "$remote_cache_home/wormswmd-fix/qt-frameworks-5.15.19-$archive_sha" ]] \
+    || fail "remote selection reused a stale version-only archive"
+remote_output=$(run_remote "$remote_ref_b" "$legacy_archive") \
+    || fail "remote package refresh failed after its source pin changed"
+remote_expected="$remote_cache_home/wormswmd-fix/qt-frameworks-5.15.19-$legacy_sha"
+[[ "$(printf '%s\n' "$remote_output" | tail -1)" == "$remote_expected" ]] \
+    || fail "remote selection reused the previous source pin's archive"
+remote_output=$(run_remote "$remote_ref_b" "$legacy_archive" true) \
+    || fail "unchanged source pin unnecessarily downloaded its cached archive"
+[[ "$(printf '%s\n' "$remote_output" | tail -1)" == "$remote_expected" ]] \
+    || fail "warm remote cache returned a different archive"
+if run_remote "$remote_ref_c" "$archive" true >/dev/null 2>&1; then
+    fail "unavailable new source pin reused an older cached archive"
+fi
+[[ "$(worms_file_sha256 "$unscoped_archive")" == "$legacy_sha" ]] \
+    || fail "remote refresh modified the retained version-only archive"
+
 printf 'Qt cache integrity check passed.\n'
