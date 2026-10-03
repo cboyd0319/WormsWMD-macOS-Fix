@@ -642,7 +642,7 @@ fi
 ensure_qt_cache_root || exit 1
 
 if [[ -z "$CACHED_PACKAGE" ]]; then
-    CACHED_PACKAGE="$CACHE_DIR/$PACKAGE_NAME"
+    CACHED_PACKAGE="$CACHE_DIR/${QT_DIST_REF}-${PACKAGE_NAME}"
 fi
 
 if $USE_LOCAL; then

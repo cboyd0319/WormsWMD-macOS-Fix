@@ -114,8 +114,9 @@ copies verify and roll back together. Expansion keeps the 8 GiB, half-free-space
 
 ## Qt Distribution Contract
 
-The preferred Qt source is `dist/` plus its `.sha256`. Consumers inspect one
-bounded copy. Extracted cache identity includes the full archive digest and
+The preferred Qt source is `dist/` plus its `.sha256`. Remote archive and checksum
+cache keys include the immutable source commit. Consumers inspect one bounded
+copy. Extracted cache identity includes the full archive digest and
 reuse verifies the archive's manifest, never a cache-local authority. Legacy
 archives without manifests re-extract on every use. Cache publish is staged;
 validated version-only caches are retained, and only explicit marker-scoped

@@ -224,8 +224,9 @@ Every reuse checks the cache manifest against the inspected archive copy;
 cache-local regeneration cannot become authority. Archives without manifests
 re-extract on every use. Valid version-only caches are renamed to reported
 recoverable `.legacy-*` paths, and `--prune-cache` removes only exact
-marker-owned retained legacy caches. Remote fallback checks the pinned release
-commit for `dist/` contents.
+marker-owned retained legacy caches. Remote fallback checks the pinned artifact
+commit for `dist/` contents and keys downloaded archives and checksums by that
+commit, so dependency-only updates cannot reuse an older Qt archive.
 
 `tools/package_qt_frameworks.sh` accepts either Intel Homebrew `qt@5` or an
 explicit Qt prefix. It writes deterministic gzip archives using
