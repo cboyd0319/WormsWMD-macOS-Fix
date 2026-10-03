@@ -132,26 +132,13 @@ fi
     || fail "Homebrew bottle provenance fetcher is missing or not executable"
 if ! cmp -s "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" \
     "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv"; then
-    /usr/bin/python3 - \
-        "$ROOT_DIR/packaging/qt-homebrew-lock.tsv" \
-        "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv" <<'PY' \
-        || fail "packaging/dist transition differs outside the reviewed libtiff row"
-import csv
-import sys
-
-def rows(path):
-    lines = [line for line in open(path, encoding="utf-8")
-             if line.strip() and not line.startswith("#")]
-    return {row["name"]: row for row in csv.DictReader(lines, delimiter="\t")}
-
-packaging, shipped = map(rows, sys.argv[1:])
-changed = sorted(name for name in packaging if packaging[name] != shipped.get(name))
-if changed != ["libtiff"]:
-    raise SystemExit(1)
-if packaging["libtiff"]["version"] != "4.7.2" \
-        or shipped["libtiff"]["version"] != "4.7.1":
-    raise SystemExit(1)
-PY
+    # The protected builder needs the reviewed source lock on main first.
+    # Allow only this exact transition; remove it when its candidate ships.
+    [[ "$(worms_file_sha256 "$ROOT_DIR/packaging/qt-homebrew-lock.tsv")" \
+        == "52309a98883cc0467d50a7c647460db9a39fb3fa051b16c4f5cc598103a52066" \
+        && "$(worms_file_sha256 "$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.source-provenance.tsv")" \
+        == "ceb853f03e2efa3bd17f2607d91e74b0d9b9ce62c015f6fdf7c5086e9cc1071a" ]] \
+        || fail "packaging/dist transition does not match the reviewed PCRE2 inputs"
 fi
 
 committed_package="$ROOT_DIR/dist/qt-frameworks-x86_64-5.15.19.tar.gz"
