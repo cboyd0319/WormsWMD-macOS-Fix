@@ -54,6 +54,7 @@ Steps to reproduce:
 
 - macOS (Intel or Apple Silicon with Rosetta 2)
 - ShellCheck (`brew install shellcheck`)
+- Node.js 20 or newer for the GitHub automation policy tests
 - Xcode Command Line Tools (`xcode-select --install`)
 
 Optional for Homebrew fallback testing:
@@ -142,6 +143,13 @@ not a source failure.
 If you change packaging or update tools, run the related scripts.
 
 ## Send a pull request
+
+Ready pull requests targeting `main` automatically request a Balanced Copilot
+review and a Codex review. The Codex workflow posts `@codex review` on opening,
+marking ready, reopening, or changing the target to `main`; drafts and other
+target branches are excluded. Requests are deduplicated per head commit.
+For later pushes, request another review manually. AI reviews remain subject
+to provider access and quotas and do not replace required checks or human review.
 
 Include:
 - A summary of the change

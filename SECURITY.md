@@ -198,6 +198,13 @@ skipped-success. A failed diff/classifier always falls back to macOS.
 Security/release workflows do not reuse untrusted cross-run caches. Workflow
 artifacts expire after 14 days.
 
+The Codex review workflow is the sole `pull_request_target` exception: it runs
+only a pinned GitHub-owned action from the trusted base, reads current PR
+metadata, and posts a fixed review request for open, non-draft PRs into `main`.
+It has only `pull-requests: write`, uses no static secrets, checks out no code,
+and executes no PR-controlled text or artifacts. Repository-wide native Codex
+auto-review stays inherited from the owner's disabled personal preference.
+
 ### Staged and CI secret scanning
 
 Run once per clone:
