@@ -35,18 +35,18 @@ jobs:
             const ready = pr => pr.state === 'open' && pr.draft === false && pr.base.ref === 'main';
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
             if (!ready(pr)) return;
-            if (!/^[a-f0-9]{40}$/.test(pr.head.sha)) throw new Error('Invalid PR revision');
-            const marker = `<!-- codex-auto-review:${number}:${pr.head.sha} -->`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: number, per_page: 100,
             });
+            const { data: latest } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            if (!ready(latest)) return;
+            if (!/^[a-f0-9]{40}$/.test(latest.head.sha)) throw new Error('Invalid PR revision');
+            const marker = `<!-- codex-auto-review:${number}:${latest.head.sha} -->`;
             if (comments.some(comment => comment.user?.login === 'github-actions[bot]' &&
                 comment.user.type === 'Bot' && comment.body?.includes(marker))) {
               core.info('Review already requested for this revision.');
               return;
             }
-            const { data: latest } = await github.rest.pulls.get({ owner, repo, pull_number: number });
-            if (!ready(latest) || latest.head.sha !== pr.head.sha) return;
             await github.rest.issues.createComment({
               owner, repo, issue_number: number, body: `@codex review\n\n${marker}`,
             });

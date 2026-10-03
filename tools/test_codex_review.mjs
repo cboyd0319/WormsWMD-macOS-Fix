@@ -55,7 +55,15 @@ for (const action of ['synchronize', 'converted_to_draft', 'edited']) {
   assert.equal((await check({ action })).length, 0);
 }
 assert.equal((await check({ eventName: 'issue_comment' })).length, 0);
-assert.equal((await check({ latest: { ...ready, head: { sha: 'b'.repeat(40) } } })).length, 0);
+const changedHead = { ...ready, head: { sha: 'b'.repeat(40) } };
+const changedBody = `@codex review\n\n<!-- codex-auto-review:7:${changedHead.head.sha} -->`;
+for (const comments of [[], [{ user: bot, body: marker }]]) {
+  assert.deepEqual(await check({ latest: changedHead, comments }),
+    [{ owner: 'owner', repo: 'repo', issue_number: 7, body: changedBody }],
+    'a push during metadata lookup must not lose the initial ready-PR review');
+}
+assert.equal((await check({ latest: changedHead, comments: [{ user: bot, body: changedBody }] })).length, 0);
+await assert.rejects(check({ pr: { ...ready, head: { sha: 'invalid' } } }), /Invalid PR revision/);
 assert.equal((await check({ comments: [{ user: bot, body: `@codex review\n\n${marker}` }] })).length, 0);
 assert.equal((await check({ comments: [{ user: { login: 'attacker', type: 'User' }, body: marker }] })).length, 1);
 assert.equal((await check({ comments: [{ user: bot, body: '<!-- codex-auto-review:7:old -->' }] })).length, 1);
