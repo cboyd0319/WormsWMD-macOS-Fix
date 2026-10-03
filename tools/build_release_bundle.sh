@@ -219,9 +219,7 @@ mkdir -p "$bundle_dir"
 
 for rel in \
     "Worms W.M.D Fix.command" \
-    "Install Fix.command" \
     "fix_worms_wmd.sh" \
-    "install.sh" \
     "README_FIRST.txt" \
     "README.md" \
     "SUPPORT.md" \
@@ -246,9 +244,7 @@ write_release_info
 
 chmod +x \
     "$bundle_dir/Worms W.M.D Fix.command" \
-    "$bundle_dir/Install Fix.command" \
-    "$bundle_dir/fix_worms_wmd.sh" \
-    "$bundle_dir/install.sh" 2>/dev/null || true
+    "$bundle_dir/fix_worms_wmd.sh" 2>/dev/null || true
 
 if [[ -d "$bundle_dir/scripts" ]]; then
     find "$bundle_dir/scripts" -type f -name "*.sh" -exec chmod +x {} +

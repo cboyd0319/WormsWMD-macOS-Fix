@@ -25,6 +25,113 @@ agl_archs=$(lipo -archs "$agl_build_dir/AGL" 2>/dev/null || true)
 echo "$agl_archs" | tr ' ' '\n' | grep -qx "x86_64" \
     || fail "AGL build output is missing x86_64 architecture: ${agl_archs:-unknown}"
 
+# Issues #30/#31: mismatched PATH/SDKROOT and incompatible SDK text stubs.
+sdk_root=$(xcrun --sdk macosx --show-sdk-path)
+real_compiler=$(xcrun --toolchain default --sdk macosx --find clang)
+sdk_bin="$tmp_dir/sdk-bin"
+broken_sdk="$tmp_dir/SDKs/MacOSX99.sdk"
+mkdir -p "$sdk_bin" "$broken_sdk/usr/lib"
+cp "$sdk_root/SDKSettings.plist" "$broken_sdk/SDKSettings.plist"
+printf 'incompatible SDK text stub\n' > "$broken_sdk/usr/lib/libSystem.tbd"
+ln -s "$sdk_root" "$tmp_dir/SDKs/MacOSX26.sdk"
+cat > "$sdk_bin/clang" <<'STUB'
+#!/bin/bash
+printf 'wrong compiler from PATH\n' >&2
+exit 99
+STUB
+cat > "$sdk_bin/xcrun" <<'STUB'
+#!/bin/bash
+case "${5:-}" in
+    --find) printf '%s\n' "$WORMS_TEST_COMPILER" ;;
+    --show-sdk-path) printf '%s\n' "$WORMS_TEST_SDK" ;;
+    *) exit 98 ;;
+esac
+STUB
+chmod +x "$sdk_bin/clang" "$sdk_bin/xcrun"
+if ! sdk_output=$(PATH="$sdk_bin:$PATH" SDKROOT="$broken_sdk" \
+    WORMS_TEST_COMPILER="$real_compiler" WORMS_TEST_SDK="$broken_sdk" \
+    MACOSX_DEPLOYMENT_TARGET=27.0 BUILD_DIR="$tmp_dir/sdk-build" \
+    "$ROOT_DIR/scripts/01_build_agl_stub.sh" 2>&1); then
+    fail "AGL build did not recover with a compatible installed SDK: $sdk_output"
+fi
+grep -Fq 'AGL build: Trying another installed macOS SDK' <<< "$sdk_output" \
+    || fail "test did not exercise incompatible SDK recovery"
+for agl_arch in x86_64 arm64; do
+    lipo "$tmp_dir/sdk-build/AGL" -verify_arch "$agl_arch" \
+        || fail "SDK recovery build lacks $agl_arch"
+    [[ -z "$(nm -arch "$agl_arch" -u "$tmp_dir/sdk-build/AGL")" ]] \
+        || fail "AGL stub has undefined symbols for $agl_arch"
+    if otool -arch "$agl_arch" -L "$tmp_dir/sdk-build/AGL" | grep -Fq 'OpenGL.framework'; then
+        fail "AGL stub still loads unused OpenGL for $agl_arch"
+    fi
+    minimum_os=$(otool -arch "$agl_arch" -l "$tmp_dir/sdk-build/AGL" | awk '
+        $1 == "cmd" {version = ($2 == "LC_VERSION_MIN_MACOSX" || $2 == "LC_BUILD_VERSION")}
+        version && ($1 == "version" || $1 == "minos") {print $2; exit}')
+    [[ "$minimum_os" =~ ^[0-9]+[.][0-9]+ ]] \
+        || fail "missing deployment target for $agl_arch"
+    (( ${minimum_os%%.*} <= 26 )) \
+        || fail "inherited deployment target excludes macOS 26 for $agl_arch"
+done
+
+# Exercise the compiled ABI under the architecture used by the game.
+cat > "$tmp_dir/agl-probe.c" <<'C'
+#include <OpenGL/gl.h>
+#include <dlfcn.h>
+#include <string.h>
+int main(int argc, char **argv) {
+    if (argc != 2) return 1;
+    void *handle = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
+    if (!handle) return 2;
+    void *(*choose)(const void *, GLint, const GLint *) = dlsym(handle, "aglChoosePixelFormat");
+    GLenum (*error)(void) = dlsym(handle, "aglGetError");
+    const GLubyte *(*message)(GLenum) = dlsym(handle, "aglErrorString");
+    GLboolean (*pbuffer)(GLint, GLint, GLenum, GLenum, long, void **) = dlsym(handle, "aglCreatePBuffer");
+    if (!choose || !error || !message || !pbuffer) return 3;
+    if (choose(NULL, 0, NULL) != NULL || error() != 10004 || error() != 0) return 4;
+    if (strcmp((const char *)message(10004), "Bad context")) return 5;
+    void *buffer = (void *)1;
+    if (pbuffer(1, 1, 0, 0, 0, &buffer) != GL_FALSE || buffer != NULL || error() != 10016) return 6;
+    return dlclose(handle) != 0;
+}
+C
+"$real_compiler" -isysroot "$sdk_root" -Wall -Wextra -Werror -arch x86_64 -arch arm64 \
+    "$tmp_dir/agl-probe.c" -o "$tmp_dir/agl-probe"
+arch -x86_64 "$tmp_dir/agl-probe" "$tmp_dir/sdk-build/AGL" \
+    || fail "AGL x86_64 ABI/load probe failed"
+if [[ "$(uname -m)" == arm64 ]]; then
+    arch -arm64 "$tmp_dir/agl-probe" "$tmp_dir/sdk-build/AGL" \
+        || fail "AGL arm64 ABI/load probe failed"
+fi
+
+# A successful merge command must not disguise an arm64-only output.
+cat > "$sdk_bin/lipo" <<'STUB'
+#!/bin/bash
+if [[ "${1:-}" == -create ]]; then
+    cp "$3" "$5"
+else
+    exec /usr/bin/lipo "$@"
+fi
+STUB
+chmod +x "$sdk_bin/lipo"
+if PATH="$sdk_bin:$PATH" WORMS_TEST_COMPILER="$real_compiler" \
+    WORMS_TEST_SDK="$sdk_root" BUILD_DIR="$tmp_dir/arm-only" \
+    "$ROOT_DIR/scripts/01_build_agl_stub.sh" > "$tmp_dir/arm-only.txt" 2>&1; then
+    fail "AGL build accepted an arm64-only merged output"
+fi
+grep -Fq 'missing the required x86_64 architecture' "$tmp_dir/arm-only.txt" \
+    || fail "architecture verification did not reject arm64-only output"
+rm "$sdk_bin/lipo"
+
+# No compatible SDK must fail, even when a previous build is present.
+rm "$tmp_dir/SDKs/MacOSX26.sdk"
+if PATH="$sdk_bin:$PATH" WORMS_TEST_COMPILER="$real_compiler" \
+    WORMS_TEST_SDK="$broken_sdk" BUILD_DIR="$tmp_dir/sdk-build" \
+    "$ROOT_DIR/scripts/01_build_agl_stub.sh" > "$tmp_dir/sdk-failure.txt" 2>&1; then
+    fail "AGL build accepted incompatible SDKs or a stale output"
+fi
+grep -Fq 'Update Apple Command Line Tools' "$tmp_dir/sdk-failure.txt" \
+    || fail "all-SDK failure omitted recovery guidance"
+
 make_game_app() {
     local game_app="$1"
 

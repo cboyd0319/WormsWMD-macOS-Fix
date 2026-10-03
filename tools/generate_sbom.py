@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a deterministic CycloneDX SBOM from the locked Qt bottle closure."""
+"""Generate a deterministic CycloneDX SBOM from locked Qt runtime inputs."""
 
 from __future__ import annotations
 
@@ -36,12 +36,17 @@ DEFAULT_POLICY = ROOT / "packaging" / "qt-component-policy.tsv"
 EXPECTED_HEADER = [
     "name",
     "version",
-    "bottle_tag",
-    "bottle_sha256",
-    "bottle_url",
+    "artifact_kind",
+    "artifact_tag",
+    "artifact_sha256",
+    "artifact_url",
     "source_sha256",
-    "ruby_source_sha256",
+    "formula_sha256",
     "tap_git_head",
+]
+LEGACY_HEADER = [
+    "name", "version", "bottle_tag", "bottle_sha256", "bottle_url",
+    "source_sha256", "ruby_source_sha256", "tap_git_head",
 ]
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -184,7 +189,7 @@ def read_provenance(path: Path) -> tuple[list[dict[str, str]], bytes]:
         raise SbomError("Provenance lock is empty")
 
     reader = csv.DictReader(data_lines, delimiter="\t")
-    if reader.fieldnames != EXPECTED_HEADER:
+    if reader.fieldnames not in (EXPECTED_HEADER, LEGACY_HEADER):
         raise SbomError("Provenance lock header does not match the supported schema")
 
     rows: list[dict[str, str]] = []
@@ -195,6 +200,10 @@ def read_provenance(path: Path) -> tuple[list[dict[str, str]], bytes]:
         if None in raw_row or any(value is None for value in raw_row.values()):
             raise SbomError("Malformed provenance row")
         row = {key: value.strip() for key, value in raw_row.items()}
+        if reader.fieldnames == LEGACY_HEADER:
+            values = list(row.values())
+            values.insert(2, "bottle")
+            row = dict(zip(EXPECTED_HEADER, values))
         if any(not row[field] for field in EXPECTED_HEADER):
             raise SbomError("Provenance rows may not contain empty fields")
         if not NAME_RE.fullmatch(row["name"]):
@@ -204,12 +213,26 @@ def read_provenance(path: Path) -> tuple[list[dict[str, str]], bytes]:
         names.add(row["name"])
         if len(row["version"]) > 128 or any(ord(char) < 32 for char in row["version"]):
             raise SbomError(f"Invalid component version for {row['name']}")
-        parsed_url = urlparse(row["bottle_url"])
+        if row["artifact_kind"] not in {"bottle", "source"}:
+            raise SbomError(f"Invalid artifact kind for {row['name']}")
+        if row["artifact_kind"] == "source":
+            version = row["version"]
+            expected_url = (
+                "https://github.com/PCRE2Project/pcre2/releases/download/"
+                f"pcre2-{version}/pcre2-{version}.tar.gz"
+            )
+            if (row["name"] != "pcre2"
+                    or not re.fullmatch(r"[0-9]+[.][0-9]+", version)
+                    or row["artifact_tag"] != "x86_64_macos"
+                    or row["artifact_url"] != expected_url
+                    or row["artifact_sha256"] != row["source_sha256"]):
+                raise SbomError("Invalid pinned PCRE2 source provenance")
+        parsed_url = urlparse(row["artifact_url"])
         if parsed_url.scheme != "https" or not parsed_url.hostname:
-            raise SbomError(f"Bottle URL must use HTTPS for {row['name']}")
-        require_sha256(row["bottle_sha256"], f"bottle checksum for {row['name']}")
+            raise SbomError(f"Artifact URL must use HTTPS for {row['name']}")
+        require_sha256(row["artifact_sha256"], f"artifact checksum for {row['name']}")
         require_sha256(row["source_sha256"], f"source checksum for {row['name']}")
-        require_sha256(row["ruby_source_sha256"], f"formula checksum for {row['name']}")
+        require_sha256(row["formula_sha256"], f"formula checksum for {row['name']}")
         if not SHA1_RE.fullmatch(row["tap_git_head"]):
             raise SbomError(f"Invalid Homebrew tap commit for {row['name']}")
         rows.append(row)
@@ -224,6 +247,8 @@ def component_from_row(
 ) -> dict[str, Any]:
     encoded_version = quote(row["version"], safe="")
     purl = policy["purl_template"].replace("{version}", encoded_version)
+    if row["artifact_kind"] == "source":
+        purl = f"pkg:generic/{row['name']}@{encoded_version}"
     component: dict[str, Any] = {
         "type": "library",
         "bom-ref": purl,
@@ -232,14 +257,15 @@ def component_from_row(
         "supplier": {"name": policy["supplier"]},
         "scope": "required" if policy["scope"] == "runtime" else "excluded",
         "purl": purl,
-        "hashes": [{"alg": "SHA-256", "content": row["bottle_sha256"]}],
-        "externalReferences": [{"type": "distribution", "url": row["bottle_url"]}],
+        "hashes": [{"alg": "SHA-256", "content": row["artifact_sha256"]}],
+        "externalReferences": [{"type": "distribution", "url": row["artifact_url"]}],
         "properties": [
-            {"name": "wormswmd:homebrew:bottle-tag", "value": row["bottle_tag"]},
-            {"name": "wormswmd:homebrew:source-sha256", "value": row["source_sha256"]},
+            {"name": "wormswmd:input-kind", "value": row["artifact_kind"]},
+            {"name": "wormswmd:input-tag", "value": row["artifact_tag"]},
+            {"name": "wormswmd:source-sha256", "value": row["source_sha256"]},
             {
                 "name": "wormswmd:homebrew:formula-sha256",
-                "value": row["ruby_source_sha256"],
+                "value": row["formula_sha256"],
             },
             {"name": "wormswmd:homebrew:tap-commit", "value": row["tap_git_head"]},
             {"name": "wormswmd:component-scope", "value": policy["scope"]},
@@ -340,7 +366,7 @@ def build_sbom(
             release_sha256,
             archive_sha256,
             *(component["bom-ref"] for component in components + build_components),
-            *(row["bottle_sha256"] for row in rows),
+            *(row["artifact_sha256"] for row in rows),
         ]
     )
     serial = uuid.uuid5(
@@ -425,7 +451,7 @@ def build_inventory_sbom(
             version,
             archive_sha256,
             *(component["bom-ref"] for component in components + build_components),
-            *(row["bottle_sha256"] for row in rows),
+            *(row["artifact_sha256"] for row in rows),
         ]
     )
     serial = uuid.uuid5(

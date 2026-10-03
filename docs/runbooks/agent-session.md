@@ -166,9 +166,9 @@ the bootstrap default tag together. If bootstrap exact-commit verification is
 used, the release commit cannot contain its own hash. Cut and push the tag
 first, verify the release workflow, then add a follow-up `main` commit pinning
 the bootstrap commit guard to the tag target. The workflow creates or resumes a
-draft, uploads and attests every asset, applies the matching `CHANGELOG.md`
-section as release notes, and only then publishes the immutable release. It
-must refuse to overwrite an already-published release.
+draft, uploads and attests every asset, applies matching changelog notes, then
+publishes the immutable release. It refuses to overwrite published releases.
+The zip omits download bootstraps. Link standalone bootstraps from main; tagged copies retain pending pins and cannot contain their own SHA.
 Configure required reviewers on the GitHub `release` environment before the
 next tag. For signing-key loss, workflow compromise, ruleset break-glass, asset
 withdrawal, or corrective publication, follow
@@ -187,8 +187,7 @@ gh attestation verify /tmp/wormswmd-release-check/WormsWMD-macOS-Fix-vX.Y.Z.zip 
 AGL stub or C source:
 
 ```bash
-clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
-rm -f /tmp/AGL_test
+./tools/test_issue_12_agl_install_failure.sh
 ```
 
 Runtime validation on macOS with the game installed:
@@ -203,7 +202,8 @@ Runtime validation on macOS with the game installed:
 
 Use local artifacts when debugging or reporting failures:
 
-- `~/Library/Logs/WormsWMD-Fix/` for fix and verification logs.
+- `~/Library/Logs/WormsWMD-Fix/` for fix and verification logs; sanitized AGL
+  compiler/SDK failures appear in support bundles under `install-summary.txt`.
 - `~/Library/Logs/WormsWMD/` for launcher logs and crash reports.
 - `./tools/collect_diagnostics.sh` for a shareable diagnostics report.
 - Exact terminal output for failed validation.

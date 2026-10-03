@@ -311,11 +311,18 @@ in a dedicated reviewed change:
   --write-lock /tmp/qt-homebrew-lock.candidate.tsv
 ```
 
-For the v1.7.7 transition, review that raw candidate and retain only the
-libtiff row. Current formula resolution also proposes unrelated dependency/tap
-churn; it is not authoritative merely because it is current. The committed
-packaging lock intentionally gets ahead of the 4.7.1 provenance in `dist` until
-the protected rebuild and artifact-only PR restore three-way byte equality.
+Refresh preserves reviewed PCRE2 source rows when the upstream formula version
+still matches, including when refreshing the Qt dependency closure. A new PCRE2
+version requires reviewing and pinning its source archive first; refresh never
+substitutes an unreviewed source download or silently switches it to a bottle.
+Other dependencies still require the requested Intel bottle; a missing bottle
+stops the refresh without changing the reviewed lock.
+
+For the v1.7.7 transition, review raw candidates and retain only the intended
+dependency changes. Current formula resolution also proposes unrelated
+dependency/tap changes; it is not authoritative merely because it is current.
+The reviewed PCRE2 10.49 source lock intentionally precedes the 10.47 provenance
+in `dist` until the protected rebuild and artifact-only PR restore three-way byte equality.
 Do not create a tag during this transition.
 
 Build the player-facing release folder and zip:

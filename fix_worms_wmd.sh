@@ -31,7 +31,7 @@ while [[ -L "$SCRIPT_PATH" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
-VERSION="1.7.6"
+VERSION="1.7.7"
 LOG_FILE="${LOG_FILE:-}"
 TRACE_FILE="${TRACE_FILE:-}"
 WORMSWMD_DEBUG="${WORMSWMD_DEBUG:-false}"
@@ -302,7 +302,7 @@ ensure_rosetta() {
 
 # Check and install Xcode Command Line Tools if needed
 ensure_xcode_clt() {
-    if command -v clang &>/dev/null || xcode-select -p &>/dev/null; then
+    if xcrun --toolchain default --sdk macosx --find clang &>/dev/null; then
         if worms_python3 >/dev/null 2>&1; then
             return 0
         fi
@@ -350,14 +350,11 @@ ensure_xcode_clt() {
         exit 1
     fi
 
-    # Verify installation
-    if ! command -v clang &>/dev/null; then
-        if ! xcode-select -p &>/dev/null; then
-            print_error "Xcode Command Line Tools installation was not completed."
-            echo ""
-            echo "Please complete the installation dialog, then run this fix again."
-            exit 1
-        fi
+    # Match the Apple toolchain selection used by the AGL builder.
+    if ! xcrun --toolchain default --sdk macosx --find clang &>/dev/null; then
+        print_error "Apple Command Line Tools could not provide the macOS compiler."
+        echo "Please complete or update the Command Line Tools installation, then retry."
+        exit 1
     fi
     if ! worms_python3 >/dev/null 2>&1; then
         print_error "Command Line Tools did not provide Python 3.9 or newer."
@@ -1578,13 +1575,13 @@ do_dry_run() {
     print_step "Changes that would be made..."
     echo ""
 
-    print_dry_run "Create a target-bound backup at: ~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS/"
-    print_dry_run "  (frameworks, plugins, all MacOS files, metadata, and existing signature resources)"
-    echo ""
-
     print_dry_run "Build AGL stub library (universal x86_64 + arm64)"
     print_dry_run "  Source: $SCRIPT_DIR/src/agl_stub.c"
     print_dry_run "  Target: $dry_game_target/Contents/Frameworks/AGL.framework/"
+    echo ""
+
+    print_dry_run "Create a target-bound backup at: ~/Documents/WormsWMD-Backup-YYYYMMDD-HHMMSS/"
+    print_dry_run "  (frameworks, plugins, all MacOS files, metadata, and existing signature resources)"
     echo ""
 
     print_dry_run "Replace Qt frameworks found in the game bundle"
@@ -1604,9 +1601,9 @@ do_dry_run() {
     print_dry_run "Update image format plugins"
     print_dry_run "Update Info.plist metadata (bundle ID, HiDPI, min version)"
     print_dry_run "Secure config URLs (HTTP→HTTPS, disable internal URLs)"
-    print_dry_run "Verify the complete runtime"
     print_dry_run "Apply ad-hoc code signature (codesign --deep --sign -)"
     print_dry_run "Strictly verify the ad-hoc signature before committing"
+    print_dry_run "Verify the complete runtime"
     print_dry_run "Remove quarantine flags (xattr -rd com.apple.quarantine)"
     print_dry_run "Reset incompatible Qt window geometry (if present)"
     echo ""
@@ -1729,6 +1726,13 @@ do_fix() {
     fi
 
     echo ""
+    # Build before backup or bundle mutation: SDK/compiler failures need no rollback.
+    print_step "Building AGL stub library..."
+    ensure_build_dir
+    print_substep "Build directory: $BUILD_DIR"
+    chmod +x "$SCRIPTS_DIR/01_build_agl_stub.sh"
+    "$SCRIPTS_DIR/01_build_agl_stub.sh"
+
     print_success "Pre-flight checks passed!"
 
     # ============================================================
@@ -1795,13 +1799,6 @@ do_fix() {
     # ============================================================
     # Apply fixes
     # ============================================================
-    echo ""
-    print_step "Building AGL stub library..."
-    ensure_build_dir
-    print_substep "Build directory: $BUILD_DIR"
-    chmod +x "$SCRIPTS_DIR/01_build_agl_stub.sh"
-    "$SCRIPTS_DIR/01_build_agl_stub.sh"
-
     echo ""
     print_step "Replacing Qt frameworks..."
 
@@ -1937,6 +1934,25 @@ do_fix() {
     fi
 
     # ============================================================
+    # Sign the complete bundle before strict installation verification.
+    # Signing failures remain inside the rollback boundary.
+    # ============================================================
+    echo ""
+    print_step "Signing the fixed game..."
+    local codesign_output
+    if ! codesign_output=$(codesign --force --deep --sign - "$GAME_APP" 2>&1); then
+        print_error "Could not apply the ad-hoc code signature"
+        [[ -n "$codesign_output" ]] && echo "$codesign_output"
+        return 1
+    fi
+    if ! codesign_output=$(codesign --verify --deep --strict "$GAME_APP" 2>&1); then
+        print_error "Ad-hoc code signature verification failed"
+        [[ -n "$codesign_output" ]] && echo "$codesign_output"
+        return 1
+    fi
+    print_substep "Ad-hoc code signature applied and verified"
+
+    # ============================================================
     # Verify installation
     # ============================================================
     echo ""
@@ -1977,23 +1993,10 @@ do_fix() {
     fi
 
     # ============================================================
-    # Post-fix: Code signing and quarantine removal
+    # Post-fix: Quarantine removal and preferences
     # ============================================================
     echo ""
     print_step "Applying finishing touches..."
-
-    local codesign_output
-    if ! codesign_output=$(codesign --force --deep --sign - "$GAME_APP" 2>&1); then
-        print_error "Could not apply the ad-hoc code signature"
-        [[ -n "$codesign_output" ]] && echo "$codesign_output"
-        return 1
-    fi
-    if ! codesign_output=$(codesign --verify --deep --strict "$GAME_APP" 2>&1); then
-        print_error "Ad-hoc code signature verification failed"
-        [[ -n "$codesign_output" ]] && echo "$codesign_output"
-        return 1
-    fi
-    print_substep "Ad-hoc code signature applied and verified"
 
     # All covered bundle mutations are now verified. Quarantine and preference
     # changes happen after the rollback boundary because they are not serialized

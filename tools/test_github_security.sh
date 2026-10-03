@@ -143,7 +143,7 @@ else
         'attestations: write' \
         '--cache "$work_root/cache-one"' \
         '--cache "$work_root/cache-two"' \
-        'QT_PACKAGE_SOURCE_LABEL="Locked Homebrew bottle closure"' \
+        'QT_PACKAGE_SOURCE_LABEL="Locked Homebrew bottles and upstream PCRE2 source"' \
         './tools/compare_qt_artifacts.sh' \
         'cmp -s' \
         'same-runner clean rebuilds' \

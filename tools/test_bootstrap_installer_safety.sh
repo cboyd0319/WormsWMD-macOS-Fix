@@ -65,4 +65,64 @@ if run_normalize "$test_home" "/tmp/../Applications/wormswmd-fix" >/dev/null 2>&
     fail "INSTALL_DIR resolving through .. into a system path was accepted"
 fi
 
+# The extracted verification helpers call the stubs defined in this subshell.
+# shellcheck disable=SC2329
+run_pin_check() (
+    set -euo pipefail
+    local entrypoint="$1" pin="$2"
+    local fixture_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    local pin_functions="$tmp_dir/pin-functions.sh"
+    RED="" NC=""
+    DEFAULT_INSTALL_REF="v1.7.7" INSTALL_REF="v1.7.7"
+    DEFAULT_INSTALL_COMMIT="$pin" INSTALL_COMMIT="$pin"
+    INSTALL_DIR="$tmp_dir/checkout"
+    print_error() { :; }
+    print_info() { :; }
+    git() { printf '%s\n' "$fixture_commit"; }
+    read() { return 0; }
+    # Extract only verification helpers, never run the network/UI entrypoints.
+    awk '
+        /^verify_(default_install|install)_commit\(\)/ { inside=1 }
+        inside { print }
+        inside && /^}/ { inside=0 }
+    ' "$ROOT_DIR/$entrypoint" > "$pin_functions"
+    # shellcheck source=/dev/null
+    source "$pin_functions"
+    if [[ "$entrypoint" == install.sh ]]; then
+        verify_default_install_commit "$INSTALL_DIR"
+    else
+        verify_install_commit
+    fi
+)
+
+for entrypoint in install.sh "Install Fix.command"; do
+    for pin in "" PENDING_v1_7_7 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; do
+        if run_pin_check "$entrypoint" "$pin" >/dev/null 2>&1; then
+            fail "$entrypoint accepted an empty, pending, or mismatched release pin"
+        fi
+    done
+    run_pin_check "$entrypoint" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+        || fail "$entrypoint rejected a matching release pin"
+    pin=$(sed -nE 's/^(DEFAULT_INSTALL_COMMIT|INSTALL_COMMIT)="([^"]*)"$/\2/p' "$ROOT_DIR/$entrypoint")
+    [[ "$pin" == PENDING_* || "$pin" =~ ^[0-9a-f]{40}$ ]] \
+        || fail "$entrypoint has no valid release pin or pending sentinel"
+done
+
+# A complete release bundle must launch its own installer, not ship pending
+# download bootstraps whose final tag commit cannot be embedded in that tag.
+bundle_source="$tmp_dir/bundle-source"
+mkdir -p "$bundle_source/tools" "$bundle_source/scripts"
+cp "$ROOT_DIR/tools/build_release_bundle.sh" "$bundle_source/tools/"
+cp "$ROOT_DIR/scripts/common.sh" "$ROOT_DIR/scripts/ui.sh" "$bundle_source/scripts/"
+cp "$ROOT_DIR/install.sh" "$ROOT_DIR/Install Fix.command" "$bundle_source/"
+printf '#!/bin/bash\nexit 0\n' > "$bundle_source/fix_worms_wmd.sh"
+cp "$bundle_source/fix_worms_wmd.sh" "$bundle_source/Worms W.M.D Fix.command"
+bash "$bundle_source/tools/build_release_bundle.sh" \
+    --version bootstrap-test --output-dir "$tmp_dir/bundles" --skip-zip >/dev/null
+bundle="$tmp_dir/bundles/WormsWMD-macOS-Fix-bootstrap-test"
+[[ -x "$bundle/Worms W.M.D Fix.command" && -x "$bundle/fix_worms_wmd.sh" ]] \
+    || fail "release bundle omitted its local installer entrypoints"
+[[ ! -e "$bundle/install.sh" && ! -e "$bundle/Install Fix.command" ]] \
+    || fail "release bundle shipped download bootstraps with unresolved release pins"
+
 printf 'Bootstrap installer safety check passed.\n'

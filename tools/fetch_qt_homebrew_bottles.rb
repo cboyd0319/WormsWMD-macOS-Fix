@@ -21,7 +21,8 @@ require 'uri'
 module WormsBottleFetcher
   DEFAULT_FORMULA = 'qt@5'
   DEFAULT_TAG = 'sonoma'
-  LOCK_HEADER = %w[name version bottle_tag bottle_sha256 bottle_url source_sha256 ruby_source_sha256 tap_git_head].freeze
+  LOCK_HEADER = %w[name version artifact_kind artifact_tag artifact_sha256 artifact_url source_sha256 formula_sha256 tap_git_head].freeze
+  LEGACY_HEADER = %w[name version bottle_tag bottle_sha256 bottle_url source_sha256 ruby_source_sha256 tap_git_head].freeze
   ALLOWED_FORMULAE = %w[
     qt@5 freetype glib jpeg-turbo libpng libtiff md4c pcre2 sqlite webp zstd
     gettext xz readline giflib lz4 libunistring
@@ -93,21 +94,32 @@ module WormsBottleFetcher
 
   def expected_bottle_path(entry)
     formula_path = entry.fetch('name').tr('@', '/')
-    "/v2/homebrew/core/#{formula_path}/blobs/sha256:#{entry.fetch('bottle_sha256')}"
+    "/v2/homebrew/core/#{formula_path}/blobs/sha256:#{entry.fetch('artifact_sha256')}"
   end
 
   def validate_lock_entry!(entry)
     name = entry.fetch('name')
     raise Error, "Formula is not allowlisted: #{name}" unless NAME_RE.match?(name) && ALLOWED_FORMULAE.include?(name)
     raise Error, "Invalid version for #{name}" unless VERSION_RE.match?(entry.fetch('version'))
-    raise Error, "Invalid bottle tag for #{name}" unless TAG_RE.match?(entry.fetch('bottle_tag'))
-    raise Error, "Unsupported bottle tag for #{name}" unless entry.fetch('bottle_tag') == DEFAULT_TAG
-    %w[bottle_sha256 source_sha256 ruby_source_sha256].each do |field|
+    raise Error, "Invalid bottle tag for #{name}" unless TAG_RE.match?(entry.fetch('artifact_tag'))
+    %w[artifact_sha256 source_sha256 formula_sha256].each do |field|
       raise Error, "Invalid #{field} for #{name}" unless SHA256_RE.match?(entry.fetch(field))
     end
     raise Error, "Invalid tap_git_head for #{name}" unless SHA1_RE.match?(entry.fetch('tap_git_head'))
 
-    uri = URI.parse(entry.fetch('bottle_url'))
+    if entry.fetch('artifact_kind') == 'source'
+      version = entry.fetch('version')
+      expected_url = "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-#{version}/pcre2-#{version}.tar.gz"
+      unless name == 'pcre2' && version.match?(/\A[0-9]+[.][0-9]+\z/) && entry.fetch('artifact_tag') == 'x86_64_macos' &&
+             entry.fetch('artifact_url') == expected_url &&
+             entry.fetch('artifact_sha256') == entry.fetch('source_sha256')
+        raise Error, 'Source builds require a checksum-pinned upstream PCRE2 release for x86_64 macOS'
+      end
+      return
+    end
+    raise Error, "Unsupported artifact kind for #{name}" unless entry.fetch('artifact_kind') == 'bottle'
+    raise Error, "Unsupported bottle tag for #{name}" unless entry.fetch('artifact_tag') == DEFAULT_TAG
+    uri = URI.parse(entry.fetch('artifact_url'))
     unless uri.is_a?(URI::HTTPS) && uri.host == 'ghcr.io' && uri.port == 443 &&
            uri.userinfo.nil? && uri.query.nil? && uri.fragment.nil? && uri.path == expected_bottle_path(entry)
       raise Error, "Invalid GHCR bottle URL for #{name}"
@@ -141,12 +153,17 @@ module WormsBottleFetcher
     lines = bytes.force_encoding(Encoding::UTF_8).lines(chomp: true)
     data_lines = lines.reject { |line| line.empty? || line.start_with?('#') }
     header = data_lines.shift&.split("\t", -1)
-    raise Error, "Invalid lock header in #{path}" unless header == LOCK_HEADER
+    unless [LOCK_HEADER, LEGACY_HEADER].include?(header)
+      raise Error, "Invalid lock header in #{path}"
+    end
     entries = data_lines.map do |line|
       raise Error, 'Invalid control character in lock row' if line.match?(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/)
       values = line.split("\t", -1)
-      raise Error, "Invalid lock row field count in #{path}" unless values.length == LOCK_HEADER.length
+      raise Error, "Invalid lock row field count in #{path}" unless values.length == header.length
       raise Error, 'Bottle lock fields may not be empty' if values.any?(&:empty?)
+      if header == LEGACY_HEADER
+        values.insert(2, 'bottle')
+      end
       LOCK_HEADER.zip(values).to_h
     end
     validate_entries!(entries, require_complete: require_complete)
@@ -165,7 +182,7 @@ module WormsBottleFetcher
     temporary = Tempfile.new(['.wormswmd-lock-', '.tsv'], parent)
     begin
       temporary.chmod(0o600)
-      temporary.puts '# WormsWMD Homebrew bottle lock v1'
+      temporary.puts '# WormsWMD runtime input lock v2 (Homebrew bottles and upstream source)'
       temporary.puts "# generated_utc\t#{Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')}"
       temporary.puts LOCK_HEADER.join("\t")
       entries.each { |entry| temporary.puts LOCK_HEADER.map { |key| entry.fetch(key) }.join("\t") }
@@ -325,7 +342,82 @@ module WormsBottleFetcher
   end
 
   def cache_filename(entry)
-    "#{entry.fetch('name').tr('/', '_')}--#{entry.fetch('version')}.#{entry.fetch('bottle_tag')}.bottle.tar.gz"
+    "#{entry.fetch('name').tr('/', '_')}--#{entry.fetch('version')}.#{entry.fetch('artifact_tag')}.#{entry.fetch('artifact_kind')}.tar.gz"
+  end
+
+  def build_pcre2_source!(entry, staging, cache, archive_directory)
+    validate_lock_entry!(entry)
+    cached = File.join(cache, cache_filename(entry))
+    if File.exist?(cached) || File.symlink?(cached)
+      actual = bounded_sha256(cached, 'PCRE2 source archive', 16 * 1024 * 1024)
+      raise Error, 'PCRE2 source checksum mismatch' unless actual == entry.fetch('source_sha256')
+    else
+      bytes = fetch_bytes(URI(entry.fetch('artifact_url')), max_bytes: 16 * 1024 * 1024,
+                          allowed_host: ->(host) { %w[github.com release-assets.githubusercontent.com].include?(host) })
+      raise Error, 'PCRE2 source checksum mismatch' unless Digest::SHA256.hexdigest(bytes) == entry.fetch('source_sha256')
+      File.open(cached, File::WRONLY | File::CREAT | File::EXCL, 0o600) { |file| file.write(bytes) }
+    end
+    inspected = File.join(archive_directory, 'pcre2-source.tar.gz')
+    run!(python3, INSPECTOR, '--profile', 'bottle', '--copy-to', inspected,
+         '--expected-sha256', entry.fetch('source_sha256'), '--quiet', cached)
+    root = "pcre2-#{entry.fetch('version')}"
+    members = capture!('tar', '-tzf', inspected).lines.map { |line| line.chomp.sub(%r{/\z}, '') }
+    unless members.include?(root) && members.all? { |member| member == root || member.start_with?("#{root}/") }
+      raise Error, 'Unexpected PCRE2 source archive root'
+    end
+    # Autoconf splits CC/CFLAGS as shell words; keep its driver path space-free
+    # and put SDK/tool paths in a quoted compiler wrapper instead.
+    work = Dir.mktmpdir('wormswmd-pcre2-', '/tmp')
+    run!('tar', '-xzf', inspected, '-C', work)
+    source = File.join(work, root)
+    compiler = capture!('/usr/bin/xcrun', '--toolchain', 'default', '--sdk', 'macosx', '--find', 'clang').strip
+    sdk = capture!('/usr/bin/xcrun', '--toolchain', 'default', '--sdk', 'macosx', '--show-sdk-path').strip
+    driver = File.join(work, 'cc')
+    flags = [compiler, '-arch', 'x86_64', '-isysroot', sdk, '-mmacosx-version-min=13.0',
+             "-ffile-prefix-map=#{source}=."]
+    File.write(driver, "#!/bin/sh\nexec #{flags.shelljoin} \"$@\"\n")
+    File.chmod(0o700, driver)
+    environment = {
+      'PATH' => '/usr/bin:/bin:/usr/sbin:/sbin', 'LC_ALL' => 'C', 'TZ' => 'UTC',
+      'CC' => driver, 'CFLAGS' => '-O2', 'CPPFLAGS' => '',
+      'LDFLAGS' => '-arch x86_64 -Wl,-headerpad_max_install_names',
+      'MACOSX_DEPLOYMENT_TARGET' => '13.0', 'SDKROOT' => sdk,
+      'CONFIG_SITE' => '/dev/null', 'MAKEFLAGS' => '', 'DYLD_LIBRARY_PATH' => nil,
+      'DYLD_INSERT_LIBRARIES' => nil
+    }
+    commands = [
+      ['./configure', '--prefix=/usr/local', '--enable-shared', '--disable-static',
+       '--enable-pcre2-8', '--enable-pcre2-16', '--disable-pcre2-32', '--enable-jit',
+       '--disable-dependency-tracking', '--disable-pcre2grep-libz', '--disable-pcre2grep-libbz2',
+       '--disable-pcre2test-libedit', '--disable-pcre2test-libreadline'],
+      ['/usr/bin/make', '-j2'], ['/usr/bin/make', 'check']
+    ]
+    commands.each do |command|
+      unless system(environment, *command, chdir: source)
+        raise Error, "PCRE2 source build failed: #{command.shelljoin}"
+      end
+    end
+    cellar_root = "pcre2/#{entry.fetch('version')}"
+    lib = File.join(staging, 'Cellar', cellar_root, 'lib')
+    FileUtils.mkdir_p(lib, mode: 0o700)
+    [8, 16].each do |width|
+      name = "libpcre2-#{width}.0.dylib"
+      built = File.realpath(File.join(source, '.libs', name))
+      raise Error, 'PCRE2 build output escaped source directory' unless built.start_with?("#{File.realpath(source)}/")
+      regular_file!(built, 'PCRE2 library', max_bytes: 16 * 1024 * 1024)
+      destination = File.join(lib, name)
+      FileUtils.cp(built, destination)
+      unless capture!('lipo', '-archs', destination).split == ['x86_64']
+        raise Error, 'PCRE2 source output must be x86_64'
+      end
+      run!('install_name_tool', '-id', "@rpath/#{name}", destination)
+      unless (mach_o_deps(destination) - ["@rpath/#{name}", '/usr/lib/libSystem.B.dylib']).empty?
+        raise Error, 'PCRE2 source output has unexpected dependencies'
+      end
+    end
+    cellar_root
+  ensure
+    FileUtils.remove_entry_secure(work) if work && File.directory?(work)
   end
 
   def download_blob(entry, cache_dir, token_cache)
@@ -333,10 +425,10 @@ module WormsBottleFetcher
     if File.exist?(out) || File.symlink?(out)
       regular_file!(out, 'Cached bottle', max_bytes: MAX_BOTTLE_BYTES)
       actual = bounded_sha256(out, 'Cached bottle', MAX_BOTTLE_BYTES)
-      raise Error, "Cached bottle checksum mismatch for #{entry.fetch('name')}" unless actual == entry.fetch('bottle_sha256')
+      raise Error, "Cached bottle checksum mismatch for #{entry.fetch('name')}" unless actual == entry.fetch('artifact_sha256')
       return out
     end
-    uri = URI(entry.fetch('bottle_url'))
+    uri = URI(entry.fetch('artifact_url'))
     repo = uri.path[%r{\A/v2/(.+)/blobs/sha256:[0-9a-f]{64}\z}, 1]
     raise Error, "Cannot parse GHCR repository for #{entry.fetch('name')}" unless repo
     token_cache[repo] ||= ghcr_token(repo)
@@ -345,7 +437,7 @@ module WormsBottleFetcher
       temporary.close
       File.chmod(0o600, temporary.path)
       actual, = stream_bottle(uri, temporary.path, token_cache.fetch(repo))
-      raise Error, "Bottle checksum mismatch for #{entry.fetch('name')}: #{actual}" unless actual == entry.fetch('bottle_sha256')
+      raise Error, "Bottle checksum mismatch for #{entry.fetch('name')}: #{actual}" unless actual == entry.fetch('artifact_sha256')
       File.link(temporary.path, out)
       out
     ensure
@@ -355,13 +447,15 @@ module WormsBottleFetcher
     raise Error, "Bottle cache target appeared during download: #{out}"
   end
 
-  def resolve_lock(root_formula, required_version, tag)
+  def resolve_lock(root_formula, required_version, tag, reviewed_entries:)
     raise Error, "Formula is not allowlisted: #{root_formula}" unless ALLOWED_FORMULAE.include?(root_formula)
     raise Error, "Invalid required version: #{required_version}" unless VERSION_RE.match?(required_version.to_s)
     raise Error, "Unsupported bottle tag: #{tag}" unless tag == DEFAULT_TAG
     queue = [root_formula]
     seen = {}
     entries = []
+    sources = reviewed_entries.select { |entry| entry['artifact_kind'] == 'source' }
+                              .to_h { |entry| [entry.fetch('name'), entry] }
     until queue.empty?
       name = queue.shift
       next if seen[name]
@@ -370,15 +464,22 @@ module WormsBottleFetcher
       version = json.dig('versions', 'stable')
       raise Error, "Formula #{name} has no stable version" unless version
       raise Error, "Expected #{root_formula} #{required_version}, found #{version}" if name == root_formula && version != required_version
-      bottle = json.dig('bottle', 'stable', 'files', tag)
-      raise Error, "Formula #{name} has no #{tag} bottle" unless bottle
-      entries << {
-        'name' => name, 'version' => version, 'bottle_tag' => tag,
-        'bottle_sha256' => bottle.fetch('sha256'), 'bottle_url' => bottle.fetch('url'),
-        'source_sha256' => json.dig('urls', 'stable', 'checksum').to_s,
-        'ruby_source_sha256' => json.dig('ruby_source_checksum', 'sha256').to_s,
-        'tap_git_head' => json.fetch('tap_git_head', '')
-      }
+      if (source = sources[name])
+        unless source.fetch('version') == version
+          raise Error, "Review and pin the new #{name} source before refreshing (locked #{source.fetch('version')}, current #{version})"
+        end
+        entries << source.dup
+      else
+        bottle = json.dig('bottle', 'stable', 'files', tag)
+        raise Error, "Formula #{name} has no #{tag} bottle" unless bottle
+        entries << {
+          'name' => name, 'version' => version, 'artifact_kind' => 'bottle', 'artifact_tag' => tag,
+          'artifact_sha256' => bottle.fetch('sha256'), 'artifact_url' => bottle.fetch('url'),
+          'source_sha256' => json.dig('urls', 'stable', 'checksum').to_s,
+          'formula_sha256' => json.dig('ruby_source_checksum', 'sha256').to_s,
+          'tap_git_head' => json.fetch('tap_git_head', '')
+        }
+      end
       seen[name] = true
       Array(json['dependencies']).each { |dependency| queue << dependency unless seen[dependency] }
     end
@@ -426,7 +527,7 @@ module WormsBottleFetcher
     copy = File.join(directory, "#{entry.fetch('name').tr('@/', '__')}.tar.gz")
     raise Error, "Temporary bottle copy already exists: #{copy}" if File.exist?(copy) || File.symlink?(copy)
     run!(python3, INSPECTOR, '--profile', 'bottle', '--copy-to', copy,
-         '--expected-sha256', entry.fetch('bottle_sha256'), '--quiet', source)
+         '--expected-sha256', entry.fetch('artifact_sha256'), '--quiet', source)
     listing = capture!('tar', '-tzf', copy)
     members = listing.lines.map { |line| line.chomp.sub(%r{\A\./}, '').sub(%r{/\z}, '') }.reject(&:empty?)
     formula = entry.fetch('name')
@@ -637,7 +738,12 @@ module WormsBottleFetcher
     token_cache = {}
     archive_directory = Dir.mktmpdir('.archives-', staging)
     entries.each do |entry|
-      puts "Fetching #{entry.fetch('name')} #{entry.fetch('version')} (#{entry.fetch('bottle_tag')})"
+      puts "Fetching #{entry.fetch('name')} #{entry.fetch('version')} (#{entry.fetch('artifact_tag')})"
+      if entry.fetch('artifact_kind') == 'source'
+        root = build_pcre2_source!(entry, staging, cache, archive_directory)
+        File.symlink(File.join('..', 'Cellar', root), File.join(opt, entry.fetch('name')))
+        next
+      end
       cached = download_blob(entry, cache, token_cache)
       archive, root = inspect_bottle_archive!(cached, entry, archive_directory)
       run!('tar', '-xzf', archive, '-C', cellar)
@@ -730,7 +836,8 @@ module WormsBottleFetcher
         raise Error, '--refresh-formula requires --version and --write-lock'
       end
       original = read_lock(options.fetch(:lock))
-      refreshed = resolve_lock(options.fetch(:refresh_formula), options.fetch(:version), options.fetch(:tag))
+      refreshed = resolve_lock(options.fetch(:refresh_formula), options.fetch(:version), options.fetch(:tag),
+                               reviewed_entries: original)
       candidate, changes = merge_refresh(original, refreshed, options.fetch(:refresh_formula))
       validate_entries!(candidate)
       if File.expand_path(options.fetch(:write_lock)) == File.expand_path(options.fetch(:lock))

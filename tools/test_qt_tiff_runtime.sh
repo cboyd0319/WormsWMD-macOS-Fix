@@ -1,5 +1,5 @@
 #!/bin/bash
-# Compile a direct QImageReader probe and read a deterministic 1x1 TIFF.
+# Exercise Qt image decoding and PCRE2-backed matching in the packaged runtime.
 
 set -euo pipefail
 
@@ -84,6 +84,7 @@ PY
 
 cat > "$tmp_dir/tiff_probe.cpp" <<'CPP'
 #include <QtCore/QCoreApplication>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QString>
 #include <QtGui/QImage>
 #include <QtGui/QImageReader>
@@ -98,6 +99,11 @@ int main(int argc, char **argv) {
     if (image.width() != 1 || image.height() != 1) return 13;
     const QRgb pixel = image.pixel(0, 0);
     if (qRed(pixel) < 250 || qGreen(pixel) > 5 || qBlue(pixel) > 5) return 14;
+    QRegularExpression expression(QStringLiteral("^(\\p{L}+)\\s+(\\d+)$"));
+    if (!expression.isValid()) return 15;
+    expression.optimize();
+    const auto match = expression.match(QString::fromUtf8("Wörms 327030"));
+    if (!match.hasMatch() || match.captured(2) != QStringLiteral("327030")) return 16;
     return 0;
 }
 CPP
@@ -113,6 +119,6 @@ CPP
 
 QT_PLUGIN_PATH="$runtime_root/PlugIns" \
     /usr/bin/arch -x86_64 "$tmp_dir/tiff_probe" "$tmp_dir/pixel.tiff" \
-    || fail "QImageReader could not decode the synthetic TIFF"
+    || fail "Qt TIFF decoding or PCRE2-backed Unicode matching failed"
 
-printf 'Qt TIFF runtime check passed.\n'
+printf 'Qt TIFF and PCRE2 runtime checks passed.\n'

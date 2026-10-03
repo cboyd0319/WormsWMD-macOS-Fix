@@ -6,7 +6,7 @@ Worms W.M.D macOS fix.
 ## Primary Flow
 
 `fix_worms_wmd.sh` is the canonical fix entrypoint. It detects or accepts a
-`GAME_APP`, initializes logging, creates backups, runs the ordered fix scripts,
+`GAME_APP`, initializes logging, builds AGL, creates backups, runs the remaining fix scripts,
 verifies the resulting bundle, and offers optional helper setup.
 
 `Worms W.M.D Fix.command` is the friendly double-click launcher. It must remain
@@ -24,7 +24,9 @@ flags are provided, `install.sh` must continue forwarding them to
 The main installer runs the fix scripts in this logical order:
 
 1. `scripts/01_build_agl_stub.sh` - build the AGL compatibility framework from
-   `src/agl_stub.c`.
+   `src/agl_stub.c` before creating the backup or modifying the game. Resolve
+   Apple compiler/SDK together, retry installed sibling macOS SDKs on failure,
+   and require both x86_64 and arm64 slices.
 2. `scripts/02_replace_qt_frameworks.sh` - replace bundled Qt frameworks and
    plugins with Qt 5.15 assets.
 3. `scripts/03_copy_dependencies.sh` - copy required dynamic libraries into the
@@ -34,7 +36,8 @@ The main installer runs the fix scripts in this logical order:
 5. `scripts/06_fix_info_plist.sh` - update bundle metadata and display flags.
 6. `scripts/07_fix_config_urls.sh` - upgrade known HTTP URLs and disable
    internal/staging URLs.
-7. `scripts/05_verify_installation.sh` - verify framework, plugin, dependency,
+7. Apply and strictly verify the ad-hoc signature on the complete fixed bundle.
+8. `scripts/05_verify_installation.sh` - verify framework, plugin, dependency,
    metadata, code-signing, quarantine, and config URL state.
 
 Strict signing remains inside rollback. Standalone checks use deep/strict state:
@@ -155,6 +158,13 @@ verified supported Qt 5.15.x version rather than the newest file by modification
 time. The current `dist/` package is Qt 5.15.19 and must include a matching
 checksum plus `SOURCE_PROVENANCE.tsv` lock before being documented as shipped.
 
+The historical `packaging/qt-homebrew-lock.tsv` filename now holds schema v2
+runtime inputs: explicit artifact kind, target, URL and checksum, source checksum,
+and Homebrew formula evidence. Readers retain v1 bottle compatibility. Only
+PCRE2 may use the source path, pinned to an upstream HTTPS release archive;
+its x86_64 build must pass upstream tests and dependency checks. The SBOM uses
+the upstream package identity for source builds, never a Homebrew bottle identity.
+
 Maintainer packages should be reproducible where possible: deterministic file
 ordering, normalized timestamps from `SOURCE_DATE_EPOCH`, stable ownership in
 the tar stream, `gzip -n`, and a generated `MANIFEST.txt`.
@@ -204,6 +214,9 @@ under `build/release/` by default. The bundle may include repository source,
 scripts, tools, docs, the reviewed packaging lock, original assets, and verified `dist/` packages.
 It must not include `.git`, local build output, downloaded sample projects,
 game binaries, save files, support bundles, logs, secrets, or user data.
+Complete release bundles use the included local launcher and omit `install.sh`
+and `Install Fix.command`. Those download-only bootstraps come from main after
+their exact release pins are finalized; tagged copies remain fail-closed.
 
 Release bundles must include `RELEASE_INFO.txt` and `RELEASE_MANIFEST.tsv`; a
 zip requires a matching `.sha256`. Tagged GitHub releases also publish a
@@ -272,7 +285,7 @@ for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix
 ./tools/collect_diagnostics.sh --help
 ./tools/backup_saves.sh --help
 ./tools/build_release_bundle.sh --version local-smoke --skip-zip
-clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
+./scripts/01_build_agl_stub.sh
 ```
 
 For runtime changes on a macOS machine with Worms W.M.D installed, also run the

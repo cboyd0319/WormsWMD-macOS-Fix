@@ -125,7 +125,6 @@ jobs:
           clang -Wall -Wextra -Werror -arch x86_64 \
             -dynamiclib \
             -o /tmp/AGL_test \
-            -framework OpenGL \
             src/agl_stub.c
           file /tmp/AGL_test
           rm /tmp/AGL_test

@@ -52,7 +52,15 @@ cat > "$agl_error_bin/clang" <<'STUB'
 printf '%s\n' "synthetic compiler detail" >&2
 exit 42
 STUB
-chmod +x "$agl_error_bin/clang"
+cat > "$agl_error_bin/xcrun" <<'STUB'
+#!/bin/bash
+case "${5:-}" in
+    --find) command -v clang ;;
+    --show-sdk-path) /usr/bin/xcrun --sdk macosx --show-sdk-path ;;
+    *) exit 1 ;;
+esac
+STUB
+chmod +x "$agl_error_bin/clang" "$agl_error_bin/xcrun"
 set +e
 agl_error_output=$(
     PATH="$agl_error_bin:$PATH" \
@@ -137,6 +145,7 @@ STUB
 
 cat > "$fake_bin/lipo" <<'STUB'
 #!/bin/bash
+[[ "${2:-}" != -verify_arch ]] || exit 0
 case "${1:-}" in
     -create)
         out=""
@@ -193,7 +202,21 @@ cat > "$fake_bin/xattr" <<'STUB'
 exit 0
 STUB
 
+cp "$agl_error_bin/xcrun" "$fake_bin/xcrun"
 chmod +x "$fake_bin"/*
+
+# Compiler failure must leave the original bundle intact without creating a backup.
+set +e
+prebuild_output=$(HOME="$test_home" PATH="$agl_error_bin:$fake_bin:$PATH" \
+    GAME_APP="$game_app" "$ROOT_DIR/fix_worms_wmd.sh" --force 2>&1)
+prebuild_status=$?
+set -e
+[[ "$prebuild_status" -ne 0 ]] || fail "installer ignored an AGL compiler failure"
+grep -Fq 'Failed to compile AGL stub for x86_64' <<< "$prebuild_output" \
+    || fail "pre-backup compiler failure was not reached: $prebuild_output"
+[[ ! -d "$test_home/Documents" ]] || fail "AGL failure created a backup directory"
+grep -Fxq 'original framework' "$game_app/Contents/Frameworks/original-framework.txt" \
+    || fail "AGL build failure changed the game"
 
 set +e
 output=$(
@@ -414,6 +437,7 @@ STUB
 
 cat > "$config_fake_bin/lipo" <<'STUB'
 #!/bin/bash
+[[ "${2:-}" != -verify_arch ]] || exit 0
 case "${1:-}" in
     -create)
         out=""
@@ -515,6 +539,7 @@ fi
 exec /usr/bin/shasum "$@"
 STUB
 
+cp "$agl_error_bin/xcrun" "$config_fake_bin/xcrun"
 chmod +x "$config_fake_bin"/*
 
 set +e
@@ -604,6 +629,42 @@ grep -Fq 'Rolled back to original game files.' <<< "$sign_output" \
     || fail "codesign rollback did not restore the main executable"
 [[ "$(shasum -a 256 "$sign_game_app/Contents/MacOS/libGalaxy.dylib" | awk '{print $1}')" == "$sign_galaxy_before" ]] \
     || fail "codesign rollback did not restore libGalaxy.dylib"
+
+order_home="$tmp_dir/sign-order-home"
+order_game_app="$order_home/GOG Games/Worms W.M.D/Worms W.M.D.app"
+order_bin="$tmp_dir/sign-order-bin"
+mkdir -p "$(dirname "$order_game_app")" "$order_bin"
+cp -R "$config_game_app" "$order_game_app"
+cat > "$order_bin/codesign" <<'STUB'
+#!/bin/bash
+if [[ "${1:-}" == --force ]]; then
+    : > "$WORMS_TEST_SIGN_STATE"
+    exit 0
+fi
+if [[ -f "$WORMS_TEST_SIGN_STATE" ]]; then
+    printf 'Signature=adhoc\n' >&2
+    exit 0
+fi
+printf 'code object is not signed at all\n' >&2
+exit 1
+STUB
+cat > "$order_bin/otool" <<'STUB'
+#!/bin/bash
+"$WORMS_TEST_BASE_OTOOL" "$@"
+if [[ "${1:-}" == -L && "${2:-}" == */QtCore.framework/Versions/5/QtCore ]]; then
+    printf '\t@executable_path/../Frameworks/QtCore.framework/Versions/5/QtCore (compatibility version 5.15.0, current version 5.15.19)\n'
+fi
+STUB
+chmod +x "$order_bin/codesign" "$order_bin/otool"
+if ! order_output=$(HOME="$order_home" PATH="$order_bin:$config_fake_bin:$PATH" \
+    GAME_APP="$order_game_app" WORMS_TEST_GAME_APP="$order_game_app" \
+    WORMS_TEST_SIGN_STATE="$tmp_dir/sign-order-state" \
+    WORMS_TEST_BASE_OTOOL="$config_fake_bin/otool" \
+    "$ROOT_DIR/fix_worms_wmd.sh" --force 2>&1); then
+    fail "fresh installation verified its signature before signing: $order_output"
+fi
+grep -Fq 'FIX COMPLETE!' <<< "$order_output" \
+    || fail "fresh installation did not complete after strict signing"
 
 restore_home="$tmp_dir/multi-restore-home"
 restore_steam_app="$restore_home/Library/Application Support/Steam/steamapps/common/WormsWMD/Worms W.M.D.app"

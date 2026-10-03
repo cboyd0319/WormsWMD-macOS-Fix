@@ -81,7 +81,7 @@ bootstrap fails.
 | --- | --- |
 | `GAME_APP` | Expected executable plus contained, regular, link-safe mutable trees |
 | `INSTALL_DIR` | User project path; not home/system/non-empty foreign repository |
-| `INSTALL_REF` | Defaults to v1.7.6; other refs require explicit developer opt-in |
+| `INSTALL_REF` | Defaults to v1.7.7; other refs require explicit developer opt-in |
 | `LOG_FILE` | Regular `.log` beneath `~/Library/Logs` |
 | `QT_PREFIX`/`QT_DEP_PREFIX` | Explicit roots; canonical regular x86_64 dependencies only |
 | Archive files | Bounded owner-only copy, external digest where available, shared profile, same-copy extraction |
@@ -122,8 +122,8 @@ The shipped Qt archive is accepted only after verifying:
 3. No traversal, control paths, canonical aliases, hardlinks, special files,
    or escaping symlinks.
 4. Archive/generated manifest and complete non-system Mach-O dependency closure.
-5. `SOURCE_PROVENANCE.tsv`, which locks the 17 Homebrew bottle inputs, source
-   hashes, formula hashes, and tap commit. SBOM generation requires its
+5. `SOURCE_PROVENANCE.tsv`, which locks 16 Homebrew bottle inputs and upstream
+   PCRE2 source, with artifact/source hashes, formula hashes, and tap commit. SBOM generation requires its
    standalone copy to be byte-identical to the copy inside the checksummed
    archive.
 6. Canonical `@rpath` IDs/imports, no component rpaths or build-prefix loads,
@@ -148,12 +148,24 @@ They do not execute extracted `qmake`. Output is staged beside the target and
 cannot replace or clean a nonempty directory without its exact path-bound
 ownership marker and the matching explicit flag.
 
-PR 4 intentionally advances only the authoritative libtiff row from 4.7.1 to
-4.7.2 while `dist` retains current 4.7.1 provenance. The other 16 rows remain
-unchanged. No tag or release is allowed in this state; tag publication must
-require byte equality among the packaging lock, versioned standalone
-provenance, and archive-embedded provenance. PR 5 restores that equality with
-the protected candidate artifact.
+PCRE2 10.49 is built from its checksum-pinned upstream release because current
+Homebrew bottles omit Intel macOS. Its bounded, inspected source archive builds
+only x86_64 libraries for the runtime, passes upstream tests, and must depend
+only on libSystem. Source inputs have an explicit kind and upstream SBOM identity.
+No tag is allowed while the reviewed lock differs from the shipped provenance;
+publication requires byte equality among the packaging lock, standalone
+provenance, and archive-embedded provenance.
+
+The 2026-10-02 Grype review of the PCRE2 10.49 candidate left four libtiff
+matches. CVE-2023-52356 and CVE-2023-6277 are addressed in the
+[upstream 4.7.0 changes](https://libtiff.gitlab.io/libtiff/releases/v4.7.0.html).
+CVE-2026-4775 is fixed in 4.7.2, as recorded by
+[Debian's security tracker](https://security-tracker.debian.org/tracker/CVE-2026-4775)
+and the [upstream RGBA overflow fix](https://libtiff.gitlab.io/libtiff/releases/v4.7.2.html).
+CVE-2023-6228 concerns the
+[tiffcp utility](https://access.redhat.com/security/cve/CVE-2023-6228), which is
+absent from this runtime archive. Raw findings remain visible; no scanner
+suppression was added.
 
 ## GitHub and CI controls
 
@@ -265,13 +277,13 @@ zip checksum and build attestation remain independently verifiable.
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.6.zip.sha256
-gh attestation verify WormsWMD-macOS-Fix-v1.7.6.zip \
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.7.zip.sha256
+gh attestation verify WormsWMD-macOS-Fix-v1.7.7.zip \
   --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
-Starting with the next release, also download
-`WormsWMD-macOS-Fix-vX.Y.Z.cdx.json`; `gh attestation verify` on the zip returns
+Starting with v1.7.7, also download
+`WormsWMD-macOS-Fix-v1.7.7.cdx.json`; `gh attestation verify` on the zip returns
 both its build provenance and SBOM relationship.
 
 ### Maintainer security checks

@@ -256,8 +256,10 @@ def compare_evidence(
             differences.append("architecture-id-import-rpath-url-entitlement-signature")
         if normalized_metadata(left["metadata"]) != normalized_metadata(right["metadata"]):
             differences.append("metadata-structure")
-        left_names = [(row.get("name"), row.get("bottle_tag")) for row in left["provenance"]]
-        right_names = [(row.get("name"), row.get("bottle_tag")) for row in right["provenance"]]
+        left_names = [(row.get("name"), row.get("artifact_kind", "bottle"),
+                       row.get("artifact_tag", row.get("bottle_tag"))) for row in left["provenance"]]
+        right_names = [(row.get("name"), row.get("artifact_kind", "bottle"),
+                        row.get("artifact_tag", row.get("bottle_tag"))) for row in right["provenance"]]
         if left_names != right_names:
             differences.append("provenance-name-or-platform-structure")
         left_hashes = {entry["path"]: entry["sha256"] for entry in left["files"]}
