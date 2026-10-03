@@ -214,7 +214,7 @@ jobs:
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-path: build/release/WormsWMD-macOS-Fix-*.zip
-          sbom-path: build/release/WormsWMD-macOS-Fix-*.cdx.json
+          sbom-path: build/release/WormsWMD-macOS-Fix-${{ needs.verify-release.outputs.version }}.cdx.json
 
       - name: Publish GitHub release assets
         env:

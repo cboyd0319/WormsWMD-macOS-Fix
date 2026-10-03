@@ -34,7 +34,8 @@ check_workflow() {
     if ! grep -Eq '^[[:space:]]+cancel-in-progress:[[:space:]]+(true|false)[[:space:]]*$' "$workflow"; then
         fail "$name must state whether superseded runs are cancelled"
     fi
-    if grep -Eq '^[[:space:]]{2}(pull_request_target|workflow_run|issue_comment):' "$workflow"; then
+    if [[ "$name" != ".github/workflows/codex-review.yml" ]] \
+        && grep -Eq '^[[:space:]]{2}(pull_request_target|workflow_run|issue_comment):' "$workflow"; then
         fail "$name uses a privileged or comment-driven trigger"
     fi
     if grep -Eq '^[[:space:]]+run:.*\$\{\{' "$workflow"; then
@@ -86,6 +87,11 @@ for workflow in "$ROOT_DIR"/.github/workflows/*.yml "$ROOT_DIR"/.github/workflow
     [[ -f "$workflow" ]] || continue
     check_workflow "$workflow"
 done
+
+# The sole metadata-only trigger exception has behavioral and authority checks.
+if ! node "$ROOT_DIR/tools/test_codex_review.mjs"; then
+    fail "Codex review automation violates its scope or authority contract"
+fi
 
 if grep -R -Eq '\$\{\{[[:space:]]*secrets[.]|secrets:[[:space:]]*inherit' \
     "$ROOT_DIR/.github/workflows"; then
@@ -253,7 +259,7 @@ for marker in \
     '--archive "dist/qt-frameworks-x86_64-5.15.19.tar.gz"' \
     '--release-archive "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip"' \
     '--release-checksum "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.zip.sha256"' \
-    'sbom-path: build/release/WormsWMD-macOS-Fix-*.cdx.json' \
+    'sbom-path: build/release/WormsWMD-macOS-Fix-${{ needs.verify-release.outputs.version }}.cdx.json' \
     'build/release/*.cdx.json' \
     'gh release create "$GITHUB_REF_NAME" --draft' \
     'gh release edit "$GITHUB_REF_NAME" --draft=false' \

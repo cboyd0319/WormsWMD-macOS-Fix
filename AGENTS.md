@@ -99,7 +99,7 @@ for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix
 ./tools/collect_diagnostics.sh --help
 ./tools/backup_saves.sh --help
 ./tools/build_release_bundle.sh --version local-smoke --skip-zip
-./tools/extract_release_notes.sh 1.7.7
+./tools/extract_release_notes.sh 1.7.8
 ./tools/install_git_hooks.sh --check
 ./scripts/01_build_agl_stub.sh
 ```

@@ -69,7 +69,7 @@ In issues #30 and #31, AGL compilation failed before Qt replacement, and the
 installer restored the original game. Missing `QtDBus`, `QtSvg`, or AGL after
 that rollback does not mean the downloaded Qt archive is incomplete.
 
-Update to v1.7.7 and choose launcher option 1. The build selects Apple's
+Update to v1.7.8 and choose launcher option 1. The build selects Apple's
 compiler and macOS SDK together, omits the unused OpenGL link, and tries another
 installed macOS SDK if the selected SDK fails. Both x86_64 and arm64 remain
 required; an arm64-only stub cannot support this Intel game under Rosetta.

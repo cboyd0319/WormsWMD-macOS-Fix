@@ -19,7 +19,7 @@ files or official Team17/Worms artwork.
 For most players:
 
 1. Open the [latest release page](https://github.com/cboyd0319/WormsWMD-macOS-Fix/releases/latest) and download
-   `WormsWMD-macOS-Fix-v1.7.7.zip`.
+   `WormsWMD-macOS-Fix-v1.7.8.zip`.
 2. Unzip it.
 3. Double-click `Worms W.M.D Fix.command`.
 4. Press `1`.
@@ -36,7 +36,7 @@ For most players:
 If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 **Open**, then choose **Open** again.
 
-## v1.7.7 At A Glance
+## v1.7.8 At A Glance
 
 | Area | What changed |
 | --- | --- |
@@ -58,7 +58,7 @@ If macOS blocks the launcher, right-click `Worms W.M.D Fix.command`, choose
 This release targets macOS 26 Tahoe and later. Earlier macOS versions usually
 do not need the AGL fix. There is one confirmed macOS 15.7.3 report that the Qt
 5.15 refresh improved keyboard buffering or lag, but macOS 15.x is not a
-validated support target for v1.7.7.
+validated support target for v1.7.8.
 
 On macOS 27 Golden Gate, Rosetta may need to be installed again after an
 upgrade. The preview command reports this without changing your Mac; the game
@@ -70,19 +70,19 @@ The release page includes a `.zip.sha256` checksum next to the zip file.
 
 ```bash
 cd ~/Downloads
-shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.7.zip.sha256
+shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.8.zip.sha256
 ```
 
 Expected output:
 
 ```text
-WormsWMD-macOS-Fix-v1.7.7.zip: OK
+WormsWMD-macOS-Fix-v1.7.8.zip: OK
 ```
 
 GitHub CLI users can also verify the release attestation:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.7.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.8.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 ## Launcher Menu
@@ -136,7 +136,7 @@ curl -fsSL https://raw.githubusercontent.com/cboyd0319/WormsWMD-macOS-Fix/main/i
 ```
 
 With no command-line flags and an interactive Terminal, this opens the same
-launcher menu as the release zip. The mainline bootstrap selects release `v1.7.7`
+launcher menu as the release zip. The mainline bootstrap selects release `v1.7.8`
 and verifies its exact commit before running it. Bootstrap pins are finalized
 after the tag exists; tagged bootstrap copies remain disabled. The complete
 release zip includes the local launcher and needs no download bootstrap.
