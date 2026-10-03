@@ -13,7 +13,7 @@ bundle, and gives you a preview and restore path.
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.6.zip.sha256
+   shasum -a 256 -c WormsWMD-macOS-Fix-v1.7.7.zip.sha256
    ```
 
 4. Unzip it and run `Worms W.M.D Fix.command`.
@@ -26,7 +26,7 @@ workflow publishes artifact attestations so you can verify that a release asset
 came from this repository's build process:
 
 ```bash
-gh attestation verify WormsWMD-macOS-Fix-v1.7.6.zip --repo cboyd0319/WormsWMD-macOS-Fix
+gh attestation verify WormsWMD-macOS-Fix-v1.7.7.zip --repo cboyd0319/WormsWMD-macOS-Fix
 ```
 
 The checksum proves the downloaded zip matches the release asset. The
@@ -77,7 +77,7 @@ provide independent approval.
   replace a published release, and publishes only after checksum assets and
   attestations exist. Repository-level immutability protects future published
   releases; v1.7.6 predates that GitHub setting.
-- Starting with the next tagged release after v1.7.6, releases publish a
+- Starting with v1.7.7, releases publish a
   deterministic CycloneDX SBOM. Twelve shipped Qt/runtime components are
   required dependencies; five non-shipped bottle inputs remain build
   formulation evidence. GitHub's SBOM attestation binds that inventory to the
@@ -94,7 +94,7 @@ provide independent approval.
 - The packaging lock may intentionally get ahead of the shipped archive for one
   reviewed source-only PR. During that interval the versioned standalone and
   embedded `dist` provenance still describe current bytes, no tag is allowed,
-  and release publication must fail. PR 5 must copy the protected candidate
+  and release publication must fail. The artifact PR must copy the protected candidate
   bytes and restore equality across the lock and both provenance copies.
 
 ## What it can still do

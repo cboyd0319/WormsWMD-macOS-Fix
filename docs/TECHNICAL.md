@@ -88,6 +88,19 @@ because Qt 5.15 no longer ships those plugin categories.
 
 The AGL stub (`src/agl_stub.c`) provides empty implementations of all 41 AGL functions. Qt 5.15 doesn't use AGL (it uses Core OpenGL directly), so the stub only needs to exist to satisfy the dynamic linker.
 
+The stub uses ABI-compatible scalar types without OpenGL headers or calls and
+links only libSystem. The build resolves Apple's compiler and SDK with `xcrun`,
+tries installed sibling macOS SDKs on failure, and verifies both x86_64 and arm64
+slices. Explicit deployment targets prevent a newer SDK or inherited build
+setting from raising the runtime requirement. Compilation finishes before the
+installer creates a backup or changes the game bundle.
+
+The maintainer runtime build uses pinned Homebrew bottles plus upstream PCRE2
+10.49 source, since current Homebrew PCRE2 bottles no longer support Intel
+macOS. The source archive is checksum-verified and inspected before extraction;
+both 8-bit and 16-bit libraries are compiled for x86_64 and run through upstream
+tests before packaging. Players receive these libraries prebuilt in `dist/`.
+
 ## Why Qt 5.15
 
 - Qt 5.15 is the last Qt 5 release with long-term support.
@@ -122,7 +135,7 @@ checksum, tar layout, tar entry metadata, symlink targets, metadata, required
 Qt frameworks/plugins, any archive manifest, and `x86_64` Mach-O slices before
 the package is reported as available. If a legacy archive lacks `MANIFEST.txt`,
 the downloader writes and verifies a cache-local manifest before installer use.
-Remote fallback uses the pinned release commit for `dist/` contents, not the
+Remote fallback uses a pinned artifact commit for `dist/` contents, not the
 mutable default branch.
 
 Maintainers can build a replacement package with:
@@ -139,7 +152,7 @@ QT_PACKAGE_VERSION=5.15.19 \
 ./tools/package_qt_frameworks.sh --output dist --version 5.15.19
 ```
 
-Generated packages include `METADATA.txt`, `MANIFEST.txt`, and optional
+Generated packages include `METADATA.txt`, `MANIFEST.txt`, and
 `SOURCE_PROVENANCE.tsv`, prune framework headers from the runtime archive, and
 use deterministic ordering and timestamps from `SOURCE_DATE_EPOCH` where
 possible. The packager rejects versions outside Qt 5.15.x and can use

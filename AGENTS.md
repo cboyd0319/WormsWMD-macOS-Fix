@@ -99,9 +99,9 @@ for script in fix_worms_wmd.sh install.sh "Install Fix.command" "Worms W.M.D Fix
 ./tools/collect_diagnostics.sh --help
 ./tools/backup_saves.sh --help
 ./tools/build_release_bundle.sh --version local-smoke --skip-zip
-./tools/extract_release_notes.sh 1.7.6
+./tools/extract_release_notes.sh 1.7.7
 ./tools/install_git_hooks.sh --check
-clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
+./scripts/01_build_agl_stub.sh
 ```
 
 Run `./fix_worms_wmd.sh --verify`, `./tools/preflight_check.sh`, and

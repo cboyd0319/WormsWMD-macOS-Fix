@@ -1021,7 +1021,7 @@ write_install_summary() {
                 echo "Size bytes: $log_size"
                 echo "Inferred outcome: $outcome"
                 echo "Step timeline:"
-                grep -E '^(==>|.*(Log file:|Game found:|ERROR:|SUCCESS:|Rolled back|Rolling back|Backup created|Backup manifest|All checks passed|Installation verification failed|Copying dependencies failed|AGL stub built successfully|Qt frameworks installed|Bundled dependencies verified|Dependencies copied|Dependencies prepared|FIX COMPLETE|Dry run complete|Pre-flight checks|Creating backup|Building AGL|Replacing Qt|Copying dependencies|Fixing library paths|Applying enhancements|Applying finishing touches|Verifying installation))' "$log_file" \
+                grep -E '^(AGL build:|==>|.*(Log file:|Game found:|ERROR:|SUCCESS:|Rolled back|Rolling back|Backup created|Backup manifest|All checks passed|Installation verification failed|Copying dependencies failed|AGL stub built successfully|Qt frameworks installed|Bundled dependencies verified|Dependencies copied|Dependencies prepared|FIX COMPLETE|Dry run complete|Pre-flight checks|Creating backup|Building AGL|Replacing Qt|Copying dependencies|Fixing library paths|Applying enhancements|Applying finishing touches|Verifying installation))' "$log_file" \
                     | tail -80 || true
             done < "$logs_list_file"
         fi

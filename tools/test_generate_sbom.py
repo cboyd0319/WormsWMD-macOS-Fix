@@ -13,6 +13,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from generate_sbom import SbomError, component_from_row, read_provenance
+from qt_component_policy import read_component_policy
+
 ROOT = Path(__file__).resolve().parent.parent
 GENERATOR = ROOT / "tools" / "generate_sbom.py"
 PROVENANCE = ROOT / "dist" / "qt-frameworks-x86_64-5.15.19.source-provenance.tsv"
@@ -21,6 +24,24 @@ TIMESTAMP = "2026-08-26T12:34:56Z"
 
 
 class GenerateSbomTests(unittest.TestCase):
+    def test_source_provenance_uses_upstream_identity_and_rejects_wrong_origin(self) -> None:
+        lock = ROOT / "packaging" / "qt-homebrew-lock.tsv"
+        rows, contents = read_provenance(lock)
+        source = next(row for row in rows if row["name"] == "pcre2")
+        policy = next(row for row in read_component_policy(
+            ROOT / "packaging" / "qt-component-policy.tsv"
+        ) if row["name"] == "pcre2")
+        component = component_from_row(source, policy)
+        self.assertEqual(component["purl"], "pkg:generic/pcre2@10.49")
+        self.assertEqual(component["hashes"][0]["content"], source["source_sha256"])
+        properties = {item["name"]: item["value"] for item in component["properties"]}
+        self.assertEqual(properties["wormswmd:input-kind"], "source")
+        with tempfile.TemporaryDirectory() as directory:
+            invalid = Path(directory) / "provenance.tsv"
+            invalid.write_bytes(contents.replace(b"https://github.com/PCRE2Project", b"https://example.invalid/PCRE2Project"))
+            with self.assertRaises(SbomError):
+                read_provenance(invalid)
+
     @staticmethod
     def write_archive(path: Path, provenance: bytes) -> None:
         with tarfile.open(path, "w:gz") as archive:

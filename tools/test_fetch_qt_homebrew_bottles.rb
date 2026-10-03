@@ -28,11 +28,12 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     {
       'name' => name,
       'version' => version,
-      'bottle_tag' => 'sonoma',
-      'bottle_sha256' => digest,
-      'bottle_url' => "https://ghcr.io/v2/homebrew/core/#{name.tr('@', '/')}/blobs/sha256:#{digest}",
+      'artifact_kind' => 'bottle',
+      'artifact_tag' => 'sonoma',
+      'artifact_sha256' => digest,
+      'artifact_url' => "https://ghcr.io/v2/homebrew/core/#{name.tr('@', '/')}/blobs/sha256:#{digest}",
       'source_sha256' => 'b' * 64,
-      'ruby_source_sha256' => 'c' * 64,
+      'formula_sha256' => 'c' * 64,
       'tap_git_head' => 'd' * 40
     }
   end
@@ -86,8 +87,10 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
       write_archive(archive, files)
       digest = Digest::SHA256.file(archive).hexdigest
       changed = item.merge(
-        'bottle_sha256' => digest,
-        'bottle_url' => "https://ghcr.io/v2/homebrew/core/#{name.tr('@', '/')}/blobs/sha256:#{digest}"
+        'artifact_kind' => 'bottle',
+        'artifact_tag' => 'sonoma',
+        'artifact_sha256' => digest,
+        'artifact_url' => "https://ghcr.io/v2/homebrew/core/#{name.tr('@', '/')}/blobs/sha256:#{digest}"
       )
       FileUtils.cp(archive, File.join(cache, Fetcher.cache_filename(changed)))
       changed
@@ -110,6 +113,36 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     assert_equal('5.15.19', entries.find { |item| item.fetch('name') == 'qt@5' }.fetch('version'))
   end
 
+  def test_source_lock_rejects_wrong_origin_target_kind_and_checksum
+    source = Fetcher.read_lock(LOCK).find { |item| item.fetch('name') == 'pcre2' }
+    assert_equal('source', source.fetch('artifact_kind'))
+    assert_equal('10.49', source.fetch('version'))
+    [
+      { 'name' => 'qt@5' }, { 'artifact_kind' => 'unverified' },
+      { 'artifact_tag' => 'arm64_macos' },
+      { 'artifact_url' => source.fetch('artifact_url').sub('github.com', 'example.invalid') },
+      { 'source_sha256' => 'e' * 64 }
+    ].each do |mutation|
+      assert_raises(Fetcher::Error) { Fetcher.validate_lock_entry!(source.merge(mutation)) }
+    end
+    cache = File.join(@tmp, 'source-cache')
+    FileUtils.mkdir_p(cache)
+    File.write(File.join(cache, Fetcher.cache_filename(source)), 'tampered source')
+    output = File.join(@tmp, 'source-output')
+    assert_raises(Fetcher::Error) do
+      Fetcher.build_pcre2_source!(source, output, cache, File.join(@tmp, 'archives'))
+    end
+    refute(File.exist?(output), 'bad source checksum created a runtime output')
+  end
+
+  def test_legacy_bottle_lock_remains_readable
+    source = entry
+    path = File.join(@tmp, 'legacy.tsv')
+    values = Fetcher::LOCK_HEADER.reject { |key| key == 'artifact_kind' }.map { |key| source.fetch(key) }
+    File.write(path, Fetcher::LEGACY_HEADER.join("\t") + "\n" + values.join("\t") + "\n")
+    assert_equal([source], Fetcher.read_lock(path, require_complete: false))
+  end
+
   def test_rejects_oversized_excess_malformed_duplicate_and_unallowlisted_locks
     path = File.join(@tmp, 'lock.tsv')
     cases = []
@@ -128,12 +161,12 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
   def test_rejects_invalid_version_tag_hash_commit_and_url_contracts
     mutations = {
       'version' => '../5.15.19',
-      'bottle_tag' => 'Sonoma!',
-      'bottle_sha256' => 'A' * 64,
+      'artifact_tag' => 'Sonoma!',
+      'artifact_sha256' => 'A' * 64,
       'source_sha256' => 'short',
-      'ruby_source_sha256' => 'z' * 64,
+      'formula_sha256' => 'z' * 64,
       'tap_git_head' => 'e' * 39,
-      'bottle_url' => 'file:///tmp/bottle.tar.gz'
+      'artifact_url' => 'file:///tmp/bottle.tar.gz'
     }
 
     mutations.each do |field, value|
@@ -151,7 +184,7 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
       https://ghcr.io/v2/homebrew/core/other/blobs/sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     ].each do |url|
       path = File.join(@tmp, 'bad-url.tsv')
-      write_lock(path, [entry.merge('bottle_url' => url)])
+      write_lock(path, [entry.merge('artifact_url' => url)])
       assert_raises(Fetcher::Error) { Fetcher.read_lock(path, require_complete: false) }
     end
   end
@@ -304,8 +337,8 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     digest = 'e' * 64
     refreshed = current.merge(
       'version' => '2.15.0',
-      'bottle_sha256' => digest,
-      'bottle_url' => "https://ghcr.io/v2/homebrew/core/freetype/blobs/sha256:#{digest}"
+      'artifact_sha256' => digest,
+      'artifact_url' => "https://ghcr.io/v2/homebrew/core/freetype/blobs/sha256:#{digest}"
     )
     candidate_path = File.join(@tmp, 'candidate.tsv')
     result = nil
@@ -330,7 +363,7 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
       original.find { |item| item['name'] == 'glib' },
       candidate.find { |item| item['name'] == 'glib' }
     )
-    assert_includes(stdout, 'Changed freetype: version, bottle_sha256, bottle_url')
+    assert_includes(stdout, 'Changed freetype: version, artifact_sha256, artifact_url')
     assert_includes(stdout, "Candidate lock: #{candidate_path}")
     refute_includes(stdout, 'Changed glib:')
   end
@@ -363,8 +396,8 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     write_archive(archive, { "#{root}/.brew/qt@5.rb" => formula_metadata(valid) })
     digest = Digest::SHA256.file(archive).hexdigest
     valid = valid.merge(
-      'bottle_sha256' => digest,
-      'bottle_url' => "https://ghcr.io/v2/homebrew/core/qt/5/blobs/sha256:#{digest}"
+      'artifact_sha256' => digest,
+      'artifact_url' => "https://ghcr.io/v2/homebrew/core/qt/5/blobs/sha256:#{digest}"
     )
     copy_dir = File.join(@tmp, 'copies')
     FileUtils.mkdir_p(copy_dir)
@@ -377,8 +410,8 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     write_archive(wrong, { 'other/1.0/file' => 'x' })
     wrong_digest = Digest::SHA256.file(wrong).hexdigest
     wrong_entry = valid.merge(
-      'bottle_sha256' => wrong_digest,
-      'bottle_url' => "https://ghcr.io/v2/homebrew/core/qt/5/blobs/sha256:#{wrong_digest}"
+      'artifact_sha256' => wrong_digest,
+      'artifact_url' => "https://ghcr.io/v2/homebrew/core/qt/5/blobs/sha256:#{wrong_digest}"
     )
     assert_raises(Fetcher::Error) do
       Fetcher.inspect_bottle_archive!(wrong, wrong_entry, File.join(@tmp, 'wrong-copy').tap { |dir| FileUtils.mkdir_p(dir) })
@@ -392,8 +425,8 @@ class FetchQtHomebrewBottlesTest < Minitest::Test
     )
     unsafe_digest = Digest::SHA256.file(unsafe).hexdigest
     unsafe_entry = valid.merge(
-      'bottle_sha256' => unsafe_digest,
-      'bottle_url' => "https://ghcr.io/v2/homebrew/core/qt/5/blobs/sha256:#{unsafe_digest}"
+      'artifact_sha256' => unsafe_digest,
+      'artifact_url' => "https://ghcr.io/v2/homebrew/core/qt/5/blobs/sha256:#{unsafe_digest}"
     )
     assert_raises(Fetcher::Error) do
       Fetcher.inspect_bottle_archive!(unsafe, unsafe_entry, File.join(@tmp, 'unsafe-copy').tap { |dir| FileUtils.mkdir_p(dir) })

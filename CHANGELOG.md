@@ -2,7 +2,20 @@
 
 Notable changes are listed here. This project follows Keep a Changelog and Semantic Versioning.
 
-## Unreleased
+## 1.7.7 (2026-10-02)
+
+### Fixed
+
+- Fixed the AGL build failure path reported in issues #30 and #31: select the
+  Apple compiler and macOS SDK together, omit the unused OpenGL dependency,
+  retry installed sibling SDKs, and preserve both x86_64 and arm64 slices.
+- Build AGL before creating a backup or modifying the game, so compiler failures
+  no longer trigger unnecessary backup and rollback work.
+- Include sanitized AGL compiler and SDK diagnostics in support bundles.
+- Sign the fixed bundle before strict installation verification, preserving
+  rollback on signing or verification failure.
+- Ship the protected, reproducible Qt candidate matching the source lock,
+  including libtiff 4.7.2, PCRE2 10.49, and updated checksum and provenance.
 
 ### Changed
 
@@ -14,6 +27,9 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ### Security
 
+- Build PCRE2 10.49 from checksum-pinned upstream source for Intel macOS,
+  including its upstream regression tests, because current Homebrew releases
+  no longer provide Intel bottles; the SBOM distinguishes source and bottle inputs.
 - Updated the immutable `actions/checkout` pin to the verified v7.0.1 tag.
 - Updated the immutable `actions/attest` pin to the verified v4.2.2 tag.
 - Added deny-by-default, job-scoped workflow permissions, checkout credential

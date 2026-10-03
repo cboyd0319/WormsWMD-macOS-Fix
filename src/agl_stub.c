@@ -14,8 +14,16 @@
  * no actual AGL functionality is provided.
  */
 
-#include <OpenGL/gl.h>
 #include <stddef.h>
+
+/* OpenGL ABI scalar types only: this stub calls no OpenGL functions and
+ * requires neither OpenGL headers nor an OpenGL link dependency. */
+typedef unsigned int GLenum;
+typedef int GLint;
+typedef unsigned int GLuint;
+typedef unsigned char GLboolean;
+typedef unsigned char GLubyte;
+#define GL_FALSE 0
 
 /* AGL Types */
 typedef void* AGLPixelFormat;

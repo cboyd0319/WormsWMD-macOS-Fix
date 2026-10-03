@@ -135,6 +135,8 @@ cat > "$test_home/Library/Logs/WormsWMD-Fix/fix_worms_wmd-20260101-000000.log" <
 ==> Creating backup...
     Backup created: ${sensitive_user}/Documents/WormsWMD-Backup-20260101-000000
 ==> Building AGL stub library...
+AGL build: ld: malformed file in SDK libSystem.tbd (unknown architecture)
+AGL build: Compiler: ${sensitive_user}/private-tools/clang token=lower-token-value
 Token: abc123
 token=lower-token-value
 Secret: shhh-secret
@@ -184,6 +186,8 @@ for bundled_file in install-summary.txt runtime-invariants.txt backup-summary.tx
     assert_sanitized "$extract_dir/$bundled_file"
 done
 
+grep -Fq 'AGL build: ld: malformed file in SDK libSystem.tbd (unknown architecture)' \
+    "$extract_dir/install-summary.txt" || fail "support bundle lost the AGL linker diagnostic"
 grep -Fq "Latest installer logs" "$extract_dir/install-summary.txt" \
     || fail "install summary does not include latest installer logs"
 grep -Fq "Inferred outcome:" "$extract_dir/install-summary.txt" \

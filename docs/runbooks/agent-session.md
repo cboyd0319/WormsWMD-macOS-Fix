@@ -187,8 +187,7 @@ gh attestation verify /tmp/wormswmd-release-check/WormsWMD-macOS-Fix-vX.Y.Z.zip 
 AGL stub or C source:
 
 ```bash
-clang -Wall -Wextra -Werror -arch x86_64 -dynamiclib -o /tmp/AGL_test -framework OpenGL src/agl_stub.c
-rm -f /tmp/AGL_test
+./tools/test_issue_12_agl_install_failure.sh
 ```
 
 Runtime validation on macOS with the game installed:
@@ -203,7 +202,8 @@ Runtime validation on macOS with the game installed:
 
 Use local artifacts when debugging or reporting failures:
 
-- `~/Library/Logs/WormsWMD-Fix/` for fix and verification logs.
+- `~/Library/Logs/WormsWMD-Fix/` for fix and verification logs; sanitized AGL
+  compiler/SDK failures appear in support bundles under `install-summary.txt`.
 - `~/Library/Logs/WormsWMD/` for launcher logs and crash reports.
 - `./tools/collect_diagnostics.sh` for a shareable diagnostics report.
 - Exact terminal output for failed validation.

@@ -21,7 +21,7 @@ backup_block=$(
     awk '
         /print_step "Creating backup\.\.\."/ { in_block=1 }
         in_block { print }
-        /print_step "Building AGL stub library\.\.\."/ { exit }
+        in_block && /print_step "Replacing Qt frameworks\.\.\."/ { exit }
     ' "$ROOT_DIR/fix_worms_wmd.sh"
 )
 

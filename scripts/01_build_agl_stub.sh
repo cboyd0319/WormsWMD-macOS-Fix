@@ -39,29 +39,61 @@ echo "=== Building AGL Stub Library (Universal Binary) ==="
 # Create build directory
 mkdir -p "$BUILD_DIR"
 
+# Resolve the compiler and SDK together; PATH or SDKROOT can select mismatched tools.
+compiler=$(xcrun --toolchain default --sdk macosx --find clang)
+sdk_path=$(xcrun --toolchain default --sdk macosx --show-sdk-path)
+echo "AGL build: Compiler: $compiler"
+
 compile_arch() {
     local arch="$1"
     local output="$2"
     local compiler_output
+    local minimum_version=10.9
+
+    [[ "$arch" != arm64 ]] || minimum_version=11.0
 
     echo "Compiling agl_stub.c for $arch..."
-    if ! compiler_output=$(clang -arch "$arch" \
+    if ! compiler_output=$("$compiler" -arch "$arch" \
         -dynamiclib \
+        -isysroot "$sdk_path" \
+        -mmacosx-version-min="$minimum_version" \
         -o "$output" \
         -install_name "@executable_path/../Frameworks/AGL.framework/Versions/A/AGL" \
-        -framework OpenGL \
         -compatibility_version 1.0.0 \
         -current_version 1.0.0 \
         "$SRC_DIR/agl_stub.c" 2>&1); then
         echo "ERROR: Failed to compile AGL stub for $arch"
-        [[ -n "$compiler_output" ]] && echo "$compiler_output"
+        if [[ -n "$compiler_output" ]]; then
+            printf '%s\n' "$compiler_output" | sed 's/^/AGL build: /'
+        fi
         return 1
     fi
 }
 
-# x86_64 is required for Rosetta 2; arm64 keeps the stub universal.
-compile_arch "x86_64" "$BUILD_DIR/AGL_x86_64"
-compile_arch "arm64" "$BUILD_DIR/AGL_arm64"
+# Use one SDK for both slices. If the selected SDK cannot link, try installed
+# sibling macOS SDKs without changing xcode-select or any system files.
+sdk_candidates=("$sdk_path")
+for candidate in "$(dirname "$sdk_path")"/MacOSX*.sdk; do
+    [[ -d "$candidate" ]] || continue
+    [[ "$(cd "$candidate" && pwd -P)" != "$(cd "$sdk_path" && pwd -P)" ]] || continue
+    sdk_candidates+=("$candidate")
+done
+built=false
+for sdk_path in "${sdk_candidates[@]}"; do
+    echo "AGL build: SDK: $sdk_path"
+    # x86_64 is required for the game under Rosetta; never ship an arm64-only stub.
+    if compile_arch "x86_64" "$BUILD_DIR/AGL_x86_64" \
+        && compile_arch "arm64" "$BUILD_DIR/AGL_arm64"; then
+        built=true
+        break
+    fi
+    echo "AGL build: Trying another installed macOS SDK if available."
+done
+if ! "$built"; then
+    echo "ERROR: No installed macOS SDK could build both required AGL slices."
+    echo "AGL build: Update Apple Command Line Tools, then retry the fix."
+    exit 1
+fi
 
 # Create universal binary
 echo "Creating universal binary..."
@@ -74,14 +106,20 @@ if ! lipo_output=$(lipo -create \
     exit 1
 fi
 
-# Clean up architecture-specific files
-rm -f "$BUILD_DIR/AGL_x86_64" "$BUILD_DIR/AGL_arm64"
-
 # Verify the build succeeded
 if [[ ! -f "$BUILD_DIR/AGL" ]]; then
     echo "ERROR: Failed to build AGL stub - output file not found"
     exit 1
 fi
+for arch in x86_64 arm64; do
+    if ! lipo "$BUILD_DIR/AGL" -verify_arch "$arch"; then
+        echo "ERROR: Built AGL stub is missing the required $arch architecture."
+        exit 1
+    fi
+done
+
+# Clean up architecture-specific files only after the combined output verifies.
+rm -f "$BUILD_DIR/AGL_x86_64" "$BUILD_DIR/AGL_arm64"
 
 echo "AGL stub built successfully at: $BUILD_DIR/AGL"
 echo ""
