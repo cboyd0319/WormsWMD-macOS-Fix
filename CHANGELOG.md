@@ -2,7 +2,7 @@
 
 Notable changes are listed here. This project follows Keep a Changelog and Semantic Versioning.
 
-## 1.7.7 (2026-10-02)
+## 1.7.7 (2026-10-03)
 
 ### Fixed
 

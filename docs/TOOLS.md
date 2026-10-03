@@ -318,12 +318,11 @@ substitutes an unreviewed source download or silently switches it to a bottle.
 Other dependencies still require the requested Intel bottle; a missing bottle
 stops the refresh without changing the reviewed lock.
 
-For the v1.7.7 transition, review raw candidates and retain only the intended
-dependency changes. Current formula resolution also proposes unrelated
-dependency/tap changes; it is not authoritative merely because it is current.
-The reviewed PCRE2 10.49 source lock intentionally precedes the 10.47 provenance
-in `dist` until the protected rebuild and artifact-only PR restore three-way byte equality.
-Do not create a tag during this transition.
+Review raw candidates and retain only the intended dependency changes. Current
+formula resolution also proposes unrelated dependency/tap changes; it is not
+authoritative merely because it is current. Before tagging, the protected
+candidate must restore byte equality among the packaging lock, standalone
+provenance, and archive-embedded provenance.
 
 Build the player-facing release folder and zip:
 

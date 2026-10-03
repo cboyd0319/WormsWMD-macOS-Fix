@@ -330,7 +330,6 @@ Runtime verification remains:
 | v1.7.6 is mutable and has no SBOM | Existing checksum/build attestation; future releases immutable with SBOM |
 | First hosted SBOM publication is not yet exercised | Generator passed official CycloneDX schema and zip-root-hash tests; next tag is final end-to-end proof |
 | Qt vulnerability findings are report-only during burn-in | Pinned scanner, exact runtime inventory, deterministic evidence, explicit VEX expiry, and maintainer triage |
-| Packaging lock is temporarily ahead of `dist` | No tag; release equality gate; PR 5 must use the protected candidate and restore three-way provenance equality |
 
 ## Reporting a vulnerability
 
