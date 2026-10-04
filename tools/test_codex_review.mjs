@@ -14,6 +14,7 @@ assert.match(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url
 assert.match(workflow, /    permissions: \{\}/);
 assert.doesNotMatch(workflow, /pull-requests: write/);
 assert.match(workflow, /cancel-in-progress: false/);
+assert.match(workflow, /^  queue: max$/m, 'ignored CI completions must not evict pending review requests');
 const groupTemplate = workflow.match(/^  group: (.+)$/m)[1].replace(/\$\{\{(.*?)\}\}/g, '${$1}');
 const group = new Function('github', `return \`${groupTemplate}\`;`);
 const groupFor = (action, changes = {}, number = 7) => group({ event_name: 'pull_request_target', event: { action, changes, pull_request: { number } } });

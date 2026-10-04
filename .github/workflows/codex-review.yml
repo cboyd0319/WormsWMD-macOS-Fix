@@ -14,6 +14,8 @@ concurrency:
   # Ignored edits must not replace pending eligible requests in GitHub's queue.
   group: codex-review-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}-${{ github.event_name == 'pull_request_target' && github.event.action == 'edited' && !github.event.changes.base && 'metadata' || 'review' }}
   cancel-in-progress: false
+  # Skipped CI-completion runs must not replace pending eligible requests.
+  queue: max
 
 jobs:
   request-review:
