@@ -251,6 +251,7 @@ if ! grep -Fq '/security/advisories/new' "$ROOT_DIR/.github/ISSUE_TEMPLATE/confi
 fi
 
 release_workflow="$ROOT_DIR/.github/workflows/release.yml"
+python3 "$ROOT_DIR/tools/test_release_publication.py"
 # These are literal workflow source markers, not shell expressions.
 # shellcheck disable=SC2016
 for marker in \

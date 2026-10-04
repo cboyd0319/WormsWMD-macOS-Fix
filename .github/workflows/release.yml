@@ -215,10 +215,10 @@ jobs:
         with:
           subject-path: build/release/WormsWMD-macOS-Fix-*.zip
           sbom-path: build/release/WormsWMD-macOS-Fix-${{ needs.verify-release.outputs.version }}.cdx.json
-
       - name: Publish GitHub release assets
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           EXPECTED_TAG_OBJECT: ${{ needs.verify-release.outputs.tag-object }}
         run: |
           set -euo pipefail
