@@ -4,8 +4,21 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ## Unreleased
 
+### Changed
+
+- Reuse successful macOS PR validation for an identical merge-commit tree on
+  `main`, after verifying the recorded test revision, parents, workflow, jobs,
+  repository, and freshness. Missing or uncertain evidence runs the full suite;
+  inexpensive checks and independent security scans still run.
+- Correct the v1.7.9 notes to cover all shipped security and review-automation
+  work, and label unpublished release attempts explicitly. The signed tag and
+  immutable assets retain their original documentation snapshot.
+
+## Mainline maintenance after 1.7.9 (2026-10-03)
+
 ### Security
 
+- Pin standalone download bootstraps to the exact published v1.7.9 commit.
 - Harden mainline download bootstraps against modified existing checkouts and
   executable Git hooks. Stage and verify a fresh checkout, isolate Git settings,
   serialize exact-destination replacement, require a private parent and trusted
@@ -15,15 +28,17 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 ## 1.7.9 (2026-10-03)
 
 This release includes the fixes prepared for the unpublished v1.7.7 and v1.7.8 tags.
+Published October 3 in America/Denver (October 4, 05:13:34 UTC).
+The notes below include a post-publication completeness correction; the signed
+tag and release ZIP preserve the original notes. Post-release bootstrap changes
+and later CI optimizations are recorded separately in the repository changelog.
 
 ### Fixed
 
 - Set explicit repository context for release publication, which runs without
   a Git checkout; GitHub CLI no longer fails while inferring the repository.
-
 - Pass the exact SBOM filename to the attestation action so verified release
   publication completes; the action does not expand globs in `sbom-path`.
-
 - Fixed the AGL build failure path reported in issues #30 and #31: select the
   Apple compiler and macOS SDK together, omit the unused OpenGL dependency,
   retry installed sibling SDKs, and preserve both x86_64 and arm64 slices.
@@ -46,23 +61,58 @@ This release includes the fixes prepared for the unpublished v1.7.7 and v1.7.8 t
   macOS, merging C compilation into the regression job, and skipping macOS for
   allowlisted documentation/community-only changes.
 - Tagged releases now publish a deterministic CycloneDX SBOM for the locked Qt
-  bottle closure and bind it to the release zip with an SBOM attestation.
+  runtime closure, including bottle and source inputs, and bind it to the release
+  ZIP with an SBOM attestation. Runtime components and scanner coverage have
+  explicit scope and evidence; vulnerability reports remain advisory.
+
+### Repository review automation
+
+- Configure Balanced Copilot review for ready PRs targeting `main`, excluding
+  drafts and automatic push re-reviews.
+- Request Codex reviews for ready PRs into `main` through a repository-scoped
+  connected-user token. Deduplicate by PR, immutable head, and author identity;
+  preserve queued requests and reject stale revisions. A trusted CI-completion
+  fallback handles Dependabot without executing PR code or artifacts. Later
+  human pushes require a new review request; repository-wide native automatic
+  Codex review remains disabled.
 
 ### Security
 
 - Build PCRE2 10.49 from checksum-pinned upstream source for Intel macOS,
   including its upstream regression tests, because current Homebrew releases
   no longer provide Intel bottles; the SBOM distinguishes source and bottle inputs.
+- Preserve PCRE2 and SLJIT license notices in the packaged runtime and exercise
+  packaged PCRE2 through Qt Unicode/JIT probes.
+- Bound archive expansion and reject unsafe, duplicate, or conflicting members
+  before extraction. Validate locked Homebrew bottle inputs, contain staging and
+  replacement, and drop authorization on cross-origin redirects.
+- Contain save-restore destinations, stage replacements on their destination
+  filesystems, and roll back applied roots on failure. Authenticate extracted Qt
+  caches against the inspected archive on reuse; canonically validate dependency
+  sources and retain required architecture checks.
+- Distinguish repairable original-app signatures from invalid complete fixes,
+  and sanitize recursive quarantine reporting. Bind update ZIP downloads to one
+  exact checksum record and publish through private, rollback-aware staging.
+- Harden trace, diagnostic, and crash-file creation and ownership checks; validate
+  update-watcher LaunchAgent paths and restore the prior agent on setup failure.
+- Harden harness source enumeration and trusted-base review boundaries; report
+  security-sensitive diffs and verify installed hook/scanner integrity.
+- Require signed-tag preflight, an independently rebuilt source bundle, canonical
+  ZIP/manifest/SBOM verification, protected approval, and exact tag identity before
+  publication. Add release containment and recovery procedures.
+- Normalize Mach-O UUIDs and metadata and compare two isolated, cache-free Qt
+  builds on one runner before shipping the protected candidate. Independent-host
+  reproducibility is not claimed.
 - Updated the immutable `actions/checkout` pin to the verified v7.0.1 tag.
 - Updated the immutable `actions/attest` pin to the verified v4.2.2 tag.
 - Added deny-by-default, job-scoped workflow permissions, checkout credential
   isolation, concurrency cancellation, and bounded job timeouts.
-- Added a path-scoped, version-pinned Zizmor workflow and a local GitHub policy
+- Added a version-pinned Zizmor scan of `.github` and a local GitHub policy
   regression check.
 - Added a seven-day Dependabot cooldown for new GitHub Actions releases.
 - Made release publication draft-first and resumable without allowing a
   published release or its assets to be overwritten.
-- Made future GitHub release notes come from the matching changelog section and
+- Generated initial GitHub release notes from the matching changelog section and
   limited workflow artifact retention to 14 days.
 - Restricted hosted Actions to verified full-SHA GitHub-owned, ShellCheck, and
   Zizmor actions; required Zizmor alongside the existing `main` checks.
@@ -71,64 +121,25 @@ This release includes the fixes prepared for the unpublished v1.7.7 and v1.7.8 t
 - Added checksum-pinned Kingfisher 2.0.0 scans for staged changes and the
   current CI checkout, with redaction, no history traversal, and no live secret
   validation.
+
+### Validation
+
+- Automated regression checks and manual Steam/GOG local matches passed on
+  Apple Silicon with macOS 27.2 and Rosetta. Reporter confirmation on macOS
+  26.6.2 remains pending; multiplayer and store-service health are not established
+  by this testing. See the [validation record](https://github.com/cboyd0319/WormsWMD-macOS-Fix/blob/main/docs/release-records/2026-10-03-issues-30-31.md)
+  for evidence and remaining dependency-scan limitations.
 
 
 ## 1.7.8 (2026-10-03)
 
-This release includes the fixes prepared for the unpublished v1.7.7 tag.
+Unpublished tag, superseded by v1.7.9. Build and verification passed, but release
+publication failed because the checkout-free job lacked repository context.
+These historical preparation notes include the unpublished v1.7.7 work; see
+v1.7.9 above for the complete published changes.
 
-### Fixed
-
-- Pass the exact SBOM filename to the attestation action so verified release
-  publication completes; the action does not expand globs in `sbom-path`.
-
-- Fixed the AGL build failure path reported in issues #30 and #31: select the
-  Apple compiler and macOS SDK together, omit the unused OpenGL dependency,
-  retry installed sibling SDKs, and preserve both x86_64 and arm64 slices.
-- Build AGL before creating a backup or modifying the game, so compiler failures
-  no longer trigger unnecessary backup and rollback work.
-- Include sanitized AGL compiler and SDK diagnostics in support bundles.
-- Sign the fixed bundle before strict installation verification, preserving
-  rollback on signing or verification failure.
-- Reject empty bootstrap commit pins and preserve reviewed PCRE2 source pins
-  during dependency refresh. Complete release zips use the local launcher and
-  omit download bootstraps whose pins are finalized on main after tagging.
-- Ship the protected, reproducible Qt candidate matching the source lock,
-  including libtiff 4.7.2, PCRE2 10.49, and updated checksum and provenance.
-- Refresh remote Qt archives when the pinned source commit changes, including
-  dependency updates that retain the same Qt version.
-
-### Changed
-
-- Reduced CI runner use by canceling stale runs, chaining cheap checks before
-  macOS, merging C compilation into the regression job, and skipping macOS for
-  allowlisted documentation/community-only changes.
-- Tagged releases now publish a deterministic CycloneDX SBOM for the locked Qt
-  bottle closure and bind it to the release zip with an SBOM attestation.
-
-### Security
-
-- Build PCRE2 10.49 from checksum-pinned upstream source for Intel macOS,
-  including its upstream regression tests, because current Homebrew releases
-  no longer provide Intel bottles; the SBOM distinguishes source and bottle inputs.
-- Updated the immutable `actions/checkout` pin to the verified v7.0.1 tag.
-- Updated the immutable `actions/attest` pin to the verified v4.2.2 tag.
-- Added deny-by-default, job-scoped workflow permissions, checkout credential
-  isolation, concurrency cancellation, and bounded job timeouts.
-- Added a path-scoped, version-pinned Zizmor workflow and a local GitHub policy
-  regression check.
-- Added a seven-day Dependabot cooldown for new GitHub Actions releases.
-- Made release publication draft-first and resumable without allowing a
-  published release or its assets to be overwritten.
-- Made future GitHub release notes come from the matching changelog section and
-  limited workflow artifact retention to 14 days.
-- Restricted hosted Actions to verified full-SHA GitHub-owned, ShellCheck, and
-  Zizmor actions; required Zizmor alongside the existing `main` checks.
-- Required approval for all external contributors, enabled CodeQL default setup
-  for Actions/C++/Ruby, and enabled immutable future GitHub releases.
-- Added checksum-pinned Kingfisher 2.0.0 scans for staged changes and the
-  current CI checkout, with redaction, no history traversal, and no live secret
-  validation.
+The earlier v1.7.7 tag was also unpublished: its SBOM attestation failed because
+the workflow supplied a literal filename glob. Both signed tags are preserved.
 
 ## Mainline maintenance after 1.7.6 (2026-08-26)
 
