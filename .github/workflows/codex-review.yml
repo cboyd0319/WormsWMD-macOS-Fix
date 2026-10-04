@@ -72,6 +72,7 @@ jobs:
             const { data: latest } = await github.rest.pulls.get({ owner, repo, pull_number: number });
             if (!ready(latest)) return;
             if (!/^[a-f0-9]{40}$/.test(latest.head.sha)) throw new Error('Invalid PR revision');
+            if (fallback && upstream.head_sha !== latest.head.sha) return;
             const marker = `<!-- codex-auto-review:${number}:${latest.head.sha} -->`;
             if (comments.some(comment => comment.user?.id === reviewer.id &&
                 comment.user.type === 'User' && comment.body?.includes(marker))) {

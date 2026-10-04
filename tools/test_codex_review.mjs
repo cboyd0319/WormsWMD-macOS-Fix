@@ -81,6 +81,7 @@ assert.equal((await check({ comments: [{ user: { login: 'attacker', type: 'User'
 assert.equal((await check({ comments: [{ user: bot, body: '<!-- codex-auto-review:7:old -->' }] })).length, 1);
 const upstream = {
   name: 'CI', event: 'pull_request', status: 'completed', actor: { id: 49699333, login: 'dependabot[bot]' },
+  head_sha: sha,
   head_repository: { full_name: 'owner/repo' }, pull_requests: [{ number: 7, base: { ref: 'main' } }],
 };
 const jobExpression = workflow.match(/    if: >-\n([\s\S]*?)    runs-on:/)[1].trim();
@@ -96,6 +97,11 @@ assert.equal(eligibleJob({ event_name: 'workflow_run', event: { workflow_run: { 
 const dependabotPR = { ...ready, user: { id: 49699333, login: 'dependabot[bot]' }, head: { sha, repo: { full_name: 'owner/repo' } } };
 const fallback = { eventName: 'workflow_run', action: 'completed', upstream, pr: dependabotPR };
 assert.equal((await check(fallback)).length, 1, 'Dependabot must receive reviews despite its restricted trigger credentials');
+const newerDependabotPR = { ...dependabotPR, head: { ...dependabotPR.head, sha: 'b'.repeat(40) } };
+assert.equal((await check({ ...fallback, pr: newerDependabotPR })).length, 0, 'old CI runs must not request newer revisions');
+assert.equal((await check({ ...fallback, latest: newerDependabotPR })).length, 0, 'a push during lookup must wait for its own CI completion');
+assert.equal((await check({ ...fallback, pr: newerDependabotPR, upstream: { ...upstream, head_sha: newerDependabotPR.head.sha } })).length, 1);
+assert.equal((await check({ ...fallback, upstream: { ...upstream, head_sha: 'old', pull_requests: [{ ...upstream.pull_requests[0], head: { sha } }] } })).length, 0, 'mutable PR association metadata cannot replace the immutable run SHA');
 assert.equal((await check({ ...fallback, comments: [{ user: reviewer, body: marker }] })).length, 0);
 for (const pr of [ready, { ...dependabotPR, draft: true }, { ...dependabotPR, state: 'closed' }, { ...dependabotPR, base: { ref: 'develop' } }, { ...dependabotPR, head: { sha, repo: { full_name: 'fork/repo' } } }]) {
   assert.equal((await check({ ...fallback, pr })).length, 0);
