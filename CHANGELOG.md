@@ -6,6 +6,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ### Changed
 
+- Update the pinned Zizmor action to v0.6.4 and synchronize its security-policy
+  check and version comment. The scanner remains explicitly pinned to 1.29.0.
 - Reuse successful macOS PR validation for an identical merge-commit tree on
   `main`, after verifying the recorded test revision, parents, workflow, jobs,
   repository, and freshness. Missing or uncertain evidence runs the full suite;

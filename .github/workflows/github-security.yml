@@ -63,7 +63,7 @@ jobs:
         run: ./tools/test_github_security.sh
 
       - name: Run Zizmor
-        # zizmorcore/zizmor-action v0.6.2
+        # zizmorcore/zizmor-action v0.6.4
         uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482
         with:
           advanced-security: false
