@@ -1,5 +1,4 @@
 name: CI
-run-name: CI ${{ github.event_name }} ${{ github.sha }}
 
 on:
   push:
@@ -25,7 +24,7 @@ jobs:
       macos-required: ${{ steps.changes.outputs.macos-required }}
       macos-reused: ${{ steps.reuse.outputs.result }}
     steps:
-      - name: Checkout
+      - name: Checkout ${{ github.sha }}
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -118,7 +117,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout
+      - name: Checkout ${{ github.sha }}
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:

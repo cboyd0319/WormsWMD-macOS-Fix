@@ -53,7 +53,8 @@ from the latest same-repository PR run completed successfully within 24 hours.
 It requires the same workflow, successful Ubuntu and macOS jobs, and identical
 Git trees for the PR head, recorded test commit, and final merge. The test commit
 must have the same two parents as the final merge. Both runners check out the
-immutable `github.sha` recorded in the fixed run name.
+immutable `github.sha` recorded in their checkout step names. Job completion
+timestamps also bound reuse, including partial re-runs.
 
 On a match, `Validate Scripts` is skipped and the Ubuntu log identifies its
 source run ID and tree. Cheap checks and GitHub Security still execute. Direct

@@ -11,9 +11,10 @@ const candidate = {
   id: 7, workflow_id: 8, path: '.github/workflows/ci.yml', event: 'pull_request',
   status: 'completed', conclusion: 'success', head_sha: head,
   repository: { id: 9 }, head_repository: { id: 9 },
-  display_title: `CI pull_request ${tested}`, updated_at: now,
+  updated_at: now,
 };
-const job = name => ({ name, status: 'completed', conclusion: 'success' });
+const checkout = { name: `Checkout ${tested}`, status: 'completed', conclusion: 'success' };
+const job = name => ({ name, status: 'completed', conclusion: 'success', completed_at: now, steps: [checkout] });
 async function check(options = {}) {
   const context = {
     eventName: 'push', ref: 'refs/heads/main', sha: current, runId: 10,
@@ -59,8 +60,7 @@ for (const change of [
   { event: 'push' }, { status: 'in_progress' }, { conclusion: 'failure' },
   { conclusion: 'cancelled' }, { head_sha: sha(6) }, { workflow_id: 99 },
   { path: '.github/workflows/other.yml' }, { repository: { id: 99 } },
-  { head_repository: { id: 99 } }, { display_title: 'old workflow title' },
-  { display_title: 'CI pull_request attacker;command' },
+  { head_repository: { id: 99 } },
   { updated_at: '2020-01-01T00:00:00Z' }, { updated_at: 'invalid' },
   { updated_at: '2100-01-01T00:00:00Z' },
 ]) assert.equal((await check({ candidate: change })).result, false, JSON.stringify(change));
@@ -72,15 +72,23 @@ for (const commits of [
 ]) assert.equal((await check({ commits })).result, false);
 for (const jobs of [[], [job('ShellCheck')], [job('ShellCheck'), { ...job('Validate Scripts'), conclusion: 'skipped' }],
   [job('ShellCheck'), job('Validate Scripts'), job('Validate Scripts')],
+  [job('ShellCheck'), { ...job('Validate Scripts'), completed_at: '2020-01-01T00:00:00Z' }],
   [job('ShellCheck'), { ...job('Validate Scripts'), status: 'in_progress' }]]) {
   assert.equal((await check({ jobs })).result, false);
 }
 assert.equal((await check({ runs: [] })).result, false);
 assert.equal((await check({ apiFailure: true })).result, false);
 assert.equal((await check({ jobsFailure: true })).result, false);
+for (const steps of [[], [{ ...checkout, name: 'Checkout' }], [{ ...checkout, name: 'Checkout attacker;command' }],
+  [checkout, checkout], [{ ...checkout, conclusion: 'failure' }]]) {
+  assert.equal((await check({ jobs: [job('ShellCheck'), { ...job('Validate Scripts'), steps }] })).result, false);
+}
+assert.equal((await check({ candidate: { display_title: 'Untrusted title' } })).result, true, 'PR titles are irrelevant');
 assert.equal((await check({ runs: [{ ...candidate, conclusion: 'failure' }, candidate] })).result, false,
   'an earlier success cannot override the latest failure');
-assert.match(workflow, /^run-name: CI \$\{\{ github.event_name \}\} \$\{\{ github.sha \}\}$/m);
+assert.match(workflow, /^name: CI$/m);
+assert.doesNotMatch(workflow, /^run-name:/m, 'keep workflow_run name compatibility');
+assert.equal((workflow.match(/name: Checkout \$\{\{ github.sha \}\}/g) ?? []).length, 2);
 assert.equal((workflow.match(/ref: \$\{\{ github.sha \}\}/g) ?? []).length, 2, 'both runners must check out the recorded immutable revision');
 assert.match(workflow, /if: needs.shellcheck.outputs.macos-required == 'true' && needs.shellcheck.outputs.macos-reused != 'true'/);
 assert.match(workflow, /id: reuse\n        if: github.event_name == 'push' && steps.changes.outputs.macos-required == 'true'/);
