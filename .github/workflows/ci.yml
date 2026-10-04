@@ -19,13 +19,16 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
     outputs:
       macos-required: ${{ steps.changes.outputs.macos-required }}
+      macos-reused: ${{ steps.reuse.outputs.result }}
     steps:
-      - name: Checkout
+      - name: Checkout ${{ github.sha }}
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -94,19 +97,31 @@ jobs:
             echo "macos-required=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Reuse successful validation of the identical merge tree
+        id: reuse
+        if: github.event_name == 'push' && steps.changes.outputs.macos-required == 'true'
+        timeout-minutes: 2
+        continue-on-error: true
+        # actions/github-script v8.0.0; read-only metadata, no artifacts or caches.
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            return await require('./tools/ci_reuse_validation.cjs')({ github, context, core });
+
   validate-scripts:
     name: Validate Scripts
     needs: shellcheck
-    if: needs.shellcheck.outputs.macos-required == 'true'
+    if: needs.shellcheck.outputs.macos-required == 'true' && needs.shellcheck.outputs.macos-reused != 'true'
     runs-on: macos-26-intel
     timeout-minutes: 20
     permissions:
       contents: read
     steps:
-      - name: Checkout
+      - name: Checkout ${{ github.sha }}
         # actions/checkout v7.0.1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Check bash syntax
@@ -132,16 +147,12 @@ jobs:
         run: ./tools/test_bootstrap_installer_safety.sh
       - name: Test dependency parsing
         run: ./tools/test_dependency_parsing.sh
-
       - name: Test issue 10 regression
         run: ./tools/test_issue_10_regression.sh
-
       - name: Test issue 11 game detection
         run: ./tools/test_issue_11_game_detection.sh
-
       - name: Test issue 12 AGL install failure
         run: ./tools/test_issue_12_agl_install_failure.sh
-
       - name: Test installer rollback regression
         run: ./tools/test_installer_rollback_regression.sh
 

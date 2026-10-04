@@ -45,6 +45,30 @@ text posted by another account. Per-PR concurrency serializes requests;
 lane. A successful request job proves posting or deduplication, not completion
 of an AI review.
 
+## CI after merging
+
+PRs keep the required `ShellCheck`, `Validate Scripts`, and `Zizmor` checks.
+For a merge commit pushed to `main`, the Ubuntu CI job can reuse macOS validation
+from the latest same-repository PR run completed successfully within 24 hours.
+It requires the same workflow, successful Ubuntu and macOS jobs, and identical
+Git trees for the PR head, recorded test commit, and final merge. The test commit
+must have the same two parents as the final merge. Both runners check out the
+immutable `github.sha` recorded in their checkout step names. Job completion
+timestamps also bound reuse, including partial re-runs.
+
+On a match, `Validate Scripts` is skipped and the Ubuntu log identifies its
+source run ID and tree. Cheap checks and GitHub Security still execute. Direct
+commits, squash/rebase merges, fork PRs, changed trees or parents, old workflows
+without the recorded SHA, stale or unsuccessful runs, missing jobs, and API
+errors take the normal path. Existing documentation-only path selection still
+applies. Only `actions: read` is added; there are no artifacts, caches, write
+tokens, or new credentials. PR validation and Codex's CI-completion trigger remain
+active. Re-running only a failed job cannot turn skipped macOS work into proof.
+
+To force a fresh macOS run, re-run the original PR workflow; PR events never reuse
+validation. To disable reuse, remove the reuse step/output and the
+`macos-reused` condition in `ci.yml`, retaining its existing path classifier.
+
 ## Credentials and trust boundary
 
 Use a fine-grained user token scoped only to this repository, with **Pull

@@ -77,6 +77,9 @@ provide independent approval.
   replace a published release, and publishes only after checksum assets and
   attestations exist. Repository-level immutability protects future published
   releases; v1.7.6 predates that GitHub setting.
+- Published release notes can receive documented corrections. The signed tag,
+  ZIP, checksums, and attestations retain their original bytes; current notes
+  identify any difference from the bundled changelog snapshot.
 - Starting with v1.7.9, releases publish a
   deterministic CycloneDX SBOM. Twelve shipped Qt/runtime components are
   required dependencies; five non-shipped bottle inputs remain build

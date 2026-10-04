@@ -49,7 +49,7 @@ check_workflow() {
 
     jobs=$(grep -Ec '^[[:space:]]+runs-on:' "$workflow" || true)
     job_permissions=$(grep -Ec '^[[:space:]]+permissions:' "$workflow" || true)
-    timeouts=$(grep -Ec '^[[:space:]]+timeout-minutes:' "$workflow" || true)
+    timeouts=$(grep -Ec '^[[:space:]]{4}timeout-minutes:' "$workflow" || true)
     if [[ "$jobs" -eq 0 ]]; then
         fail "$name does not define a job"
     fi
@@ -96,6 +96,9 @@ done
 # The sole metadata-only trigger exception has behavioral and authority checks.
 if ! node "$ROOT_DIR/tools/test_codex_review.mjs"; then
     fail "Codex review automation violates its scope or authority contract"
+fi
+if ! node "$ROOT_DIR/tools/test_ci_validation_reuse.mjs"; then
+    fail "CI validation reuse violates its exact-tree or fail-safe contract"
 fi
 
 if [[ ! -f "$ROOT_DIR/.github/workflows/github-security.yml" ]]; then
