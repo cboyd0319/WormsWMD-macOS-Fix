@@ -25,7 +25,7 @@ module.exports = async ({ github, context, core }) => {
     };
     if (!run || !Number.isSafeInteger(repoID) || run.repository?.id !== repoID ||
         run.head_repository?.id !== repoID || run.workflow_id !== current.workflow_id ||
-        run.path !== '.github/workflows/ci.yml' || run.event !== 'pull_request' ||
+        run.path?.split('@')[0] !== '.github/workflows/ci.yml' || run.event !== 'pull_request' ||
         run.head_sha !== head || run.status !== 'completed' || run.conclusion !== 'success' ||
         !recent(run.updated_at)) return false;
     const { data: result } = await github.rest.actions.listJobsForWorkflowRun({

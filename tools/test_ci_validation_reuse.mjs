@@ -53,6 +53,7 @@ async function check(options = {}) {
   return { result, lookups };
 }
 assert.equal((await check()).result, true);
+assert.equal((await check({ candidate: { path: '.github/workflows/ci.yml@refs/pull/40/merge' } })).result, true);
 for (const context of [{ eventName: 'pull_request' }, { ref: 'refs/heads/dev' }, { sha: 'bad' }]) {
   assert.deepEqual(await check({ context }), { result: false, lookups: 0 });
 }
