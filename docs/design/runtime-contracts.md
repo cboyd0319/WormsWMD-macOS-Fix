@@ -22,11 +22,11 @@ flags are provided, `install.sh` must continue forwarding them to
 `fix_worms_wmd.sh`.
 
 Bootstrap downloads use private staging, isolated Git settings, and no hooks.
-Verify the default commit before checkout and a clean tree before execution.
-Never fetch, check out, or execute an existing checkout; read only its literal
-origin URL without includes. Serialize promotion with a lock and preserve the
-previous directory for recovery. Restore it if promotion fails. Reject symlink
-targets and unrelated directories; validate existing parents before mutation.
+Require a user-owned parent, trusted ancestors, no allow ACLs, and no shared
+writes except sticky ancestors. Verify the default commit before checkout and
+a clean tree before execution; read only the old origin URL without includes.
+Lock exact-destination promotion and preserve or restore the previous directory.
+Reject symlinks and unrelated directories; validate parents before mutation.
 
 The main installer runs the fix scripts in this logical order:
 

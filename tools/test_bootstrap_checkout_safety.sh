@@ -23,7 +23,7 @@ printf '#!/bin/bash\nprintf "Darwin\\n"\n' > "$work/bin/uname"
 chmod +x "$work/bin/clear" "$work/bin/uname"
 
 for entrypoint in install.sh "Install Fix.command"; do
-    for scenario in fresh tampered wrong-pin wrong-remote clone-failure symlink locked publish-failure; do
+    for scenario in fresh tampered wrong-pin wrong-remote clone-failure symlink locked publish-failure raced-destination raced-symlink shared-parent acl-parent; do
         case_dir="$work/${entrypoint// /-}-$scenario"
         case_home="$case_dir/home with spaces"
         target="$case_home/.wormswmd-fix"
@@ -47,12 +47,33 @@ for entrypoint in install.sh "Install Fix.command"; do
             elif [[ "$scenario" == symlink ]]; then
                 mv "$target" "$case_dir/original"
                 ln -s "$case_dir/original" "$target"
+            elif [[ "$scenario" == shared-parent ]]; then
+                chmod 0777 "$case_home"
+            elif [[ "$scenario" == acl-parent ]]; then
+                chmod +a 'everyone allow add_file,add_subdirectory' "$case_home"
             elif [[ "$scenario" == locked ]]; then
                 mkdir "$target.bootstrap-lock"
             elif [[ "$scenario" == publish-failure ]]; then
                 cat > "$work/bin/mv" <<'STUB'
 #!/bin/bash
-case "$1" in */checkout) exit 1 ;; esac
+case "$1" in */checkout|*/new/*) exit 1 ;; esac
+exec /bin/mv "$@"
+STUB
+                chmod +x "$work/bin/mv"
+            elif [[ "$scenario" == raced-destination || "$scenario" == raced-symlink ]]; then
+                cat > "$work/bin/mv" <<'STUB'
+#!/bin/bash
+case "$1" in
+    */checkout|*/new/*)
+        if [[ "$RACE_KIND" == raced-symlink ]]; then
+            mkdir "$RACE_TARGET.attacker"
+            ln -s "$RACE_TARGET.attacker" "$RACE_TARGET"
+        else
+            mkdir "$RACE_TARGET"
+        fi
+        printf '#!/bin/bash\nprintf raced > "$DIRTY_MARKER"\n' > "$RACE_TARGET/fix_worms_wmd.sh"
+        ;;
+esac
 exec /bin/mv "$@"
 STUB
                 chmod +x "$work/bin/mv"
@@ -66,7 +87,7 @@ STUB
         result=0
         HOME="$case_home" INSTALL_DIR="$target" PATH="$work/bin:$PATH" \
             RUN_MARKER="$case_dir/ran" DIRTY_MARKER="$case_dir/dirty-ran" \
-            HOOK_MARKER="$case_dir/hook-ran" \
+            HOOK_MARKER="$case_dir/hook-ran" RACE_TARGET="$target" RACE_KIND="$scenario" \
             /bin/bash "$case_dir/bootstrap.sh" --dry-run > "$case_dir/output" 2>&1 || result=$?
         if [[ "$scenario" == clone-failure ]]; then
             mv "$work/unavailable.git" "$upstream"
@@ -84,6 +105,12 @@ STUB
                     [[ -n "$preserved" ]] || fail "previous user files were not preserved"
                     [[ "$(cat "$preserved")" == 'keep user data' ]] || fail "previous user file changed"
                 fi
+                ;;
+            raced-destination|raced-symlink)
+                [[ ! -e "$case_dir/ran" ]] || fail "$entrypoint executed after a destination race"
+                preserved=$(find "$case_home" -path '*/previous/untracked.txt' -type f -print)
+                [[ -n "$preserved" && "$(cat "$preserved")" == 'keep user data' ]] \
+                    || fail "$entrypoint lost the prior checkout after a race"
                 ;;
             *)
                 [[ ! -e "$case_dir/ran" ]] || fail "$entrypoint/$scenario executed despite invalid input"

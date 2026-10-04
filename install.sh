@@ -129,8 +129,37 @@ bootstrap_git() (
     git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c init.templateDir= "$@"
 )
 
+# A private parent and trusted ancestors prevent another account replacing paths.
+verify_install_parent() {
+    local path="$1" owner mode metadata acl first=1
+    [[ -O "$path" ]] || return 1
+    while :; do
+        metadata=$(/usr/bin/stat -f '%u %p' "$path") || return 1
+        owner=${metadata%% *}
+        mode=${metadata##* }
+        [[ "$owner" == 0 || "$owner" == "$EUID" ]] || return 1
+        [[ "$mode" =~ ^[0-7]{5,6}$ ]] || return 1
+        if (( (8#$mode & 0022) != 0 )); then
+            # A root/user-owned sticky ancestor protects its owned child.
+            (( first == 0 && (8#$mode & 01000) != 0 )) || return 1
+        fi
+        acl=$(/bin/ls -lde "$path") || return 1
+        if printf '%s\n' "$acl" | grep -Eq '^[[:space:]]*[0-9]+:.* allow '; then
+            return 1
+        fi
+        [[ "$path" != / ]] || return 0
+        path=$(dirname "$path")
+        first=0
+    done
+}
+
 prepare_installation() (
-    local stage="" lock="$INSTALL_DIR.bootstrap-lock" remote checkout_status
+    local stage="" lock="$INSTALL_DIR.bootstrap-lock" remote checkout_status parent checkout
+    parent=$(cd "$(dirname "$INSTALL_DIR")" && pwd -P) || return 1
+    if ! verify_install_parent "$parent"; then
+        printf 'Use an INSTALL_DIR parent owned by you, without shared write access or allow ACLs: %s\n' "$parent" >&2
+        return 1
+    fi
     umask 077
     if [[ -L "$INSTALL_DIR" || ( -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR" ) ]]; then
         printf 'Refusing a symlink or non-directory INSTALL_DIR: %s\n' "$INSTALL_DIR" >&2
@@ -154,20 +183,24 @@ prepare_installation() (
         esac
     fi
     stage=$(mktemp -d "$INSTALL_DIR.bootstrap.XXXXXX") || return 1
+    mkdir "$stage/new" || return 1
+    checkout="$stage/new/$(basename "$INSTALL_DIR")"
     bootstrap_git clone --progress --no-checkout --branch "$INSTALL_REF" --depth 1 \
-        "$REPO_URL.git" "$stage/checkout" || return 1
-    verify_default_install_commit "$stage/checkout"
-    bootstrap_git -C "$stage/checkout" checkout --detach HEAD || return 1
-    checkout_status=$(bootstrap_git -C "$stage/checkout" status --porcelain --untracked-files=all) || return 1
+        "$REPO_URL.git" "$checkout" || return 1
+    verify_default_install_commit "$checkout"
+    bootstrap_git -C "$checkout" checkout --detach HEAD || return 1
+    checkout_status=$(bootstrap_git -C "$checkout" status --porcelain --untracked-files=all) || return 1
     if [[ -n "$checkout_status" ||
-          ! -f "$stage/checkout/fix_worms_wmd.sh" ]]; then
+          ! -f "$checkout/fix_worms_wmd.sh" ]]; then
         printf 'Downloaded checkout is incomplete or modified; refusing execution.\n' >&2
         return 1
     fi
     if [[ -d "$INSTALL_DIR" ]]; then
         mv "$INSTALL_DIR" "$stage/previous" || return 1
     fi
-    if ! mv "$stage/checkout" "$INSTALL_DIR"; then
+    # Naming the parent makes mv rename to the exact basename, never nest inside
+    # a concurrently created INSTALL_DIR. Staging is on the same filesystem.
+    if ! mv "$checkout" "$parent/"; then
         if [[ -d "$stage/previous" && ! -e "$INSTALL_DIR" && ! -L "$INSTALL_DIR" ]]; then
             mv "$stage/previous" "$INSTALL_DIR" || return 1
         fi

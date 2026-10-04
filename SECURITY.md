@@ -35,7 +35,7 @@ Release and review-automation evidence updated 2026-10-03; see the
 | Symlink/hardlink escape | Mutable trees must remain inside the selected app and reject unsafe links |
 | Partial or wrong-target restore | Backups are verified, app/storefront-bound, staged, and checked after restore |
 | Malicious executable download | Release/Qt payloads use checksums, immutable refs, provenance, and attestations |
-| Modified bootstrap checkout or Git hook | Fresh staging, isolated Git settings, hooks disabled, pre-checkout commit verification, clean-tree gate, preserved previous checkout |
+| Modified bootstrap checkout or Git hook | Private staging, trusted parent/ancestors, isolated Git settings, hooks disabled, commit/tree verification, exact-destination promotion, preserved previous checkout |
 | CI workflow compromise | Full-SHA Action policy, selected-action allowlist, job-scoped tokens, CODEOWNERS |
 | New committed secrets | Local staged scan, required current-tree scan, secret scanning, push protection |
 | Diagnostic data exposure | Support bundles sanitize text and omit raw/private/game/save content |

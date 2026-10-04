@@ -8,7 +8,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 - Harden mainline download bootstraps against modified existing checkouts and
   executable Git hooks. Stage and verify a fresh checkout, isolate Git settings,
-  serialize replacement, and preserve the previous directory. This correction
+  serialize exact-destination replacement, require a private parent and trusted
+  ancestors, and preserve the previous directory. This correction
   applies to standalone bootstraps; v1.7.9's immutable complete ZIP excludes them.
 
 ## 1.7.9 (2026-10-03)

@@ -51,6 +51,13 @@ configuration are never reused for execution. A custom `INSTALL_DIR` must name
 a dedicated directory beneath an existing parent; normalization creates no
 parent directories before validating their resolved location.
 
+The parent must belong to the current user and disallow group/other writes.
+Ancestors must belong to that user or root, with no shared writes except sticky
+directories such as `/tmp`. Explicit allow ACLs are refused along the path;
+choose another private location instead of weakening existing permissions.
+Replacement uses an exact-destination rename, so a raced directory or symlink
+cannot redirect execution into an unverified tree.
+
 When replacing this fix's existing checkout, the bootstrap preserves the entire
 old directory at the printed `INSTALL_DIR.bootstrap.XXXXXX/previous` path.
 Inspect it for local files you need before removing it manually. A failed
