@@ -151,6 +151,12 @@ target branches are excluded. Requests are deduplicated per head commit.
 For later pushes, request another review manually. AI reviews remain subject
 to provider access and quotas and do not replace required checks or human review.
 
+Maintainers must configure `CODEX_REVIEW_TOKEN` as an Actions repository secret:
+use a fine-grained token from a GitHub user connected to Codex, scoped only to
+this repository with Pull requests read/write (Metadata read is required).
+Choose an expiration and rotate it before expiry. The default Actions bot's
+comment did not trigger a code review in the live integration test.
+
 Include:
 - A summary of the change
 - Test results

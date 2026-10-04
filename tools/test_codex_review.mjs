@@ -5,9 +5,12 @@ const workflow = readFileSync(new URL('../.github/workflows/codex-review.yml', i
 const script = workflow.split('          script: |\n')[1];
 assert.ok(script, 'workflow must contain one inline, trusted reviewer script');
 assert.equal(workflow.match(/          script: \|/g).length, 1);
-assert.doesNotMatch(workflow, /actions\/checkout|\brun:|\brequire\(|\bimport\b|\beval\(|\$\{\{\s*secrets\.|contents:|id-token:|issues:|workflow_dispatch|workflow_run:|issue_comment:/);
+const credentialLine = '          github-token: ${{ secrets.CODEX_REVIEW_TOKEN }}';
+assert.equal(workflow.split(credentialLine).length, 2, 'only the scoped user credential may be consumed');
+assert.doesNotMatch(workflow.replace(credentialLine, ''), /actions\/checkout|\brun:|\brequire\(|\bimport\b|\beval\(|\bsecrets\b|contents:|id-token:|issues:|workflow_dispatch|workflow_run:|issue_comment:/);
 assert.match(workflow, /pull_request_target:\n    branches: \[main\]\n    types: \[opened, reopened, ready_for_review, edited\]/);
-assert.match(workflow, /pull-requests: write/);
+assert.match(workflow, /    permissions: \{\}/);
+assert.doesNotMatch(workflow, /pull-requests: write/);
 assert.match(workflow, /cancel-in-progress: false/);
 const groupTemplate = workflow.match(/^  group: (.+)$/m)[1].replace(/\$\{\{(.*?)\}\}/g, '${$1}');
 const group = new Function('github', `return \`${groupTemplate}\`;`);
@@ -24,13 +27,15 @@ const run = new (Object.getPrototypeOf(async function () {}).constructor)(
 const sha = 'a'.repeat(40);
 const ready = { state: 'open', draft: false, base: { ref: 'main' }, head: { sha } };
 const marker = `<!-- codex-auto-review:7:${sha} -->`;
-const bot = { login: 'github-actions[bot]', type: 'Bot' };
+const reviewer = { id: 123, login: 'connected-reviewer', type: 'User' };
+const bot = { id: 456, login: 'github-actions[bot]', type: 'Bot' };
 
-async function check({ action = 'opened', pr = ready, latest = pr, comments = [], changes, eventName = 'pull_request_target' } = {}) {
+async function check({ action = 'opened', pr = ready, latest = pr, comments = [], changes, eventName = 'pull_request_target', identity = reviewer } = {}) {
   const sent = [];
   let reads = 0;
   const github = {
     rest: {
+      users: { getAuthenticated: async () => ({ data: identity }) },
       pulls: { get: async () => ({ data: reads++ ? latest : pr }) },
       issues: { listComments() {}, createComment: async payload => sent.push(payload) },
     },
@@ -57,14 +62,18 @@ for (const action of ['synchronize', 'converted_to_draft', 'edited']) {
 assert.equal((await check({ eventName: 'issue_comment' })).length, 0);
 const changedHead = { ...ready, head: { sha: 'b'.repeat(40) } };
 const changedBody = `@codex review\n\n<!-- codex-auto-review:7:${changedHead.head.sha} -->`;
-for (const comments of [[], [{ user: bot, body: marker }]]) {
+for (const comments of [[], [{ user: reviewer, body: marker }]]) {
   assert.deepEqual(await check({ latest: changedHead, comments }),
     [{ owner: 'owner', repo: 'repo', issue_number: 7, body: changedBody }],
     'a push during metadata lookup must not lose the initial ready-PR review');
 }
-assert.equal((await check({ latest: changedHead, comments: [{ user: bot, body: changedBody }] })).length, 0);
+assert.equal((await check({ latest: changedHead, comments: [{ user: reviewer, body: changedBody }] })).length, 0);
 await assert.rejects(check({ pr: { ...ready, head: { sha: 'invalid' } } }), /Invalid PR revision/);
-assert.equal((await check({ comments: [{ user: bot, body: `@codex review\n\n${marker}` }] })).length, 0);
+assert.equal((await check({ comments: [{ user: reviewer, body: `@codex review\n\n${marker}` }] })).length, 0);
+assert.equal((await check({ comments: [{ user: { ...reviewer, login: 'renamed-user' }, body: marker }] })).length, 0, 'deduplication must use the stable authenticated user ID');
+assert.equal((await check({ comments: [{ user: bot, body: marker }] })).length, 1, 'ignored Actions-bot requests must not suppress a real user request');
+await assert.rejects(check({ identity: bot }), /connected to Codex/);
+await assert.rejects(check({ identity: { ...reviewer, id: undefined } }), /connected to Codex/);
 assert.equal((await check({ comments: [{ user: { login: 'attacker', type: 'User' }, body: marker }] })).length, 1);
 assert.equal((await check({ comments: [{ user: bot, body: '<!-- codex-auto-review:7:old -->' }] })).length, 1);
 console.log('Codex review scope, stale-state, and duplicate-request tests passed.');
