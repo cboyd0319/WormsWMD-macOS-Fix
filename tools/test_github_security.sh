@@ -104,9 +104,9 @@ fi
 if [[ ! -f "$ROOT_DIR/.github/workflows/github-security.yml" ]]; then
     fail ".github/workflows/github-security.yml is required"
 else
-    if ! grep -Fq 'zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054' \
+    if ! grep -Fq 'zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482' \
         "$ROOT_DIR/.github/workflows/github-security.yml"; then
-        fail "GitHub security workflow must pin zizmor-action v0.6.2"
+        fail "GitHub security workflow must pin zizmor-action v0.6.4"
     fi
     if ! grep -Eq '^[[:space:]]+version:[[:space:]]+[v]?[0-9]+[.][0-9]+[.][0-9]+[[:space:]]*$' \
         "$ROOT_DIR/.github/workflows/github-security.yml"; then
