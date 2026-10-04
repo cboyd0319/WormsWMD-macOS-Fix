@@ -159,6 +159,9 @@ this repository with Pull requests read/write (Metadata read is required).
 Choose an expiration and rotate it before expiry. The default Actions bot's
 comment did not trigger a code review in the live integration test.
 
+See the [review automation runbook](docs/runbooks/review-automation.md) for
+configuration, trigger details, token rotation, completion checks, and recovery.
+
 Include:
 - A summary of the change
 - Test results

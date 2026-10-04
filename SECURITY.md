@@ -13,12 +13,15 @@ download guidance lives in [`docs/TRUST.md`](docs/TRUST.md).
 | Game mutation | Pass | Validated app boundary, verified backup, transactional rollback |
 | Downloads | Pass | HTTPS plus immutable refs or SHA-256 verification for executable payloads |
 | Release integrity | Pass | Zip checksum, build attestation, draft-first publication, immutable future releases |
-| Release SBOM | Ready | CycloneDX 1.6 plus SBOM attestation begins with the next tagged release |
+| Release SBOM | Pass | v1.7.9 CycloneDX 1.6 and ZIP-bound SBOM attestation verified after publication |
 | CI security | Pass | Full-SHA allowlisted Actions, least privilege, required Zizmor, CodeQL |
 | New secret prevention | Pass | Enforced staged Kingfisher, required current-tree scan, GitHub push protection |
 | Support privacy | Pass | Sanitized reports; no raw logs, game binaries, saves, or private configs |
 
 Last reviewed: 2026-08-27.
+
+Release and review-automation evidence updated 2026-10-03; see the
+[issues 30/31 validation record](docs/release-records/2026-10-03-issues-30-31.md).
 
 ## Threat model
 
@@ -214,6 +217,8 @@ identity before deduplicating requests. It checks out no code and executes no
 PR-controlled text or artifacts. Rotate the token before expiry; missing or
 expired credentials fail the request job. Repository-wide native Codex
 auto-review stays inherited from the owner's disabled personal preference.
+The [review automation runbook](docs/runbooks/review-automation.md) defines
+credential rotation, exact revision checks, live completion proof, and recovery.
 
 ### Staged and CI secret scanning
 
@@ -351,7 +356,6 @@ Runtime verification remains:
 | Local hooks can be absent or bypassed | Required current-tree Kingfisher plus GitHub push protection |
 | Admin branch bypass remains enabled | Required checks/review still apply normally; second trusted reviewer needed before enforcement |
 | v1.7.6 is mutable and has no SBOM | Existing checksum/build attestation; future releases immutable with SBOM |
-| First hosted SBOM publication is not yet exercised | Generator passed official CycloneDX schema and zip-root-hash tests; next tag is final end-to-end proof |
 | Qt vulnerability findings are report-only during burn-in | Pinned scanner, exact runtime inventory, deterministic evidence, explicit VEX expiry, and maintainer triage |
 
 ## Reporting a vulnerability
