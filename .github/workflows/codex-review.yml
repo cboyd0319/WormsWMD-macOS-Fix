@@ -4,17 +4,28 @@ on:
   pull_request_target:
     branches: [main]
     types: [opened, reopened, ready_for_review, edited]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 
 permissions: {}
 
 concurrency:
   # Ignored edits must not replace pending eligible requests in GitHub's queue.
-  group: codex-review-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && !github.event.changes.base && 'metadata' || 'review' }}
+  group: codex-review-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}-${{ github.event_name == 'pull_request_target' && github.event.action == 'edited' && !github.event.changes.base && 'metadata' || 'review' }}
   cancel-in-progress: false
 
 jobs:
   request-review:
-    if: github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main'
+    # Dependabot's PR-trigger credentials are restricted; CI completion uses the trusted default branch.
+    if: >-
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main' &&
+       (github.event.action != 'edited' || github.event.changes.base) &&
+       (github.event.sender.id != 49699333 || github.event.pull_request.user.id != 49699333)) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.actor.id == 49699333 &&
+       github.event.workflow_run.pull_requests[0].base.ref == 'main')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -27,13 +38,26 @@ jobs:
         with:
           github-token: ${{ secrets.CODEX_REVIEW_TOKEN }}
           script: |
-            const { action, number, changes } = context.payload;
-            if (context.eventName !== 'pull_request_target' ||
-                !['opened', 'reopened', 'ready_for_review', 'edited'].includes(action) ||
-                (action === 'edited' && !changes?.base)) return;
-            if (!Number.isSafeInteger(number) || number < 1) throw new Error('Invalid PR number');
             const { owner, repo } = context.repo;
-            const ready = pr => pr.state === 'open' && pr.draft === false && pr.base.ref === 'main';
+            const { action, changes, workflow_run: upstream } = context.payload;
+            const fallback = context.eventName === 'workflow_run';
+            const dependabotID = 49699333;
+            let number;
+            if (fallback) {
+              if (upstream?.name !== 'CI' || upstream.event !== 'pull_request' ||
+                  upstream.status !== 'completed' || upstream.actor?.id !== dependabotID ||
+                  upstream.head_repository?.full_name !== `${owner}/${repo}` ||
+                  !Array.isArray(upstream.pull_requests) || upstream.pull_requests.length !== 1 ||
+                  upstream.pull_requests[0].base?.ref !== 'main') return;
+              number = upstream.pull_requests[0].number;
+            } else if (context.eventName === 'pull_request_target') {
+              if (!['opened', 'reopened', 'ready_for_review', 'edited'].includes(action) ||
+                  (action === 'edited' && !changes?.base)) return;
+              number = context.payload.number;
+            } else return;
+            if (!Number.isSafeInteger(number) || number < 1) throw new Error('Invalid PR number');
+            const ready = pr => pr.state === 'open' && pr.draft === false && pr.base.ref === 'main' &&
+              (!fallback || (pr.user?.id === dependabotID && pr.head.repo?.full_name === `${owner}/${repo}`));
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
             if (!ready(pr)) return;
             const { data: reviewer } = await github.rest.users.getAuthenticated();

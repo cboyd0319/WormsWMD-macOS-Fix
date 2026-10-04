@@ -148,7 +148,9 @@ Ready pull requests targeting `main` automatically request a Balanced Copilot
 review and a Codex review. The Codex workflow posts `@codex review` on opening,
 marking ready, reopening, or changing the target to `main`; drafts and other
 target branches are excluded. Requests are deduplicated per head commit.
-For later pushes, request another review manually. AI reviews remain subject
+Dependabot requests run after its CI completes, because GitHub withholds secrets
+from its PR trigger; eligible CI completions also review new Dependabot revisions.
+For later pushes to other PRs, request another review manually. AI reviews remain subject
 to provider access and quotas and do not replace required checks or human review.
 
 Maintainers must configure `CODEX_REVIEW_TOKEN` as an Actions repository secret:

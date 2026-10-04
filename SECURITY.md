@@ -198,9 +198,13 @@ skipped-success. A failed diff/classifier always falls back to macOS.
 Security/release workflows do not reuse untrusted cross-run caches. Workflow
 artifacts expire after 14 days.
 
-The Codex review workflow is the sole `pull_request_target` exception: it runs
+The Codex review workflow is the sole privileged-trigger exception: it runs
 only a pinned GitHub-owned action from the trusted base, reads current PR
 metadata, and posts a fixed review request for open, non-draft PRs into `main`.
+Its primary trigger is `pull_request_target`. Dependabot uses `workflow_run`
+after CI completes, since its PR trigger cannot access secrets. That fallback
+requires a Dependabot-initiated PR run from this repository, exactly one PR,
+and a currently eligible Dependabot PR; it consumes no CI artifacts or caches.
 Its `GITHUB_TOKEN` has no permissions. Its sole static-secret exception is
 `CODEX_REVIEW_TOKEN`: a fine-grained token for a Codex-connected user, limited
 to this repository with Pull requests read/write and required Metadata read.

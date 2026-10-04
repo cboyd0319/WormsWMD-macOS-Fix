@@ -7,14 +7,16 @@ assert.ok(script, 'workflow must contain one inline, trusted reviewer script');
 assert.equal(workflow.match(/          script: \|/g).length, 1);
 const credentialLine = '          github-token: ${{ secrets.CODEX_REVIEW_TOKEN }}';
 assert.equal(workflow.split(credentialLine).length, 2, 'only the scoped user credential may be consumed');
-assert.doesNotMatch(workflow.replace(credentialLine, ''), /actions\/checkout|\brun:|\brequire\(|\bimport\b|\beval\(|\bsecrets\b|contents:|id-token:|issues:|workflow_dispatch|workflow_run:|issue_comment:/);
+assert.doesNotMatch(workflow.replace(credentialLine, ''), /actions\/checkout|\brun:|\brequire\(|\bimport\b|\beval\(|\bsecrets\b|contents:|id-token:|issues:|workflow_dispatch|issue_comment:/);
 assert.match(workflow, /pull_request_target:\n    branches: \[main\]\n    types: \[opened, reopened, ready_for_review, edited\]/);
+assert.match(workflow, /workflow_run:\n    workflows: \[CI\]\n    types: \[completed\]/);
+assert.match(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'), /^name: CI$/m);
 assert.match(workflow, /    permissions: \{\}/);
 assert.doesNotMatch(workflow, /pull-requests: write/);
 assert.match(workflow, /cancel-in-progress: false/);
 const groupTemplate = workflow.match(/^  group: (.+)$/m)[1].replace(/\$\{\{(.*?)\}\}/g, '${$1}');
 const group = new Function('github', `return \`${groupTemplate}\`;`);
-const groupFor = (action, changes = {}, number = 7) => group({ event: { action, changes, pull_request: { number } } });
+const groupFor = (action, changes = {}, number = 7) => group({ event_name: 'pull_request_target', event: { action, changes, pull_request: { number } } });
 assert.notEqual(groupFor('opened'), groupFor('edited'), 'ignored edits must not evict a pending review');
 for (const action of ['reopened', 'ready_for_review']) assert.equal(groupFor(action), groupFor('opened'));
 assert.equal(groupFor('edited', { base: {} }), groupFor('opened'), 'eligible requests must serialize together');
@@ -30,7 +32,7 @@ const marker = `<!-- codex-auto-review:7:${sha} -->`;
 const reviewer = { id: 123, login: 'connected-reviewer', type: 'User' };
 const bot = { id: 456, login: 'github-actions[bot]', type: 'Bot' };
 
-async function check({ action = 'opened', pr = ready, latest = pr, comments = [], changes, eventName = 'pull_request_target', identity = reviewer } = {}) {
+async function check({ action = 'opened', pr = ready, latest = pr, comments = [], changes, eventName = 'pull_request_target', identity = reviewer, upstream } = {}) {
   const sent = [];
   let reads = 0;
   const github = {
@@ -43,7 +45,7 @@ async function check({ action = 'opened', pr = ready, latest = pr, comments = []
   };
   await run(github, {
     repo: { owner: 'owner', repo: 'repo' }, eventName,
-    payload: { action, number: 7, changes },
+    payload: { action, number: 7, changes, workflow_run: upstream },
   }, { info() {} });
   return sent;
 }
@@ -76,4 +78,32 @@ await assert.rejects(check({ identity: bot }), /connected to Codex/);
 await assert.rejects(check({ identity: { ...reviewer, id: undefined } }), /connected to Codex/);
 assert.equal((await check({ comments: [{ user: { login: 'attacker', type: 'User' }, body: marker }] })).length, 1);
 assert.equal((await check({ comments: [{ user: bot, body: '<!-- codex-auto-review:7:old -->' }] })).length, 1);
+const upstream = {
+  name: 'CI', event: 'pull_request', status: 'completed', actor: { id: 49699333, login: 'dependabot[bot]' },
+  head_repository: { full_name: 'owner/repo' }, pull_requests: [{ number: 7, base: { ref: 'main' } }],
+};
+const jobExpression = workflow.match(/    if: >-\n([\s\S]*?)    runs-on:/)[1].trim();
+const eligibleJob = new Function('github', `return Boolean(${jobExpression});`);
+const prEvent = { action: 'opened', sender: { id: 123 }, pull_request: { ...ready, number: 7, user: { login: 'owner' } } };
+assert.equal(eligibleJob({ event_name: 'pull_request_target', actor_id: '123', event: prEvent }), true);
+const botEvent = { ...prEvent, sender: { id: 49699333 }, pull_request: { ...prEvent.pull_request, user: { id: 49699333, login: 'dependabot[bot]' } } };
+assert.equal(eligibleJob({ event_name: 'pull_request_target', actor_id: '49699333', event: botEvent }), false, 'restricted Dependabot triggers must not consume the credential');
+assert.equal(eligibleJob({ event_name: 'pull_request_target', actor_id: '123', event: { ...botEvent, sender: { id: 123 }, action: 'ready_for_review' } }), true);
+assert.equal(eligibleJob({ event_name: 'pull_request_target', actor_id: '123', event: { ...prEvent, action: 'edited', changes: {} } }), false);
+assert.equal(eligibleJob({ event_name: 'workflow_run', event: { workflow_run: upstream } }), true);
+assert.equal(eligibleJob({ event_name: 'workflow_run', event: { workflow_run: { ...upstream, actor: { login: 'owner' } } } }), false);
+const dependabotPR = { ...ready, user: { id: 49699333, login: 'dependabot[bot]' }, head: { sha, repo: { full_name: 'owner/repo' } } };
+const fallback = { eventName: 'workflow_run', action: 'completed', upstream, pr: dependabotPR };
+assert.equal((await check(fallback)).length, 1, 'Dependabot must receive reviews despite its restricted trigger credentials');
+assert.equal((await check({ ...fallback, comments: [{ user: reviewer, body: marker }] })).length, 0);
+for (const pr of [ready, { ...dependabotPR, draft: true }, { ...dependabotPR, state: 'closed' }, { ...dependabotPR, base: { ref: 'develop' } }, { ...dependabotPR, head: { sha, repo: { full_name: 'fork/repo' } } }]) {
+  assert.equal((await check({ ...fallback, pr })).length, 0);
+  assert.equal((await check({ ...fallback, latest: pr })).length, 0);
+}
+for (const change of [
+  { actor: { id: 999, login: 'dependabot[bot]' } }, { name: 'Untrusted workflow' }, { event: 'push' }, { status: 'in_progress' }, { actor: { login: 'attacker' } },
+  { head_repository: { full_name: 'fork/repo' } }, { pull_requests: [] },
+  { pull_requests: [{ number: 7 }, { number: 8 }] }, { pull_requests: [{ number: 7, base: { ref: 'develop' } }] },
+]) assert.equal((await check({ ...fallback, upstream: { ...upstream, ...change } })).length, 0);
+assert.equal(group({ event_name: 'workflow_run', event: { pull_request: {}, workflow_run: upstream } }), groupFor('opened'), 'both triggers must share one review queue');
 console.log('Codex review scope, stale-state, and duplicate-request tests passed.');
