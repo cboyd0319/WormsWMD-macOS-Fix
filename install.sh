@@ -93,8 +93,14 @@ normalize_install_dir() {
 
     parent=$(dirname "$raw_dir")
     base=$(basename "$raw_dir")
-    mkdir -p "$parent"
-    parent=$(cd "$parent" && pwd -P)
+    if [[ "$base" == . || "$base" == .. ]]; then
+        print_error "INSTALL_DIR must name a dedicated project directory."
+        exit 1
+    fi
+    if ! parent=$(cd "$parent" && pwd -P); then
+        print_error "INSTALL_DIR must have an existing parent directory."
+        exit 1
+    fi
     INSTALL_DIR="$parent/$base"
     home_real=$(cd "$HOME" && pwd -P)
 
@@ -115,44 +121,62 @@ directory_is_empty() {
     [[ -z "$(find "$dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]
 }
 
-repo_remote_matches() {
-    local dir="$1"
-    local remote
+# Ignore inherited Git configuration and disable executable hooks.
+bootstrap_git() (
+    local name
+    for name in "${!GIT_@}"; do unset "$name"; done
+    export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+    git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c init.templateDir= "$@"
+)
 
-    remote=$(git -C "$dir" config --get remote.origin.url 2>/dev/null || true)
-    case "$remote" in
-        "$REPO_URL"|"$REPO_URL.git"|git@github.com:cboyd0319/WormsWMD-macOS-Fix.git)
-            return 0
-            ;;
-    esac
-
-    return 1
-}
-
-clone_install_ref() {
-    git clone --progress --branch "$INSTALL_REF" --depth 1 "$REPO_URL.git" "$INSTALL_DIR"
-}
-
-checkout_install_ref() {
-    local dir="$1"
-
-    if [[ "$INSTALL_REF" == "main" ]]; then
-        if ! git -C "$dir" checkout main >/dev/null 2>&1; then
-            git -C "$dir" checkout -B main origin/main
+prepare_installation() (
+    local stage="" lock="$INSTALL_DIR.bootstrap-lock" remote checkout_status
+    umask 077
+    if [[ -L "$INSTALL_DIR" || ( -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR" ) ]]; then
+        printf 'Refusing a symlink or non-directory INSTALL_DIR: %s\n' "$INSTALL_DIR" >&2
+        return 1
+    fi
+    if ! mkdir "$lock"; then
+        printf 'Another bootstrap may be running; inspect lock: %s\n' "$lock" >&2
+        return 1
+    fi
+    trap 'if [[ -n "$stage" && ! -e "$stage/previous" ]]; then rm -rf "$stage"; fi; rmdir "$lock"' EXIT
+    if [[ -d "$INSTALL_DIR" ]] && ! directory_is_empty "$INSTALL_DIR"; then
+        if [[ ! -d "$INSTALL_DIR/.git" || -L "$INSTALL_DIR/.git" ||
+              ! -f "$INSTALL_DIR/.git/config" || -L "$INSTALL_DIR/.git/config" ]]; then
+            printf 'Existing directory is not a fix checkout; move it yourself: %s\n' "$INSTALL_DIR" >&2
+            return 1
         fi
-        git -C "$dir" pull --progress --ff-only origin main
-        return
+        remote=$(bootstrap_git config --no-includes --file "$INSTALL_DIR/.git/config" --get remote.origin.url) || return 1
+        case "$remote" in
+            "$REPO_URL"|"$REPO_URL.git"|git@github.com:cboyd0319/WormsWMD-macOS-Fix.git) ;;
+            *) printf 'Existing checkout has a different remote; move it yourself: %s\n' "$INSTALL_DIR" >&2; return 1 ;;
+        esac
     fi
-
-    print_info "Using trusted release/reference: $INSTALL_REF"
-    if git -C "$dir" fetch --progress --force origin "refs/tags/$INSTALL_REF:refs/tags/$INSTALL_REF"; then
-        git -C "$dir" checkout --detach "$INSTALL_REF"
-        return
+    stage=$(mktemp -d "$INSTALL_DIR.bootstrap.XXXXXX") || return 1
+    bootstrap_git clone --progress --no-checkout --branch "$INSTALL_REF" --depth 1 \
+        "$REPO_URL.git" "$stage/checkout" || return 1
+    verify_default_install_commit "$stage/checkout"
+    bootstrap_git -C "$stage/checkout" checkout --detach HEAD || return 1
+    checkout_status=$(bootstrap_git -C "$stage/checkout" status --porcelain --untracked-files=all) || return 1
+    if [[ -n "$checkout_status" ||
+          ! -f "$stage/checkout/fix_worms_wmd.sh" ]]; then
+        printf 'Downloaded checkout is incomplete or modified; refusing execution.\n' >&2
+        return 1
     fi
-
-    git -C "$dir" fetch --progress --force origin "$INSTALL_REF"
-    git -C "$dir" checkout --detach FETCH_HEAD
-}
+    if [[ -d "$INSTALL_DIR" ]]; then
+        mv "$INSTALL_DIR" "$stage/previous" || return 1
+    fi
+    if ! mv "$stage/checkout" "$INSTALL_DIR"; then
+        if [[ -d "$stage/previous" && ! -e "$INSTALL_DIR" && ! -L "$INSTALL_DIR" ]]; then
+            mv "$stage/previous" "$INSTALL_DIR" || return 1
+        fi
+        return 1
+    fi
+    if [[ -d "$stage/previous" ]]; then
+        printf 'Previous checkout preserved at: %s/previous\n' "$stage"
+    fi
+)
 
 verify_default_install_commit() {
     local dir="$1"
@@ -167,7 +191,7 @@ verify_default_install_commit() {
         exit 1
     fi
 
-    actual_commit=$(git -C "$dir" rev-parse HEAD 2>/dev/null || true)
+    actual_commit=$(bootstrap_git -C "$dir" rev-parse HEAD 2>/dev/null || true)
     if [[ "$actual_commit" != "$DEFAULT_INSTALL_COMMIT" ]]; then
         print_error "Pinned release verification failed for $DEFAULT_INSTALL_REF."
         print_info "Expected $DEFAULT_INSTALL_COMMIT but got ${actual_commit:-unknown}."
@@ -209,39 +233,7 @@ echo ""
 # Download/update the fix
 print_step "Downloading fix..."
 
-if [[ -f "$INSTALL_DIR" ]]; then
-    print_error "INSTALL_DIR points to a file: $INSTALL_DIR"
-    exit 1
-fi
-
-mkdir -p "$(dirname "$INSTALL_DIR")"
-
-if [[ -d "$INSTALL_DIR/.git" ]]; then
-    if ! repo_remote_matches "$INSTALL_DIR"; then
-        print_error "INSTALL_DIR is a Git repository for a different remote: $INSTALL_DIR"
-        print_info "Choose another INSTALL_DIR or move that repository yourself."
-        exit 1
-    fi
-    print_info "Updating existing installation..."
-    if checkout_install_ref "$INSTALL_DIR"; then
-        : # Success
-    else
-        print_error "Update failed. Existing installation was left untouched: $INSTALL_DIR"
-        exit 1
-    fi
-    verify_default_install_commit "$INSTALL_DIR"
-else
-    # Fresh installation
-    if [[ -d "$INSTALL_DIR" ]]; then
-        if ! directory_is_empty "$INSTALL_DIR"; then
-            print_error "INSTALL_DIR already exists and is not an empty fix checkout: $INSTALL_DIR"
-            print_info "Choose another INSTALL_DIR or move that directory yourself."
-            exit 1
-        fi
-    fi
-    clone_install_ref
-    verify_default_install_commit "$INSTALL_DIR"
-fi
+prepare_installation
 
 print_success "Fix downloaded to: $INSTALL_DIR"
 echo ""

@@ -65,6 +65,17 @@ if run_normalize "$test_home" "/tmp/../Applications/wormswmd-fix" >/dev/null 2>&
     fail "INSTALL_DIR resolving through .. into a system path was accepted"
 fi
 
+for unsafe_leaf in "$test_home/." "$test_home/.."; do
+    if run_normalize "$test_home" "$unsafe_leaf" >/dev/null 2>&1; then
+        fail "INSTALL_DIR with a dot-directory leaf was accepted"
+    fi
+done
+
+if run_normalize "$test_home" "$test_home/missing-parent/fix" >/dev/null 2>&1; then
+    fail "INSTALL_DIR created an unvalidated parent before canonical path checks"
+fi
+[[ ! -e "$test_home/missing-parent" ]] || fail "normalization mutated an unvalidated parent"
+
 # The extracted verification helpers call the stubs defined in this subshell.
 # shellcheck disable=SC2329
 run_pin_check() (
@@ -78,7 +89,7 @@ run_pin_check() (
     INSTALL_DIR="$tmp_dir/checkout"
     print_error() { :; }
     print_info() { :; }
-    git() { printf '%s\n' "$fixture_commit"; }
+    bootstrap_git() { printf '%s\n' "$fixture_commit"; }
     read() { return 0; }
     # Extract only verification helpers, never run the network/UI entrypoints.
     awk '
@@ -126,3 +137,4 @@ bundle="$tmp_dir/bundles/WormsWMD-macOS-Fix-bootstrap-test"
     || fail "release bundle shipped download bootstraps with unresolved release pins"
 
 printf 'Bootstrap installer safety check passed.\n'
+bash "$ROOT_DIR/tools/test_bootstrap_checkout_safety.sh"
