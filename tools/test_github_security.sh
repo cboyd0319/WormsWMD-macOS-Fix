@@ -41,6 +41,11 @@ check_workflow() {
     if grep -Eq '^[[:space:]]+run:.*\$\{\{' "$workflow"; then
         fail "$name expands a GitHub expression directly in a run command"
     fi
+    # The Codex behavior check separately permits exactly its scoped user token.
+    if [[ "$name" != ".github/workflows/codex-review.yml" ]] \
+        && grep -Eq '\$\{\{[[:space:]]*secrets[.]|secrets:[[:space:]]*inherit' "$workflow"; then
+        fail "$name must not consume static repository secrets or inherit secret sets"
+    fi
 
     jobs=$(grep -Ec '^[[:space:]]+runs-on:' "$workflow" || true)
     job_permissions=$(grep -Ec '^[[:space:]]+permissions:' "$workflow" || true)
@@ -91,11 +96,6 @@ done
 # The sole metadata-only trigger exception has behavioral and authority checks.
 if ! node "$ROOT_DIR/tools/test_codex_review.mjs"; then
     fail "Codex review automation violates its scope or authority contract"
-fi
-
-if grep -R -Eq '\$\{\{[[:space:]]*secrets[.]|secrets:[[:space:]]*inherit' \
-    "$ROOT_DIR/.github/workflows"; then
-    fail "workflows must not consume static repository secrets or inherit secret sets"
 fi
 
 if [[ ! -f "$ROOT_DIR/.github/workflows/github-security.yml" ]]; then
