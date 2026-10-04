@@ -52,6 +52,11 @@ current when adding, moving, renaming, or deleting Markdown files.
   diagnostic collection, handoff, and clean-state workflow.
 - [Release incident runbook](runbooks/release-incident.md) - signed-tag
   preflight, containment, evidence preservation, withdrawal, and recovery.
+- [Automatic PR reviews](runbooks/review-automation.md) - Copilot and Codex
+  configuration, trigger scope, credential rotation, and failure recovery.
+- [Issues 30/31 validation and release record](release-records/2026-10-03-issues-30-31.md)
+  - fixes, review dispositions, Steam/GOG validation, dependency provenance,
+    automation integration tests, and v1.7.9 publication evidence.
 - [Agent harness style](style/agent-harness.md) - repo-local harness engineering
   standard.
 - [Execution plans](exec-plans/README.md) - plan lifecycle and required shape.

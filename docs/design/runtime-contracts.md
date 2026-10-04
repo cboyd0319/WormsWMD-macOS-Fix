@@ -21,6 +21,13 @@ interactive no-argument runs when that launcher is present. When command-line
 flags are provided, `install.sh` must continue forwarding them to
 `fix_worms_wmd.sh`.
 
+Bootstrap downloads use private staging, isolated Git settings, and no hooks.
+Require a user-owned parent, trusted ancestors, no allow ACLs, and no shared
+writes except sticky ancestors. Verify the default commit before checkout and
+a clean tree before execution; read only the old origin URL without includes.
+Lock exact-destination promotion and preserve or restore the previous directory.
+Reject symlinks and unrelated directories; validate parents before mutation.
+
 The main installer runs the fix scripts in this logical order:
 
 1. `scripts/01_build_agl_stub.sh` - build the AGL compatibility framework from

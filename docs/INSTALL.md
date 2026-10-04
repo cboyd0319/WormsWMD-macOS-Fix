@@ -44,9 +44,31 @@ from the main branch, then double-click it. It clones or
 updates this repository under `~/.wormswmd-fix` and opens the friendly launcher
 when it is available.
 
-The bootstrap installers only update an existing checkout of this repository.
-They refuse to move or overwrite non-empty directories that are not this fix,
-and they refuse Git repositories with a different remote.
+Both bootstraps download into a private staging directory, verify the pinned
+commit before checkout, and require a clean tree before running it. They ignore
+inherited Git configuration and disable hooks. Existing checkout files and Git
+configuration are never reused for execution. A custom `INSTALL_DIR` must name
+a dedicated directory beneath an existing parent; normalization creates no
+parent directories before validating their resolved location.
+
+The parent must belong to the current user and disallow group/other writes.
+Ancestors must belong to that user or root, with no shared writes except sticky
+directories such as `/tmp`. Explicit allow ACLs are refused along the path;
+choose another private location instead of weakening existing permissions.
+Replacement uses an exact-destination rename, so a raced directory or symlink
+cannot redirect execution into an unverified tree.
+
+When replacing this fix's existing checkout, the bootstrap preserves the entire
+old directory at the printed `INSTALL_DIR.bootstrap.XXXXXX/previous` path.
+Inspect it for local files you need before removing it manually. A failed
+download or verification leaves the old checkout untouched; a failed replacement
+attempts to restore it. Symlink targets, unrelated non-empty directories, and
+repositories with another remote are refused.
+
+An adjacent `INSTALL_DIR.bootstrap-lock` prevents concurrent bootstraps. If an
+interrupted process leaves that lock, first confirm no bootstrap is running,
+then remove only the empty lock directory and retry. Bootstrap checkout backups
+are separate from game and save backups.
 
 Terminal users can use:
 
