@@ -78,7 +78,7 @@ jobs:
             --output "build/release/WormsWMD-macOS-Fix-${RELEASE_VERSION}.cdx.json"
       - name: Upload read-only workflow artifact
         # actions/upload-artifact v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ${{ steps.release_names.outputs.artifact }}
           retention-days: 14
@@ -139,7 +139,7 @@ jobs:
             "$RELEASE_VERSION" "$release_timestamp" build/release
       - name: Upload verified release artifact
         # actions/upload-artifact v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: verified-${{ needs.build-release.outputs.artifact-name }}
           retention-days: 1
