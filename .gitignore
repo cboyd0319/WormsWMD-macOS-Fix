@@ -31,3 +31,7 @@ __pycache__/
 
 # Backup directories (created by fix script)
 WormsWMD-Backup-*/
+
+# Claude Code local-only files (approved commands can embed secrets)
+**/.claude/*settings.local.json*
+*CLAUDE.local.md*
