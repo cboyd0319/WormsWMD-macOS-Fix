@@ -171,9 +171,9 @@ else
     fi
 fi
 
-if ! grep -Eq '^[[:space:]]+default-days:[[:space:]]+7[[:space:]]*$' \
+if ! grep -Eq '^[[:space:]]+default-days:[[:space:]]+8[[:space:]]*$' \
     "$ROOT_DIR/.github/dependabot.yml"; then
-    fail "Dependabot GitHub Actions updates require a seven-day cooldown"
+    fail "Dependabot GitHub Actions updates require an eight-day cooldown"
 fi
 
 if [[ ! -f "$ROOT_DIR/.github/pull_request_template.md" ]]; then

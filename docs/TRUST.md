@@ -63,7 +63,7 @@ provide independent approval.
 - GitHub Actions validates shell syntax, ShellCheck, harness docs, release
   packaging, and the AGL stub compile.
 - GitHub workflows use job-scoped permissions, bounded execution, disabled
-  checkout credential persistence, immutable Action SHAs, and a seven-day
+  checkout credential persistence, immutable Action SHAs, and an eight-day
   update cooldown.
 - A required Zizmor job and the local GitHub policy regression validate
   workflow changes before they reach release automation.

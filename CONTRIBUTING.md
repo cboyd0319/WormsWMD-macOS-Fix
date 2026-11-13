@@ -142,6 +142,9 @@ not a source failure.
 
 If you change packaging or update tools, run the related scripts.
 
+Dependency versions younger than 7 days are not adopted; exceptions for
+security fixes need the owner's approval.
+
 ## Send a pull request
 
 Ready pull requests targeting `main` automatically request a Balanced Copilot
