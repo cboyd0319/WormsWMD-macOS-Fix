@@ -6,6 +6,8 @@ Notable changes are listed here. This project follows Keep a Changelog and Seman
 
 ### Changed
 
+- Raise the Dependabot GitHub Actions cooldown from 7 to 8 days so only
+  releases more than 7 days old are proposed. Security updates are unaffected.
 - Update the pinned Zizmor action to v0.6.4 and synchronize its security-policy
   check and version comment. The scanner remains explicitly pinned to 1.29.0.
 - Reuse successful macOS PR validation for an identical merge-commit tree on
